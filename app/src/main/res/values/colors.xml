@@ -1,0 +1,61 @@
+<resources>
+    <!-- Default / 黑红主题 -->
+    <color name="palette_blue_primary">#FF3B30</color>
+    <color name="palette_blue_primary_variant">#C12727</color>
+    <color name="palette_blue_accent">#7D3CFF</color>
+    <color name="palette_blue_accent_variant">#5D2DBF</color>
+    <color name="palette_blue_surface">#000000</color>
+    <color name="palette_blue_surface_variant">#141414</color>
+    <color name="palette_blue_card">#0F0F0F</color>
+    <color name="palette_blue_text_primary">#F5F5F5</color>
+    <color name="palette_blue_text_secondary">#B3B3B3</color>
+    <color name="palette_blue_border">#242424</color>
+    <color name="palette_blue_chip">#1C1C1C</color>
+    <color name="palette_blue_on_primary">#FFFFFF</color>
+    <color name="palette_blue_on_secondary">#F5F5F5</color>
+
+    <!-- 主题 2：Pastel (Base #BBD8FF / Primary #FFD4C4 / Accent #2B3A67) -->
+    <color name="palette_pastel_primary">#FFD4C4</color>
+    <color name="palette_pastel_primary_variant">#F5B49F</color>
+    <color name="palette_pastel_accent">#2B3A67</color>
+    <color name="palette_pastel_accent_variant">#1F2B4F</color>
+    <color name="palette_pastel_surface">#BBD8FF</color>
+    <color name="palette_pastel_surface_variant">#D7E6FF</color>
+    <color name="palette_pastel_card">#FFFFFF</color>
+    <color name="palette_pastel_text_primary">#1D2433</color>
+    <color name="palette_pastel_text_secondary">#4C5668</color>
+    <color name="palette_pastel_border">#A5BFE6</color>
+    <color name="palette_pastel_chip">#E6F0FF</color>
+    <color name="palette_pastel_on_primary">#1F1F1F</color>
+    <color name="palette_pastel_on_secondary">#FFFFFF</color>
+
+    <!-- 主题 3：Deep Sea (Base #114468 / Primary #EF6837 / Accent #2DE2E6) -->
+    <color name="palette_deepsea_primary">#EF6837</color>
+    <color name="palette_deepsea_primary_variant">#C84F25</color>
+    <color name="palette_deepsea_accent">#2DE2E6</color>
+    <color name="palette_deepsea_accent_variant">#20B8BC</color>
+    <color name="palette_deepsea_surface">#114468</color>
+    <color name="palette_deepsea_surface_variant">#0E3B5A</color>
+    <color name="palette_deepsea_card">#0B2F47</color>
+    <color name="palette_deepsea_text_primary">#EAF6FF</color>
+    <color name="palette_deepsea_text_secondary">#B5CDE4</color>
+    <color name="palette_deepsea_border">#1D5C82</color>
+    <color name="palette_deepsea_chip">#155277</color>
+    <color name="palette_deepsea_on_primary">#FFFFFF</color>
+    <color name="palette_deepsea_on_secondary">#0A2B33</color>
+
+    <!-- 自定义主题占位，会在运行时被覆盖 -->
+    <color name="palette_custom_primary">#FF3B30</color>
+    <color name="palette_custom_primary_variant">#C12727</color>
+    <color name="palette_custom_accent">#7D3CFF</color>
+    <color name="palette_custom_accent_variant">#5D2DBF</color>
+    <color name="palette_custom_surface">#000000</color>
+    <color name="palette_custom_surface_variant">#141414</color>
+    <color name="palette_custom_card">#0F0F0F</color>
+    <color name="palette_custom_text_primary">#F5F5F5</color>
+    <color name="palette_custom_text_secondary">#B3B3B3</color>
+    <color name="palette_custom_border">#242424</color>
+    <color name="palette_custom_chip">#1C1C1C</color>
+    <color name="palette_custom_on_primary">#FFFFFF</color>
+    <color name="palette_custom_on_secondary">#F5F5F5</color>
+</resources>

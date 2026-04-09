@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/svColorSurface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp">
+
+            <ImageButton
+                android:id="@+id/btnCloseFullscreen"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_action_circle"
+                android:contentDescription="@string/gallery_action_close_folder"
+                android:padding="10dp"
+                android:src="@drawable/ic_action_close"
+                android:tint="?attr/svColorAccent" />
+
+            <TextView
+                android:id="@+id/folderTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceHeadline6"
+                android:textColor="?attr/svColorTextPrimary"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/folderCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textColor="?attr/svColorTextSecondary" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnImportNoDetectionImages"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/gallery_import_no_detection_images"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/folderRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp"
+            android:clipToPadding="false" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/fullscreenEmptyText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/gallery_empty"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextSecondary"
+        android:visibility="gone" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/selectionActionBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="2dp"
+        android:layout_marginBottom="6dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="?attr/svColorCard"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="6dp"
+        app:cardUseCompatPadding="false"
+        app:strokeColor="?attr/svColorBorder"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="10dp">
+
+            <TextView
+                android:id="@+id/selectionCountText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="@string/gallery_selection_count"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textColor="?attr/svColorTextPrimary" />
+
+            <TextView
+                android:id="@+id/btnMoveSelected"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_action_primary_rounded"
+                android:clickable="true"
+                android:contentDescription="@string/gallery_action_move_selected"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/gallery_action_move_short"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textColor="?attr/svColorOnPrimary"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnSelectAllCurrentPage"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_action_primary_rounded"
+                android:clickable="true"
+                android:contentDescription="@string/gallery_action_select_all_current_page"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/gallery_action_select_all_short"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textColor="?attr/svColorOnPrimary"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/btnSaveSelected"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_action_primary_rounded"
+                android:contentDescription="@string/gallery_action_save_selected"
+                android:padding="9dp"
+                android:src="@drawable/ic_action_download"
+                android:tint="?attr/svColorOnPrimary" />
+
+            <ImageButton
+                android:id="@+id/btnDeleteSelected"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_action_primary_rounded"
+                android:contentDescription="@string/gallery_action_delete_selected"
+                android:padding="9dp"
+                android:src="@drawable/ic_action_delete"
+                android:tint="?attr/svColorOnPrimary" />
+
+            <ImageButton
+                android:id="@+id/btnCancelSelection"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_action_primary_rounded"
+                android:contentDescription="@string/gallery_action_cancel_selection"
+                android:padding="9dp"
+                android:src="@drawable/ic_action_close"
+                android:tint="?attr/svColorOnPrimary" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

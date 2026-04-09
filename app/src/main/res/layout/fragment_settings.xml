@@ -1,0 +1,918 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/settingsScrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@drawable/bg_page_gradient"
+    android:clickable="true"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="3dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="?attr/svColorCard"
+            app:strokeColor="?attr/svColorBorder"
+            app:strokeWidth="1dp">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+    <!-- 主题选择 -->
+    <TextView
+        android:id="@+id/themeTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_theme_title"
+        android:textAppearance="?attr/textAppearanceHeadline6"
+        android:textStyle="bold"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/themeSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_theme_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/themeTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/openThemeDialogButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_theme_manage"
+        android:layout_marginBottom="16dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/themeSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 隐私设置部分 -->
+    <TextView
+        android:id="@+id/privacyTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_privacy_title"
+        android:textAppearance="?attr/textAppearanceHeadline6"
+        android:textStyle="bold"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/openThemeDialogButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 遮挡模式选择 -->
+    <TextView
+        android:id="@+id/blurModeLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_blur_mode_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/privacyTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <RadioGroup
+        android:id="@+id/blurModeGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/blurModeLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <RadioButton
+            android:id="@+id/blurModeMosaic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_blur_mode_mosaic"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+        <RadioButton
+            android:id="@+id/blurModeBlack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_blur_mode_black"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+        <RadioButton
+            android:id="@+id/blurModeGaussian"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_blur_mode_gaussian"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+        <RadioButton
+            android:id="@+id/blurModeSobel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_blur_mode_sobel"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+        <RadioButton
+            android:id="@+id/blurModeSticker"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_blur_mode_sticker"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/privacyPresetLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_privacy_preset_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/blurModeGroup"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/privacyPresetSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_privacy_preset_empty"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/privacyPresetLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/privacyPresetRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/privacyPresetSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/switchPresetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_privacy_preset_switch"
+            android:minHeight="44dp"
+            android:backgroundTint="?attr/svColorPrimary"
+            android:textColor="?attr/svColorOnPrimary"
+            app:cornerRadius="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/savePresetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/settings_privacy_preset_save"
+            android:minHeight="44dp"
+            android:backgroundTint="?attr/svColorPrimary"
+            android:textColor="?attr/svColorOnPrimary"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/privacyPresetActionRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/privacyPresetRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sharePresetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_privacy_preset_share"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:textColor="?attr/svColorPrimary"
+            app:strokeColor="?attr/svColorPrimary"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/importPresetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/settings_privacy_preset_import"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:textColor="?attr/svColorPrimary"
+            app:strokeColor="?attr/svColorPrimary"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/deletePresetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/settings_privacy_preset_delete"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:textColor="?attr/svColorPrimary"
+            app:strokeColor="?attr/svColorPrimary"
+            app:strokeWidth="1dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/circularMaskLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_circular_mask_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/privacyPresetActionRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/circularMaskSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_circular_mask_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/circularMaskLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/circularMaskSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_circular_mask_title"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/circularMaskSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/maskOutlineLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_mask_outline_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/circularMaskSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/maskOutlineSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_mask_outline_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/maskOutlineLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/maskOutlineRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/maskOutlineSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Switch
+            android:id="@+id/maskOutlineSwitch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_mask_outline_title"
+            android:textColor="?attr/svColorTextPrimary"
+            android:thumbTint="?attr/svColorPrimary"
+            android:trackTint="@color/switch_track_tint" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/maskOutlineAdjustButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/settings_mask_outline_adjust"
+            android:minHeight="44dp"
+            android:backgroundTint="?attr/svColorPrimary"
+            android:textColor="?attr/svColorOnPrimary"
+            app:cornerRadius="12dp" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/reversePreRenderSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_reverse_pre_render_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/maskOutlineRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/reversePreRenderSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_reverse_pre_render_title"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/reversePreRenderSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/mosaicIntensityLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_mosaic_intensity_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/reversePreRenderSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/mosaicIntensitySummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/mosaicIntensityLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <SeekBar
+        android:id="@+id/mosaicIntensitySeekBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        app:layout_constraintTop_toBottomOf="@id/mosaicIntensitySummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/gaussianIntensityLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_gaussian_intensity_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/mosaicIntensitySeekBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/gaussianIntensitySummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/gaussianIntensityLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <SeekBar
+        android:id="@+id/gaussianIntensitySeekBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        app:layout_constraintTop_toBottomOf="@id/gaussianIntensitySummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/maskScaleLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_mask_scale_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/gaussianIntensitySeekBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/maskScaleSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/maskScaleLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <SeekBar
+        android:id="@+id/maskScaleSeekBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/maskScaleSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/stickerTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_sticker_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/maskScaleSeekBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/stickerSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_sticker_summary_default"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/stickerTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/chooseStickerButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_sticker_pick"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/stickerSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/resetStickerButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_sticker_reset"
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        app:strokeColor="?attr/svColorPrimary"
+        app:strokeWidth="1dp"
+        android:textColor="?attr/svColorPrimary"
+        app:layout_constraintTop_toBottomOf="@id/chooseStickerButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 遮挡标签管理 -->
+    <TextView
+        android:id="@+id/blockedLabelsLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_label_effects_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/resetStickerButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/labelEffectsHint"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_label_effects_hint"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/blockedLabelsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/labelChipGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:chipSpacing="8dp"
+        app:layout_constraintTop_toBottomOf="@id/labelEffectsHint"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:singleLine="false" />
+
+    <TextView
+        android:id="@+id/animeLabelsLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_anime_label_effects_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/labelChipGroup"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/animeLabelEffectsHint"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_anime_label_effects_hint"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/animeLabelsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/animeLabelChipGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:chipSpacing="8dp"
+        app:layout_constraintTop_toBottomOf="@id/animeLabelEffectsHint"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:singleLine="false" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/labelSettingsInlineCard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        app:cardBackgroundColor="?attr/svColorCard"
+        app:cardCornerRadius="22dp"
+        app:cardElevation="6dp"
+        app:strokeColor="?attr/svColorAccent"
+        app:strokeWidth="1dp"
+        app:layout_constraintTop_toBottomOf="@id/animeLabelChipGroup"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/labelSettingsInlineContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- 上传方式设置 -->
+    <TextView
+        android:id="@+id/uploadViaFileSystemLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_upload_via_files_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/labelSettingsInlineCard"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/uploadViaFileSystemSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_upload_via_files_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/uploadViaFileSystemLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/uploadViaFileSystemSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_upload_via_files_title"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/uploadViaFileSystemSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 视频处理速度选项 -->
+    <TextView
+        android:id="@+id/videoSpeedLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_video_speed_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/uploadViaFileSystemSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/videoSpeedButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_video_speed_title"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/videoSpeedLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/videoSpeedSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_video_speed_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/videoSpeedButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 随机浏览设置 -->
+    <TextView
+        android:id="@+id/randomBrowseLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_browse_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/videoSpeedSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/randomBrowseSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_browse_switch"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        app:layout_constraintTop_toBottomOf="@id/randomBrowseLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/randomQueueButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_queue_button"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/randomBrowseSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/randomQueueSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginTop="6dp"
+        app:layout_constraintTop_toBottomOf="@id/randomQueueButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/randomPlaySwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_play_switch"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/randomQueueSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/randomPlayIntervalButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_play_interval_button"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/randomPlaySwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/randomPlaySummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_random_play_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/randomPlayIntervalButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 节拍器设置 -->
+    <TextView
+        android:id="@+id/metronomeLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_metronome_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/randomPlaySummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/metronomeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_metronome_switch"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        app:layout_constraintTop_toBottomOf="@id/metronomeLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/metronomeSpeedButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_metronome_speed_button"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/metronomeSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/metronomeSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_metronome_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/metronomeSpeedButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 调试信息部分 -->
+    <TextView
+        android:id="@+id/settingsTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_debug_info"
+        android:textAppearance="?attr/textAppearanceHeadline6"
+        android:textStyle="bold"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/metronomeSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/debugToggle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_debug_toggle"
+        android:layout_marginBottom="8dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        app:strokeColor="?attr/svColorPrimary"
+        app:strokeWidth="1dp"
+        android:textColor="?attr/svColorPrimary"
+        app:layout_constraintTop_toBottomOf="@id/settingsTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/shareLogsButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_share_logs"
+        android:layout_marginBottom="16dp"
+        android:backgroundTint="?attr/svColorAccent"
+        android:textColor="?attr/svColorOnSecondary"
+        app:layout_constraintTop_toBottomOf="@id/debugToggle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/joinGroupButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_join_group"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="?attr/svColorPrimary"
+        android:textColor="?attr/svColorOnPrimary"
+        app:layout_constraintTop_toBottomOf="@id/shareLogsButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/languageButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_language_button"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="?attr/svColorAccent"
+        android:textColor="?attr/svColorOnSecondary"
+        app:layout_constraintTop_toBottomOf="@id/joinGroupButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/supportButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/support_button"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:textColor="?attr/svColorTextSecondary"
+        app:strokeColor="?attr/svColorBorder"
+        app:strokeWidth="1dp"
+        app:layout_constraintTop_toBottomOf="@id/languageButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>

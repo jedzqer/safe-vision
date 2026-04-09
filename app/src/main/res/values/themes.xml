@@ -1,0 +1,221 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 基础主题定义，颜色通过自定义属性注入 -->
+    <style name="Theme.SafeVision.Base" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">?attr/svColorPrimary</item>
+        <item name="colorPrimaryVariant">?attr/svColorPrimaryVariant</item>
+        <item name="colorSecondary">?attr/svColorAccent</item>
+        <item name="colorSecondaryVariant">?attr/svColorAccentVariant</item>
+        <item name="colorSurface">?attr/svColorCard</item>
+        <item name="android:colorBackground">?attr/svColorSurface</item>
+        <item name="colorOnPrimary">?attr/svColorOnPrimary</item>
+        <item name="colorOnSecondary">?attr/svColorOnSecondary</item>
+        <item name="colorOnSurface">?attr/svColorTextPrimary</item>
+        <item name="colorOnBackground">?attr/svColorTextPrimary</item>
+        <item name="android:statusBarColor">?attr/svColorPrimaryVariant</item>
+        <item name="android:navigationBarColor">?attr/svColorSurface</item>
+        <item name="android:windowBackground">?attr/svColorSurface</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="materialButtonStyle">@style/Widget.SafeVision.Button</item>
+        <item name="materialCardViewStyle">@style/Widget.SafeVision.Card</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.SafeVision.AlertDialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SafeVision.MaterialAlertDialog</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.SafeVision.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.SafeVision.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.SafeVision.Large</item>
+        <item name="tabStyle">@style/Widget.SafeVision.TabLayout</item>
+    </style>
+
+    <!-- 默认黑红主题（作为全局默认） -->
+    <style name="Theme.SafeVision" parent="Theme.SafeVision.Base">
+        <item name="svColorPrimary">@color/palette_blue_primary</item>
+        <item name="svColorPrimaryVariant">@color/palette_blue_primary_variant</item>
+        <item name="svColorAccent">@color/palette_blue_accent</item>
+        <item name="svColorAccentVariant">@color/palette_blue_accent_variant</item>
+        <item name="svColorSurface">@color/palette_blue_surface</item>
+        <item name="svColorSurfaceVariant">@color/palette_blue_surface_variant</item>
+        <item name="svColorCard">@color/palette_blue_card</item>
+        <item name="svColorTextPrimary">@color/palette_blue_text_primary</item>
+        <item name="svColorTextSecondary">@color/palette_blue_text_secondary</item>
+        <item name="svColorBorder">@color/palette_blue_border</item>
+        <item name="svColorChip">@color/palette_blue_chip</item>
+        <item name="svColorOnPrimary">@color/palette_blue_on_primary</item>
+        <item name="svColorOnSecondary">@color/palette_blue_on_secondary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- 黑底红主题 + 电紫强调 -->
+    <style name="Theme.SafeVision.BlackRed" parent="Theme.SafeVision.Base">
+        <item name="svColorPrimary">@color/palette_blue_primary</item>
+        <item name="svColorPrimaryVariant">@color/palette_blue_primary_variant</item>
+        <item name="svColorAccent">@color/palette_blue_accent</item>
+        <item name="svColorAccentVariant">@color/palette_blue_accent_variant</item>
+        <item name="svColorSurface">@color/palette_blue_surface</item>
+        <item name="svColorSurfaceVariant">@color/palette_blue_surface_variant</item>
+        <item name="svColorCard">@color/palette_blue_card</item>
+        <item name="svColorTextPrimary">@color/palette_blue_text_primary</item>
+        <item name="svColorTextSecondary">@color/palette_blue_text_secondary</item>
+        <item name="svColorBorder">@color/palette_blue_border</item>
+        <item name="svColorChip">@color/palette_blue_chip</item>
+        <item name="svColorOnPrimary">@color/palette_blue_on_primary</item>
+        <item name="svColorOnSecondary">@color/palette_blue_on_secondary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- 自定义主题，颜色运行时覆盖 palette_custom_* -->
+    <style name="Theme.SafeVision.Custom" parent="Theme.SafeVision.Base">
+        <item name="svColorPrimary">@color/palette_custom_primary</item>
+        <item name="svColorPrimaryVariant">@color/palette_custom_primary_variant</item>
+        <item name="svColorAccent">@color/palette_custom_accent</item>
+        <item name="svColorAccentVariant">@color/palette_custom_accent_variant</item>
+        <item name="svColorSurface">@color/palette_custom_surface</item>
+        <item name="svColorSurfaceVariant">@color/palette_custom_surface_variant</item>
+        <item name="svColorCard">@color/palette_custom_card</item>
+        <item name="svColorTextPrimary">@color/palette_custom_text_primary</item>
+        <item name="svColorTextSecondary">@color/palette_custom_text_secondary</item>
+        <item name="svColorBorder">@color/palette_custom_border</item>
+        <item name="svColorChip">@color/palette_custom_chip</item>
+        <item name="svColorOnPrimary">@color/palette_custom_on_primary</item>
+        <item name="svColorOnSecondary">@color/palette_custom_on_secondary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Pastel 主题 -->
+    <style name="Theme.SafeVision.Pastel" parent="Theme.SafeVision.Base">
+        <item name="svColorPrimary">@color/palette_pastel_primary</item>
+        <item name="svColorPrimaryVariant">@color/palette_pastel_primary_variant</item>
+        <item name="svColorAccent">@color/palette_pastel_accent</item>
+        <item name="svColorAccentVariant">@color/palette_pastel_accent_variant</item>
+        <item name="svColorSurface">@color/palette_pastel_surface</item>
+        <item name="svColorSurfaceVariant">@color/palette_pastel_surface_variant</item>
+        <item name="svColorCard">@color/palette_pastel_card</item>
+        <item name="svColorTextPrimary">@color/palette_pastel_text_primary</item>
+        <item name="svColorTextSecondary">@color/palette_pastel_text_secondary</item>
+        <item name="svColorBorder">@color/palette_pastel_border</item>
+        <item name="svColorChip">@color/palette_pastel_chip</item>
+        <item name="svColorOnPrimary">@color/palette_pastel_on_primary</item>
+        <item name="svColorOnSecondary">@color/palette_pastel_on_secondary</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- Deep Sea 主题 -->
+    <style name="Theme.SafeVision.DeepSea" parent="Theme.SafeVision.Base">
+        <item name="svColorPrimary">@color/palette_deepsea_primary</item>
+        <item name="svColorPrimaryVariant">@color/palette_deepsea_primary_variant</item>
+        <item name="svColorAccent">@color/palette_deepsea_accent</item>
+        <item name="svColorAccentVariant">@color/palette_deepsea_accent_variant</item>
+        <item name="svColorSurface">@color/palette_deepsea_surface</item>
+        <item name="svColorSurfaceVariant">@color/palette_deepsea_surface_variant</item>
+        <item name="svColorCard">@color/palette_deepsea_card</item>
+        <item name="svColorTextPrimary">@color/palette_deepsea_text_primary</item>
+        <item name="svColorTextSecondary">@color/palette_deepsea_text_secondary</item>
+        <item name="svColorBorder">@color/palette_deepsea_border</item>
+        <item name="svColorChip">@color/palette_deepsea_chip</item>
+        <item name="svColorOnPrimary">@color/palette_deepsea_on_primary</item>
+        <item name="svColorOnSecondary">@color/palette_deepsea_on_secondary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="ShapeAppearance.SafeVision.Small" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
+    </style>
+
+    <style name="ShapeAppearance.SafeVision.Medium" parent="ShapeAppearance.MaterialComponents.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">18dp</item>
+    </style>
+
+    <style name="ShapeAppearance.SafeVision.Large" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">22dp</item>
+    </style>
+
+    <style name="Widget.SafeVision.Button" parent="Widget.MaterialComponents.Button">
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textColor">?attr/svColorOnPrimary</item>
+    </style>
+
+    <style name="Widget.SafeVision.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">4dp</item>
+        <item name="cardUseCompatPadding">true</item>
+        <item name="cardBackgroundColor">?attr/svColorCard</item>
+    </style>
+
+    <style name="Widget.SafeVision.TabLayout" parent="Widget.MaterialComponents.TabLayout">
+        <item name="tabIndicatorColor">?attr/svColorAccent</item>
+        <item name="tabIndicatorFullWidth">false</item>
+        <item name="tabIndicatorHeight">4dp</item>
+        <item name="tabRippleColor">?attr/svColorChip</item>
+        <item name="tabSelectedTextColor">?attr/svColorAccent</item>
+        <item name="tabTextColor">@color/tab_text_color</item>
+    </style>
+
+    <style name="ThemeOverlay.SafeVision.AlertDialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="android:windowMinWidthMajor">92%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
+    </style>
+
+    <style name="ThemeOverlay.SafeVision.MaterialAlertDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="backgroundTint">?attr/svColorCard</item>
+        <item name="android:textColorPrimary">?attr/svColorTextPrimary</item>
+        <item name="android:textColorSecondary">?attr/svColorTextSecondary</item>
+        <item name="android:textColorAlertDialogListItem">?attr/svColorTextPrimary</item>
+        <item name="colorOnSurface">?attr/svColorTextPrimary</item>
+        <item name="colorControlNormal">?attr/svColorTextSecondary</item>
+        <item name="colorControlActivated">?attr/svColorAccent</item>
+        <item name="buttonBarButtonStyle">@style/Widget.SafeVision.Dialog.Button.Flush</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.SafeVision.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.SafeVision.Dialog.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.SafeVision.Dialog.Button.Flush</item>
+        <item name="android:checkedTextViewStyle">@style/Widget.SafeVision.CheckedTextView</item>
+        <item name="checkboxStyle">@style/Widget.SafeVision.CompoundButton.CheckBox</item>
+        <item name="radioButtonStyle">@style/Widget.SafeVision.CompoundButton.RadioButton</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/TextAppearance.SafeVision.Dialog.Body</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.SafeVision.Dialog.Title</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.SafeVision.Large</item>
+    </style>
+
+    <style name="TextAppearance.SafeVision.Dialog.Title" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
+        <item name="android:textColor">?attr/svColorTextPrimary</item>
+    </style>
+
+    <style name="TextAppearance.SafeVision.Dialog.Body" parent="MaterialAlertDialog.MaterialComponents.Body.Text">
+        <item name="android:textColor">?attr/svColorTextSecondary</item>
+    </style>
+
+    <style name="Widget.SafeVision.Dialog.Button" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">?attr/svColorAccent</item>
+        <item name="iconTint">?attr/svColorAccent</item>
+    </style>
+
+    <style name="Widget.SafeVision.Dialog.Button.Flush" parent="Widget.MaterialComponents.Button.TextButton.Dialog.Flush">
+        <item name="android:textColor">?attr/svColorAccent</item>
+        <item name="iconTint">?attr/svColorAccent</item>
+    </style>
+
+    <style name="Widget.SafeVision.CheckedTextView" parent="Widget.MaterialComponents.CheckedTextView">
+        <item name="android:textColor">?attr/svColorTextPrimary</item>
+    </style>
+
+    <style name="Widget.SafeVision.CompoundButton.CheckBox" parent="Widget.MaterialComponents.CompoundButton.CheckBox">
+        <item name="android:textColor">?attr/svColorTextPrimary</item>
+        <item name="buttonTint">?attr/svColorAccent</item>
+    </style>
+
+    <style name="Widget.SafeVision.CompoundButton.RadioButton" parent="Widget.MaterialComponents.CompoundButton.RadioButton">
+        <item name="android:textColor">?attr/svColorTextPrimary</item>
+        <item name="buttonTint">?attr/svColorAccent</item>
+    </style>
+
+</resources>

@@ -1,0 +1,16 @@
+<resources>
+    <!-- 自定义主题颜色属性，用于在多套色板之间切换 -->
+    <attr name="svColorPrimary" format="color" />
+    <attr name="svColorPrimaryVariant" format="color" />
+    <attr name="svColorAccent" format="color" />
+    <attr name="svColorAccentVariant" format="color" />
+    <attr name="svColorSurface" format="color" />
+    <attr name="svColorSurfaceVariant" format="color" />
+    <attr name="svColorCard" format="color" />
+    <attr name="svColorTextPrimary" format="color" />
+    <attr name="svColorTextSecondary" format="color" />
+    <attr name="svColorBorder" format="color" />
+    <attr name="svColorChip" format="color" />
+    <attr name="svColorOnPrimary" format="color" />
+    <attr name="svColorOnSecondary" format="color" />
+</resources>

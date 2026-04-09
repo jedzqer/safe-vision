@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer guard ring -->
+    <path
+        android:fillColor="#0F2E45"
+        android:fillAlpha="0.9"
+        android:pathData="M54,12a42,42 0 1 1 0,84a42,42 0 1 1 0,-84z" />
+    <!-- Inner ring sized by golden ratio (phi ≈ 1.618) -->
+    <path
+        android:fillColor="#102F4F"
+        android:pathData="M54,22.05a31.95,31.95 0 1 1 0,63.9a31.95,31.95 0 1 1 0,-63.9z" />
+    <!-- Eye contour built from smooth arcs -->
+    <path
+        android:strokeColor="#7CD8FF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M18,54 C32,30 76,30 90,54 C76,78 32,78 18,54 Z" />
+    <!-- Iris + pupil with phi-proportioned radii -->
+    <path
+        android:fillColor="#5CC7FF"
+        android:pathData="M54,43a11,11 0 1 1 0,22a11,11 0 1 1 0,-22z" />
+    <path
+        android:fillColor="#F5C24B"
+        android:pathData="M54,48.2a5.8,5.8 0 1 1 0,11.6a5.8,5.8 0 1 1 0,-11.6z" />
+    <!-- Golden spiral made of quarter arcs following phi scaling -->
+    <path
+        android:strokeColor="#F5C24B"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M70,38
+            A26,26 0 0 1 38,70
+            A16,16 0 0 1 50,50
+            A10,10 0 0 1 64,46
+            A6,6 0 0 1 54,52" />
+    <!-- Subtle highlight arc to emphasize curvature -->
+    <path
+        android:strokeColor="#B2ECFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M30,50 C42,38 66,38 78,50" />
+</vector>

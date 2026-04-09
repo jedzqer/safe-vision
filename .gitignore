@@ -1,0 +1,19 @@
+# Gradle caches
+.gradle
+.gradle_local
+.kotlin
+
+# Build outputs
+/build
+/app/build
+*.apk
+*.aab
+
+# IDE files
+.idea
+.vscode
+*.iml
+
+# Local config & secrets
+local.properties
+keystore.jks
