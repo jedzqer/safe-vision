@@ -365,10 +365,14 @@
     <string name="screen_detection_permission_denied">未授予錄屏權限，無法開始畫面偵測</string>
     <string name="screen_detection_settings_title">畫面偵測設定</string>
     <string name="screen_detection_settings_anime_model">使用動漫模型辨識</string>
+    <string name="screen_detection_settings_system_alert_window">關閉無障礙權限，使用一般懸浮窗權限</string>
+    <string name="screen_detection_settings_system_alert_window_summary">供無法啟用無障礙權限的裝置使用。此模式會以一般懸浮窗顯示遮罩，並攔截被遮罩區域的觸控。</string>
     <string name="screen_detection_settings_interval">辨識頻率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒辨識一次</string>
     <string name="screen_detection_accessibility_permission_required">需要開啟無障礙遮罩服務才能顯示畫面遮罩</string>
     <string name="screen_detection_accessibility_permission_denied">未啟用無障礙遮罩服務，已取消畫面偵測</string>
+    <string name="screen_detection_overlay_permission_required">需要授予懸浮窗權限才能顯示畫面遮罩</string>
+    <string name="screen_detection_overlay_permission_denied">未授予懸浮窗權限，已取消畫面偵測</string>
     <string name="screen_detection_notification_permission_denied">未授予通知權限，無法透過通知欄保活畫面偵測</string>
     <string name="screen_detection_status_starting">正在啟動畫面偵測...</string>
     <string name="screen_detection_status_running">畫面偵測執行中</string>
@@ -378,6 +382,7 @@
     <string name="screen_detection_status_start_failed">畫面偵測啟動失敗</string>
     <string name="screen_detection_status_error">畫面偵測異常：%1$s</string>
     <string name="screen_detection_status_accessibility_missing">無障礙遮罩服務未連線，無法顯示畫面遮罩</string>
+    <string name="screen_detection_status_overlay_missing">懸浮窗權限未就緒，無法顯示畫面遮罩</string>
     <string name="screen_detection_accessibility_service_label">Safe Vision 畫面遮罩</string>
     <string name="screen_detection_accessibility_service_desc">為畫面偵測提供可穿透觸控的隱私遮罩層。</string>
     <string name="screen_detection_accessibility_service_summary">啟用後可在畫面辨識時顯示不攔截觸控的遮罩層。</string>

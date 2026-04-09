@@ -72,7 +72,7 @@ class ImageProcessingFragment : Fragment() {
     private var currentBatchVideoIndex: Int = 0
     private var totalBatchVideos: Int = 0
     private var completedBatchVideos: Int = 0
-    private var pendingScreenCaptureAfterAccessibilityPermission = false
+    private var pendingScreenCaptureAfterOverlayPermission = false
     private var pendingScreenDetectionAfterNotificationPermission = false
     
     private lateinit var batchManager: BatchProcessingManager
@@ -148,17 +148,13 @@ class ImageProcessingFragment : Fragment() {
     private val accessibilityPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        if (!pendingScreenCaptureAfterAccessibilityPermission) return@registerForActivityResult
-        pendingScreenCaptureAfterAccessibilityPermission = false
-        if (ScreenAccessibilityOverlayService.isEnabled(requireContext())) {
-            requestScreenCapturePermission()
-        } else {
-            Toast.makeText(
-                requireContext(),
-                getString(R.string.screen_detection_accessibility_permission_denied),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+        handleOverlayPermissionResult()
+    }
+
+    private val systemAlertWindowPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        handleOverlayPermissionResult()
     }
 
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -167,7 +163,7 @@ class ImageProcessingFragment : Fragment() {
         if (!pendingScreenDetectionAfterNotificationPermission) return@registerForActivityResult
         pendingScreenDetectionAfterNotificationPermission = false
         if (granted) {
-            ensureAccessibilityPermissionThenRequestScreenCapture()
+            ensureOverlayPermissionThenRequestScreenCapture()
         } else {
             Toast.makeText(
                 requireContext(),
@@ -338,6 +334,16 @@ class ImageProcessingFragment : Fragment() {
             isChecked = appSettings.isScreenDetectionAnimeModelEnabled()
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextPrimary))
         }
+        val systemAlertWindowSwitch = SwitchCompat(requireContext()).apply {
+            text = getString(R.string.screen_detection_settings_system_alert_window)
+            isChecked = appSettings.isScreenDetectionSystemAlertWindowEnabled()
+            setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextPrimary))
+        }
+        val systemAlertWindowSummary = TextView(requireContext()).apply {
+            text = getString(R.string.screen_detection_settings_system_alert_window_summary)
+            setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
+            textSize = 13f
+        }
         val intervalTitle = TextView(requireContext()).apply {
             text = getString(R.string.screen_detection_settings_interval)
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextPrimary))
@@ -376,6 +382,24 @@ class ImageProcessingFragment : Fragment() {
             )
         )
         contentView.addView(
+            systemAlertWindowSwitch,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (12 * density).toInt()
+            }
+        )
+        contentView.addView(
+            systemAlertWindowSummary,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (4 * density).toInt()
+            }
+        )
+        contentView.addView(
             intervalTitle,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -406,6 +430,7 @@ class ImageProcessingFragment : Fragment() {
             .setView(contentView)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 appSettings.setScreenDetectionAnimeModelEnabled(animeSwitch.isChecked)
+                appSettings.setScreenDetectionSystemAlertWindowEnabled(systemAlertWindowSwitch.isChecked)
                 appSettings.setScreenDetectionIntervalSeconds(currentIntervalSeconds())
                 ensureNotificationPermissionThenStartScreenDetection()
             }
@@ -415,7 +440,7 @@ class ImageProcessingFragment : Fragment() {
 
     private fun ensureNotificationPermissionThenStartScreenDetection() {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
-            ensureAccessibilityPermissionThenRequestScreenCapture()
+            ensureOverlayPermissionThenRequestScreenCapture()
             return
         }
         val context = requireContext()
@@ -424,25 +449,64 @@ class ImageProcessingFragment : Fragment() {
                 Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
         ) {
-            ensureAccessibilityPermissionThenRequestScreenCapture()
+            ensureOverlayPermissionThenRequestScreenCapture()
             return
         }
         pendingScreenDetectionAfterNotificationPermission = true
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    private fun ensureAccessibilityPermissionThenRequestScreenCapture() {
-        if (ScreenAccessibilityOverlayService.isEnabled(requireContext())) {
+    private fun ensureOverlayPermissionThenRequestScreenCapture() {
+        val context = requireContext()
+        val mode = appSettingsManager.getScreenDetectionOverlayMode()
+        if (ScreenOverlayController.isOverlayPermissionGranted(context, mode)) {
             requestScreenCapturePermission()
             return
         }
-        pendingScreenCaptureAfterAccessibilityPermission = true
+        pendingScreenCaptureAfterOverlayPermission = true
+        when (mode) {
+            ScreenOverlayMode.ACCESSIBILITY -> {
+                Toast.makeText(
+                    context,
+                    getString(R.string.screen_detection_accessibility_permission_required),
+                    Toast.LENGTH_SHORT
+                ).show()
+                accessibilityPermissionLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> {
+                Toast.makeText(
+                    context,
+                    getString(R.string.screen_detection_overlay_permission_required),
+                    Toast.LENGTH_SHORT
+                ).show()
+                systemAlertWindowPermissionLauncher.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    )
+                )
+            }
+        }
+    }
+
+    private fun handleOverlayPermissionResult() {
+        if (!pendingScreenCaptureAfterOverlayPermission) return
+        pendingScreenCaptureAfterOverlayPermission = false
+        val context = requireContext()
+        val mode = appSettingsManager.getScreenDetectionOverlayMode()
+        if (ScreenOverlayController.isOverlayPermissionGranted(context, mode)) {
+            requestScreenCapturePermission()
+            return
+        }
+        val deniedMessage = when (mode) {
+            ScreenOverlayMode.ACCESSIBILITY -> R.string.screen_detection_accessibility_permission_denied
+            ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> R.string.screen_detection_overlay_permission_denied
+        }
         Toast.makeText(
-            requireContext(),
-            getString(R.string.screen_detection_accessibility_permission_required),
+            context,
+            getString(deniedMessage),
             Toast.LENGTH_SHORT
         ).show()
-        accessibilityPermissionLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     private fun requestScreenCapturePermission() {

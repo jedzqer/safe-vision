@@ -365,10 +365,14 @@
     <string name="screen_detection_permission_denied">화면 캡처 권한이 거부되어 화면 감지를 시작할 수 없습니다.</string>
     <string name="screen_detection_settings_title">화면 감지 설정</string>
     <string name="screen_detection_settings_anime_model">애니메이션 모델 감지 사용</string>
+    <string name="screen_detection_settings_system_alert_window">접근성을 끄고 일반 오버레이 권한 사용</string>
+    <string name="screen_detection_settings_system_alert_window_summary">접근성 권한을 켤 수 없는 기기용입니다. 이 모드는 일반 오버레이 창으로 마스크를 표시하며 가려진 영역의 터치를 차단합니다.</string>
     <string name="screen_detection_settings_interval">감지 주기</string>
     <string name="screen_detection_settings_interval_value">%1$.2f초마다 감지</string>
     <string name="screen_detection_accessibility_permission_required">화면 마스킹을 표시하려면 접근성 오버레이 서비스가 필요합니다.</string>
     <string name="screen_detection_accessibility_permission_denied">접근성 오버레이 서비스가 활성화되지 않아 화면 감지가 취소되었습니다.</string>
+    <string name="screen_detection_overlay_permission_required">화면 마스킹을 표시하려면 오버레이 권한이 필요합니다.</string>
+    <string name="screen_detection_overlay_permission_denied">오버레이 권한이 부여되지 않아 화면 감지가 취소되었습니다.</string>
     <string name="screen_detection_notification_permission_denied">알림 권한이 없어 알림을 통해 화면 감지를 유지할 수 없습니다.</string>
     <string name="screen_detection_status_starting">화면 감지를 시작하는 중...</string>
     <string name="screen_detection_status_running">화면 감지가 실행 중입니다</string>
@@ -378,6 +382,7 @@
     <string name="screen_detection_status_start_failed">화면 감지 시작에 실패했습니다</string>
     <string name="screen_detection_status_error">화면 감지 오류: %1$s</string>
     <string name="screen_detection_status_accessibility_missing">접근성 오버레이 서비스가 연결되지 않아 화면 마스킹을 표시할 수 없습니다.</string>
+    <string name="screen_detection_status_overlay_missing">오버레이 권한이 준비되지 않아 화면 마스킹을 표시할 수 없습니다.</string>
     <string name="screen_detection_accessibility_service_label">Safe Vision 화면 마스크</string>
     <string name="screen_detection_accessibility_service_desc">화면 감지를 위한 터치 통과형 개인정보 마스크를 제공합니다.</string>
     <string name="screen_detection_accessibility_service_summary">활성화하면 화면 감지 중 터치를 막지 않는 개인정보 마스크를 표시합니다.</string>

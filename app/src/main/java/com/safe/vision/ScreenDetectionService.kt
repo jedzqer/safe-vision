@@ -61,6 +61,7 @@ class ScreenDetectionService : Service() {
     private var overlayRenderer: ScreenPrivacyMaskRenderer? = null
     private var detectionIntervalMs: Long = 500L
     private var overlayMetrics: OverlayMetrics? = null
+    private var overlayMode: ScreenOverlayMode = ScreenOverlayMode.ACCESSIBILITY
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             DebugLogManager.addLog("屏幕检测", "MediaProjection 已停止")
@@ -116,10 +117,6 @@ class ScreenDetectionService : Service() {
 
         detectionJob = serviceScope.launch {
             runCatching {
-                if (!ScreenAccessibilityOverlayService.isConnected()) {
-                    error(getString(R.string.screen_detection_status_accessibility_missing))
-                }
-
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_starting))
                 val projectionManager = getSystemService(MediaProjectionManager::class.java)
                 val projection = projectionManager.getMediaProjection(resultCode, resultData)
@@ -127,7 +124,13 @@ class ScreenDetectionService : Service() {
                 mediaProjection = projection
                 projection.registerCallback(projectionCallback, null)
 
-                val metrics = ScreenAccessibilityOverlayService.resolveOverlayMetrics(applicationContext)
+                val appSettings = AppSettingsManager.getInstance(applicationContext)
+                overlayMode = appSettings.getScreenDetectionOverlayMode()
+                if (!ScreenOverlayController.isOverlayReady(applicationContext, overlayMode)) {
+                    error(overlayUnavailableMessage(overlayMode))
+                }
+
+                val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext)
                 overlayMetrics = metrics
                 imageReader = ImageReader.newInstance(
                     metrics.widthPixels,
@@ -146,7 +149,6 @@ class ScreenDetectionService : Service() {
                     null
                 )
 
-                val appSettings = AppSettingsManager.getInstance(applicationContext)
                 val variant = if (appSettings.isScreenDetectionAnimeModelEnabled()) {
                     DetectionModelVariant.ANIME
                 } else {
@@ -218,18 +220,35 @@ class ScreenDetectionService : Service() {
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
         val metrics = overlayMetrics ?: return
         if (frame == null) {
-            ScreenAccessibilityOverlayService.clearMaskOverlays()
+            ScreenOverlayController.clearMaskOverlays(overlayMode)
             return
         }
 
         if (frame.requiresFullscreenOverlay || frame.regions.isEmpty()) {
-            ScreenAccessibilityOverlayService.showFullscreenOverlay(frame.bitmap, metrics)
-            ScreenAccessibilityOverlayService.clearRegionOverlays()
+            val shown = ScreenOverlayController.showFullscreenOverlay(
+                applicationContext,
+                frame.bitmap,
+                metrics,
+                overlayMode
+            )
+            if (!shown) {
+                frame.bitmap.recycle()
+            }
+            ScreenOverlayController.clearRegionOverlays(overlayMode)
             return
         }
 
-        ScreenAccessibilityOverlayService.clearFullscreenOverlay()
-        ScreenAccessibilityOverlayService.showRegionOverlays(frame.bitmap, frame.regions, metrics)
+        ScreenOverlayController.clearFullscreenOverlay(overlayMode)
+        val shown = ScreenOverlayController.showRegionOverlays(
+            applicationContext,
+            frame.bitmap,
+            frame.regions,
+            metrics,
+            overlayMode
+        )
+        if (!shown) {
+            frame.bitmap.recycle()
+        }
     }
 
     private fun stopDetection(status: String) {
@@ -243,7 +262,7 @@ class ScreenDetectionService : Service() {
     }
 
     private fun releaseResources() {
-        ScreenAccessibilityOverlayService.removeOverlayViews()
+        ScreenOverlayController.removeOverlayViews()
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
@@ -255,6 +274,13 @@ class ScreenDetectionService : Service() {
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "停止 MediaProjection 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         mediaProjection = null
         overlayMetrics = null
+    }
+
+    private fun overlayUnavailableMessage(mode: ScreenOverlayMode): String {
+        return when (mode) {
+            ScreenOverlayMode.ACCESSIBILITY -> getString(R.string.screen_detection_status_accessibility_missing)
+            ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> getString(R.string.screen_detection_status_overlay_missing)
+        }
     }
 
     private fun updateNotification(status: String) {

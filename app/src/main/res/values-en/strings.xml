@@ -49,10 +49,14 @@
     <string name="screen_detection_permission_denied">Screen capture permission was denied. Unable to start screen detection.</string>
     <string name="screen_detection_settings_title">Screen Detection Settings</string>
     <string name="screen_detection_settings_anime_model">Use Anime Model Detection</string>
+    <string name="screen_detection_settings_system_alert_window">Disable Accessibility and use regular overlay permission</string>
+    <string name="screen_detection_settings_system_alert_window_summary">For devices that cannot enable accessibility permission. This mode uses a regular overlay window and blocks touches on masked areas.</string>
     <string name="screen_detection_settings_interval">Detection Frequency</string>
     <string name="screen_detection_settings_interval_value">Detect every %1$.2f seconds</string>
     <string name="screen_detection_accessibility_permission_required">Accessibility overlay service is required to display screen masking.</string>
     <string name="screen_detection_accessibility_permission_denied">Accessibility overlay service was not enabled. Screen detection was cancelled.</string>
+    <string name="screen_detection_overlay_permission_required">Overlay permission is required to display screen masking.</string>
+    <string name="screen_detection_overlay_permission_denied">Overlay permission was not granted. Screen detection was cancelled.</string>
     <string name="screen_detection_notification_permission_denied">Notification permission is required to keep screen detection alive through the notification.</string>
     <string name="screen_detection_status_starting">Starting screen detection...</string>
     <string name="screen_detection_status_running">Screen detection is running</string>
@@ -62,6 +66,7 @@
     <string name="screen_detection_status_start_failed">Failed to start screen detection</string>
     <string name="screen_detection_status_error">Screen detection error: %1$s</string>
     <string name="screen_detection_status_accessibility_missing">Accessibility overlay service is not connected. Unable to display screen masking.</string>
+    <string name="screen_detection_status_overlay_missing">Overlay permission is not ready. Unable to display screen masking.</string>
     <string name="screen_detection_accessibility_service_label">Safe Vision Screen Mask</string>
     <string name="screen_detection_accessibility_service_desc">Provides a touch-through privacy mask for screen detection.</string>
     <string name="screen_detection_accessibility_service_summary">Enable to show a non-blocking privacy mask during screen detection.</string>

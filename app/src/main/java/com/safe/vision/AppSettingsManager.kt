@@ -33,6 +33,7 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_DETECTION_MODEL_VARIANT = "detection_model_variant"
         private const val KEY_SCREEN_DETECTION_ANIME_MODEL = "screen_detection_anime_model"
         private const val KEY_SCREEN_DETECTION_INTERVAL_SECONDS = "screen_detection_interval_seconds"
+        private const val KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW = "screen_detection_use_system_alert_window"
         private const val DEFAULT_SCREEN_DETECTION_INTERVAL_SECONDS = 0.5f
         private const val MIN_SCREEN_DETECTION_INTERVAL_SECONDS = 0.01f
         private const val MAX_SCREEN_DETECTION_INTERVAL_SECONDS = 1.0f
@@ -143,6 +144,24 @@ class AppSettingsManager private constructor(context: Context) {
                 )
             )
             .apply()
+    }
+
+    fun isScreenDetectionSystemAlertWindowEnabled(): Boolean {
+        return sharedPreferences.getBoolean(KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW, false)
+    }
+
+    fun setScreenDetectionSystemAlertWindowEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW, enabled)
+            .apply()
+    }
+
+    fun getScreenDetectionOverlayMode(): ScreenOverlayMode {
+        return if (isScreenDetectionSystemAlertWindowEnabled()) {
+            ScreenOverlayMode.SYSTEM_ALERT_WINDOW
+        } else {
+            ScreenOverlayMode.ACCESSIBILITY
+        }
     }
 
     fun isFileSystemPickerEnabled(): Boolean {

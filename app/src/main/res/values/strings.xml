@@ -49,10 +49,14 @@
     <string name="screen_detection_permission_denied">未授予录屏权限，无法开始屏幕检测</string>
     <string name="screen_detection_settings_title">屏幕检测设置</string>
     <string name="screen_detection_settings_anime_model">使用动漫模型识别</string>
+    <string name="screen_detection_settings_system_alert_window">关闭无障碍权限，使用普通悬浮窗权限</string>
+    <string name="screen_detection_settings_system_alert_window_summary">用于无法启用无障碍权限的设备。此模式会使用普通悬浮窗显示遮挡，并拦截被遮挡区域的触摸。</string>
     <string name="screen_detection_settings_interval">识别频率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒识别一次</string>
     <string name="screen_detection_accessibility_permission_required">需要开启无障碍遮挡服务才能显示屏幕遮挡</string>
     <string name="screen_detection_accessibility_permission_denied">未启用无障碍遮挡服务，已取消屏幕检测</string>
+    <string name="screen_detection_overlay_permission_required">需要授予悬浮窗权限才能显示屏幕遮挡</string>
+    <string name="screen_detection_overlay_permission_denied">未授予悬浮窗权限，已取消屏幕检测</string>
     <string name="screen_detection_notification_permission_denied">未授予通知权限，无法通过通知栏保活屏幕检测</string>
     <string name="screen_detection_status_starting">正在启动屏幕检测...</string>
     <string name="screen_detection_status_running">屏幕检测运行中</string>
@@ -62,6 +66,7 @@
     <string name="screen_detection_status_start_failed">屏幕检测启动失败</string>
     <string name="screen_detection_status_error">屏幕检测异常：%1$s</string>
     <string name="screen_detection_status_accessibility_missing">无障碍遮挡服务未连接，无法显示屏幕遮挡</string>
+    <string name="screen_detection_status_overlay_missing">悬浮窗权限未就绪，无法显示屏幕遮挡</string>
     <string name="screen_detection_accessibility_service_label">Safe Vision 屏幕遮挡</string>
     <string name="screen_detection_accessibility_service_desc">为屏幕检测提供可穿透触摸的隐私遮挡层。</string>
     <string name="screen_detection_accessibility_service_summary">启用后可在屏幕识别时显示不拦截触控的遮挡层。</string>
