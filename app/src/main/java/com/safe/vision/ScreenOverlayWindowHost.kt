@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import kotlin.math.abs
 
 internal class ScreenOverlayWindowHost(
     private val context: Context,
@@ -14,8 +15,14 @@ internal class ScreenOverlayWindowHost(
     private val windowType: Int,
     private val touchThrough: Boolean
 ) {
+    private data class RegionOverlaySlot(
+        val view: ScreenMaskOverlayView,
+        var label: String,
+        var lastRegion: Rect
+    )
+
     private var maskOverlayView: ScreenMaskOverlayView? = null
-    private val maskRegionOverlayViews = mutableListOf<ScreenMaskOverlayView>()
+    private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
 
     fun showFullscreenOverlay(bitmap: Bitmap, metrics: OverlayMetrics) {
         if (maskOverlayView == null) {
@@ -29,41 +36,49 @@ internal class ScreenOverlayWindowHost(
         maskOverlayView?.visibility = View.VISIBLE
     }
 
-    fun showRegionOverlays(bitmap: Bitmap, regions: List<Rect>, metrics: OverlayMetrics) {
+    fun showRegionOverlays(
+        bitmap: Bitmap,
+        regions: List<ScreenPrivacyMaskRenderer.OverlayRegion>,
+        metrics: OverlayMetrics
+    ) {
         val safeRegions = regions.mapNotNull { region ->
-            val safe = BlurEffects.clampRect(region, bitmap.width, bitmap.height)
-            if (safe.width() > 0 && safe.height() > 0) safe else null
-        }
-
-        while (maskRegionOverlayViews.size < safeRegions.size) {
-            val view = createOverlayView().apply {
-                visibility = View.INVISIBLE
+            val safe = BlurEffects.clampRect(region.rect, bitmap.width, bitmap.height)
+            if (safe.width() > 0 && safe.height() > 0) {
+                ScreenPrivacyMaskRenderer.OverlayRegion(region.label, safe)
+            } else {
+                null
             }
-            maskRegionOverlayViews += view
-            windowManager.addView(view, createRegionMaskLayoutParams(Rect(0, 0, 1, 1), metrics))
         }
 
-        while (maskRegionOverlayViews.size > safeRegions.size) {
-            val view = maskRegionOverlayViews.removeLast()
-            runCatching { windowManager.removeView(view) }
-            view.release()
-        }
+        val reusableSlots = maskRegionOverlaySlots.toMutableList()
+        val nextSlots = ArrayList<RegionOverlaySlot>(safeRegions.size)
 
-        safeRegions.forEachIndexed { index, region ->
-            val view = maskRegionOverlayViews[index]
+        safeRegions.forEach { region ->
+            val slot = takeBestSlot(region, reusableSlots, metrics)
+            val view = slot.view
             val cropped = Bitmap.createBitmap(
                 bitmap,
-                region.left,
-                region.top,
-                region.width(),
-                region.height()
+                region.rect.left,
+                region.rect.top,
+                region.rect.width(),
+                region.rect.height()
             )
             view.visibility = View.INVISIBLE
-            windowManager.updateViewLayout(view, createRegionMaskLayoutParams(region, metrics))
+            windowManager.updateViewLayout(view, createRegionMaskLayoutParams(region.rect, metrics))
             view.setContentOffset(0, 0)
             view.setOverlayBitmap(cropped)
             view.visibility = View.VISIBLE
+            slot.label = region.label
+            slot.lastRegion = Rect(region.rect)
+            nextSlots += slot
         }
+
+        reusableSlots.forEach { slot ->
+            runCatching { windowManager.removeView(slot.view) }
+            slot.view.release()
+        }
+        maskRegionOverlaySlots.clear()
+        maskRegionOverlaySlots += nextSlots
         bitmap.recycle()
     }
 
@@ -73,9 +88,9 @@ internal class ScreenOverlayWindowHost(
     }
 
     fun clearRegionOverlays() {
-        maskRegionOverlayViews.forEach { view ->
-            view.release()
-            view.visibility = View.INVISIBLE
+        maskRegionOverlaySlots.forEach { slot ->
+            slot.view.release()
+            slot.view.visibility = View.INVISIBLE
         }
     }
 
@@ -89,12 +104,47 @@ internal class ScreenOverlayWindowHost(
             view.release()
             runCatching { windowManager.removeView(view) }
         }
-        maskRegionOverlayViews.forEach { view ->
-            view.release()
-            runCatching { windowManager.removeView(view) }
+        maskRegionOverlaySlots.forEach { slot ->
+            slot.view.release()
+            runCatching { windowManager.removeView(slot.view) }
         }
         maskOverlayView = null
-        maskRegionOverlayViews.clear()
+        maskRegionOverlaySlots.clear()
+    }
+
+    private fun takeBestSlot(
+        region: ScreenPrivacyMaskRenderer.OverlayRegion,
+        reusableSlots: MutableList<RegionOverlaySlot>,
+        metrics: OverlayMetrics
+    ): RegionOverlaySlot {
+        val sameLabelIndex = reusableSlots
+            .withIndex()
+            .filter { it.value.label == region.label }
+            .minByOrNull { movementDistanceSquared(it.value.lastRegion, region.rect) }
+            ?.index
+
+        val slotIndex = sameLabelIndex ?: reusableSlots
+            .withIndex()
+            .minByOrNull { movementDistanceSquared(it.value.lastRegion, region.rect) }
+            ?.index
+
+        if (slotIndex != null) {
+            return reusableSlots.removeAt(slotIndex)
+        }
+
+        val view = createOverlayView().apply {
+            visibility = View.INVISIBLE
+        }
+        windowManager.addView(view, createRegionMaskLayoutParams(Rect(0, 0, 1, 1), metrics))
+        return RegionOverlaySlot(view, region.label, Rect(region.rect))
+    }
+
+    private fun movementDistanceSquared(previous: Rect, current: Rect): Long {
+        val dx = previous.centerX().toLong() - current.centerX().toLong()
+        val dy = previous.centerY().toLong() - current.centerY().toLong()
+        val dw = previous.width().toLong() - current.width().toLong()
+        val dh = previous.height().toLong() - current.height().toLong()
+        return dx * dx + dy * dy + abs(dw) * abs(dw) / 4L + abs(dh) * abs(dh) / 4L
     }
 
     private fun createOverlayView(): ScreenMaskOverlayView {

@@ -15,9 +15,14 @@ import kotlin.math.atan2
 import kotlin.math.roundToInt
 
 class ScreenPrivacyMaskRenderer(context: Context) {
+    data class OverlayRegion(
+        val label: String,
+        val rect: Rect
+    )
+
     data class OverlayFrame(
         val bitmap: Bitmap,
-        val regions: List<Rect>,
+        val regions: List<OverlayRegion>,
         val requiresFullscreenOverlay: Boolean
     )
 
@@ -209,9 +214,18 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             return null
         }
 
-        val regionRects = normalTasks.map { task ->
-            BlurEffects.clampRect(task.drawRect, sourceBitmap.width, sourceBitmap.height)
-        }.filter { it.width() > 0 && it.height() > 0 }
+        val regionRects = normalTasks.mapNotNull { task ->
+            val rect = BlurEffects.clampRect(task.drawRect, sourceBitmap.width, sourceBitmap.height)
+            if (rect.width() > 0 && rect.height() > 0) {
+                OverlayRegion(task.className, rect)
+            } else {
+                null
+            }
+        }.sortedWith(
+            compareBy<OverlayRegion> { it.label }
+                .thenBy { it.rect.centerX() }
+                .thenBy { it.rect.centerY() }
+        )
 
         fun applyEffect(
             targetCanvas: Canvas,

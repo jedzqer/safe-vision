@@ -3,7 +3,6 @@ package com.safe.vision
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
 import android.os.Build
 import android.provider.Settings
 import android.util.DisplayMetrics
@@ -82,7 +81,7 @@ object ScreenOverlayController {
     fun showRegionOverlays(
         context: Context,
         bitmap: Bitmap,
-        regions: List<Rect>,
+        regions: List<ScreenPrivacyMaskRenderer.OverlayRegion>,
         metrics: OverlayMetrics,
         mode: ScreenOverlayMode
     ): Boolean {
