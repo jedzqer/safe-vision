@@ -232,6 +232,9 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 PrivacySettingsManager.BLUR_MODE_STICKER -> {
                     val sticker = StickerLoader.loadSticker(appContext, privacySettings, className)
                     if (sticker != null) {
+                        // Pre-composite the current screen content with the sticker so
+                        // semi-transparent PNGs don't rely on system overlay blending.
+                        targetCanvas.drawBitmap(sourceBitmap, rect, rect, null)
                         BlurEffects.drawSticker(
                             targetCanvas,
                             sticker,
@@ -324,6 +327,9 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 PrivacySettingsManager.BLUR_MODE_STICKER -> {
                     val sticker = StickerLoader.loadSticker(appContext, privacySettings)
                     if (sticker != null) {
+                        // Render the sampled screen frame first, then blend the sticker
+                        // inside our bitmap to keep alpha behavior consistent in overlay mode.
+                        canvas.drawBitmap(sourceBitmap, 0f, 0f, null)
                         BlurEffects.drawSticker(canvas, sticker, fullRect, sourceBitmap.width, sourceBitmap.height)
                     } else {
                         BlurEffects.drawMosaic(canvas, sourceBitmap, fullRect, privacySettings.getMosaicBlockSize())
