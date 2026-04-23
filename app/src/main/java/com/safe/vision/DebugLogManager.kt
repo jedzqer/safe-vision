@@ -11,6 +11,7 @@ import java.io.FileWriter
 import java.lang.ref.WeakReference
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
@@ -70,9 +71,9 @@ object DebugLogManager {
         val logLine = "[$timestamp] $tag: $message"
 
         synchronized(logsLock) {
-            logs.addLast(logLine)
+            logs.offerLast(logLine)
             while (logs.size > MAX_IN_MEMORY_LOGS) {
-                logs.removeFirst()
+                logs.pollFirst()
             }
         }
 

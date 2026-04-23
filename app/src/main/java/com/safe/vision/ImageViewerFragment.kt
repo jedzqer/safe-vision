@@ -669,7 +669,7 @@ class ImageViewerFragment : Fragment() {
         if (appSettings.isRandomBrowseEnabled()) {
             if (allMedia.size <= 1) return
             rebuildRandomCandidatesIfNeeded()
-            browseHistory.addLast(currentIndex)
+            browseHistory.offerLast(currentIndex)
             val candidates = randomCandidateIndices.filter { index ->
                 index != currentIndex && index in allMedia.indices
             }
@@ -688,8 +688,8 @@ class ImageViewerFragment : Fragment() {
         if (isEditMode) return
         if (allMedia.isEmpty()) return
         if (appSettings.isRandomBrowseEnabled()) {
-            if (browseHistory.isEmpty()) return
-            showMedia(browseHistory.removeLast())
+            val previousIndex = browseHistory.pollLast() ?: return
+            showMedia(previousIndex)
             return
         }
         showMedia(currentIndex - 1)
