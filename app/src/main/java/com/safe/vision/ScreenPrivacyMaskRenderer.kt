@@ -41,13 +41,6 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         detections: List<YoloOnnxRunner.Detection>,
         labelProfile: DetectionConfig.LabelProfile
     ): OverlayFrame? {
-        val outputBitmap = Bitmap.createBitmap(
-            sourceBitmap.width,
-            sourceBitmap.height,
-            Bitmap.Config.ARGB_8888
-        )
-        val canvas = Canvas(outputBitmap)
-
         val defaultBlurMode = privacySettings.getBlurMode(labelProfile)
         val labelOverrides = privacySettings.getLabelEffectOverrides(labelProfile)
         val reverseLabels = privacySettings.getReverseLabels(labelProfile).toSet()
@@ -209,7 +202,6 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
 
         if (normalTasks.isEmpty() && reverseRegions.isEmpty()) {
-            outputBitmap.recycle()
             return null
         }
 
@@ -225,6 +217,13 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 .thenBy { it.rect.centerX() }
                 .thenBy { it.rect.centerY() }
         )
+
+        val outputBitmap = Bitmap.createBitmap(
+            sourceBitmap.width,
+            sourceBitmap.height,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(outputBitmap)
 
         fun applyEffect(
             targetCanvas: Canvas,
