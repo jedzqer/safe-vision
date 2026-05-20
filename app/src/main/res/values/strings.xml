@@ -175,6 +175,9 @@
     <string name="viewer_edit_no_image">仅图片支持编辑</string>
     <string name="viewer_edit_tip_finish_first">请先完成当前编辑</string>
     <string name="viewer_edit_action_resize">缩放</string>
+    <string name="viewer_edit_action_edit_eye_bar">编辑眼遮挡</string>
+    <string name="viewer_edit_action_rotate_eye_bar">旋转眼遮挡</string>
+    <string name="viewer_edit_rotate_eye_bar_title">调整眼遮挡旋转角度</string>
     <string name="viewer_edit_action_delete">删除</string>
     <string name="viewer_delete_title">删除媒体</string>
     <string name="viewer_delete_message">确定要删除 %1$s 吗？</string>

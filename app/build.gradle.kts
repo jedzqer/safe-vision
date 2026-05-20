@@ -11,8 +11,8 @@ android {
         applicationId = "com.safe.vision"
         minSdk = 24
         targetSdk = 36
-        versionCode = 46
-        versionName = "1.20.2"
+        versionCode = 47
+        versionName = "1.20.3"
     }
 
     signingConfigs {

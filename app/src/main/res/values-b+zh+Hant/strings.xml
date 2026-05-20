@@ -142,6 +142,9 @@
     <string name="viewer_edit_no_image">僅圖片支援編輯</string>
     <string name="viewer_edit_tip_finish_first">請先完成目前編輯</string>
     <string name="viewer_edit_action_resize">縮放</string>
+    <string name="viewer_edit_action_edit_eye_bar">編輯眼部遮擋</string>
+    <string name="viewer_edit_action_rotate_eye_bar">旋轉眼部遮擋</string>
+    <string name="viewer_edit_rotate_eye_bar_title">調整眼部遮擋旋轉角度</string>
     <string name="viewer_edit_action_delete">刪除</string>
     <string name="viewer_delete_title">刪除媒體</string>
     <string name="viewer_delete_message">確定要刪除 %1$s 嗎？</string>

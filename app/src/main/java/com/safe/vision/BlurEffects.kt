@@ -161,6 +161,29 @@ object BlurEffects {
             ?: cropToEyeStrip(faceRect, surfaceWidth, surfaceHeight)
     }
 
+    fun rotatedRectPath(rect: RectF, rotationDegrees: Float): Path {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val angle = Math.toRadians(rotationDegrees.toDouble()).toFloat()
+        val ux = cos(angle)
+        val uy = sin(angle)
+        val nx = -uy
+        val ny = ux
+        val halfW = rect.width() / 2f
+        val halfH = rect.height() / 2f
+        val p1 = PointF(cx - ux * halfW + nx * halfH, cy - uy * halfW + ny * halfH)
+        val p2 = PointF(cx + ux * halfW + nx * halfH, cy + uy * halfW + ny * halfH)
+        val p3 = PointF(cx + ux * halfW - nx * halfH, cy + uy * halfW - ny * halfH)
+        val p4 = PointF(cx - ux * halfW - nx * halfH, cy - uy * halfW - ny * halfH)
+        return Path().apply {
+            moveTo(p1.x, p1.y)
+            lineTo(p2.x, p2.y)
+            lineTo(p3.x, p3.y)
+            lineTo(p4.x, p4.y)
+            close()
+        }
+    }
+
     fun circumscribedCircleBounds(rect: Rect, surfaceWidth: Int, surfaceHeight: Int): Rect {
         val safeRect = clampRect(rect, surfaceWidth, surfaceHeight)
         if (safeRect.width() <= 0 || safeRect.height() <= 0) return safeRect

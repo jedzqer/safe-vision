@@ -142,6 +142,9 @@
     <string name="viewer_edit_no_image">편집은 이미지만 지원합니다</string>
     <string name="viewer_edit_tip_finish_first">현재 편집을 먼저 완료해 주세요</string>
     <string name="viewer_edit_action_resize">크기 조절</string>
+    <string name="viewer_edit_action_edit_eye_bar">눈 가리개 편집</string>
+    <string name="viewer_edit_action_rotate_eye_bar">눈 가리개 회전</string>
+    <string name="viewer_edit_rotate_eye_bar_title">눈 가리개 회전 각도 조절</string>
     <string name="viewer_edit_action_delete">삭제</string>
     <string name="viewer_delete_title">미디어 삭제</string>
     <string name="viewer_delete_message">%1$s을(를) 삭제하시겠습니까?</string>

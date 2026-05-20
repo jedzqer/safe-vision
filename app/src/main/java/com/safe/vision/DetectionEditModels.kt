@@ -12,7 +12,9 @@ data class EditableDetection(
     val label: String,
     val rect: RectF,
     val score: Float? = null,
-    val eyes: Pair<PointF, PointF>? = null
+    val eyes: Pair<PointF, PointF>? = null,
+    val eyeBar: RectF? = null,
+    val eyeBarRotationDegrees: Float? = null
 )
 
 object DetectionMetadataIo {
@@ -33,13 +35,21 @@ object DetectionMetadataIo {
             val h = box.optDouble(3, 0.0).toFloat()
             if (w <= 0f || h <= 0f) continue
             val eyes = parseEyes(obj.optJSONArray("eyes"))
+            val eyeBar = parseRect(obj.optJSONArray("eye_bar"))
+            val eyeBarRotationDegrees = if (obj.has("eye_bar_rotation")) {
+                obj.optDouble("eye_bar_rotation", 0.0).toFloat()
+            } else {
+                null
+            }
             val score = if (obj.has("score")) obj.optDouble("score", 1.0).toFloat() else null
             list.add(
                 EditableDetection(
                     label = label,
                     rect = RectF(x, y, x + w, y + h),
                     score = score,
-                    eyes = eyes
+                    eyes = eyes,
+                    eyeBar = eyeBar,
+                    eyeBarRotationDegrees = eyeBarRotationDegrees
                 )
             )
         }
@@ -77,6 +87,22 @@ object DetectionMetadataIo {
                         }
                     )
                 }
+                item.eyeBar?.let { eyeBar ->
+                    val clampedEyeBarW = eyeBar.width().coerceAtLeast(1f)
+                    val clampedEyeBarH = eyeBar.height().coerceAtLeast(1f)
+                    put(
+                        "eye_bar",
+                        JSONArray().apply {
+                            put(eyeBar.left.toInt())
+                            put(eyeBar.top.toInt())
+                            put(clampedEyeBarW.toInt())
+                            put(clampedEyeBarH.toInt())
+                        }
+                    )
+                    item.eyeBarRotationDegrees?.let { rotation ->
+                        put("eye_bar_rotation", rotation.toDouble())
+                    }
+                }
             }
             arr.put(obj)
         }
@@ -96,5 +122,15 @@ object DetectionMetadataIo {
             right.optDouble(0, 0.0).toFloat(),
             right.optDouble(1, 0.0).toFloat()
         )
+    }
+
+    private fun parseRect(array: JSONArray?): RectF? {
+        if (array == null || array.length() < 4) return null
+        val x = array.optDouble(0, 0.0).toFloat()
+        val y = array.optDouble(1, 0.0).toFloat()
+        val w = array.optDouble(2, 0.0).toFloat()
+        val h = array.optDouble(3, 0.0).toFloat()
+        if (w <= 0f || h <= 0f) return null
+        return RectF(x, y, x + w, y + h)
     }
 }

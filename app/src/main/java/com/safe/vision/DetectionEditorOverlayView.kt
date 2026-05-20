@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -21,6 +22,7 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
 
     var onBoxLongPress: ((String) -> Unit)? = null
     var onDataChanged: (() -> Unit)? = null
+    var eyeModeResolver: ((EditableDetection) -> Boolean)? = null
 
     private var items: MutableList<EditableDetection> = mutableListOf()
     private var imageMatrix: Matrix = Matrix()
@@ -57,6 +59,7 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
 
     private var activeId: String? = null
     private var resizeTargetId: String? = null
+    private var eyeBarEditTargetId: String? = null
     private var downX = 0f
     private var downY = 0f
     private var lastImageX = 0f
@@ -98,7 +101,29 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
 
     fun enableResizeMode(id: String) {
         resizeTargetId = id
+        eyeBarEditTargetId = null
         activeId = id
+        invalidate()
+    }
+
+    fun enableEyeBarEditMode(id: String) {
+        eyeBarEditTargetId = id
+        resizeTargetId = null
+        activeId = id
+        invalidate()
+    }
+
+    fun updateEyeBarRotation(id: String, rotationDegrees: Float) {
+        val idx = items.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val item = items[idx]
+        if (!isEyeMode(item)) return
+        val baseEyeBar = item.eyeBar ?: defaultEyeBarFor(item)
+        items[idx] = item.copy(
+            eyeBar = clampRect(baseEyeBar),
+            eyeBarRotationDegrees = rotationDegrees
+        )
+        onDataChanged?.invoke()
         invalidate()
     }
 
@@ -111,6 +136,10 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
             drawLabel(canvas, item.label, viewRect)
             if (item.id == resizeTargetId) {
                 drawHandles(canvas, viewRect)
+            }
+            if (item.id == eyeBarEditTargetId && isEyeMode(item)) {
+                val eyeBar = item.eyeBar ?: defaultEyeBarFor(item)
+                drawEyeBar(canvas, item, eyeBar)
             }
         }
     }
@@ -143,15 +172,23 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
                 val idx = items.indexOfFirst { it.id == id }
                 if (idx < 0) return true
                 val current = items[idx]
-                val updatedRect = if (activeHandle == ResizeHandle.NONE) {
+                if (id == eyeBarEditTargetId && isEyeMode(current)) {
+                    val baseEyeBar = current.eyeBar ?: defaultEyeBarFor(current)
                     val dx = imagePoint.x - lastImageX
                     val dy = imagePoint.y - lastImageY
-                    RectF(current.rect).apply { offset(dx, dy) }
+                    val movedEyeBar = clampRect(RectF(baseEyeBar).apply { offset(dx, dy) })
+                    items[idx] = current.copy(eyeBar = movedEyeBar)
                 } else {
-                    resizeRect(current.rect, imagePoint.x, imagePoint.y, activeHandle)
+                    val updatedRect = if (activeHandle == ResizeHandle.NONE) {
+                        val dx = imagePoint.x - lastImageX
+                        val dy = imagePoint.y - lastImageY
+                        RectF(current.rect).apply { offset(dx, dy) }
+                    } else {
+                        resizeRect(current.rect, imagePoint.x, imagePoint.y, activeHandle)
+                    }
+                    val clamped = clampRect(updatedRect)
+                    items[idx] = current.copy(rect = clamped)
                 }
-                val clamped = clampRect(updatedRect)
-                items[idx] = current.copy(rect = clamped)
                 lastImageX = imagePoint.x
                 lastImageY = imagePoint.y
                 onDataChanged?.invoke()
@@ -182,6 +219,15 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         canvas.drawCircle(rect.right, rect.top, handleRadius, handlePaint)
         canvas.drawCircle(rect.left, rect.bottom, handleRadius, handlePaint)
         canvas.drawCircle(rect.right, rect.bottom, handleRadius, handlePaint)
+    }
+
+    private fun drawEyeBar(canvas: Canvas, item: EditableDetection, eyeBar: RectF) {
+        val rotation = item.eyeBarRotationDegrees ?: 0f
+        val viewRect = mapRectToView(eyeBar)
+        val mappedRotation = rotation + imageMatrixRotationDegrees()
+        val path = rotatedRectPath(viewRect, mappedRotation)
+        canvas.drawPath(path, fillPaint)
+        canvas.drawPath(path, borderPaint)
     }
 
     private fun mapRectToView(src: RectF): RectF {
@@ -251,6 +297,54 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         if (left + w > imageBounds.right) left = imageBounds.right - w
         if (top + h > imageBounds.bottom) top = imageBounds.bottom - h
         return RectF(left, top, left + w, top + h)
+    }
+
+    private fun isEyeMode(item: EditableDetection): Boolean {
+        return eyeModeResolver?.invoke(item) == true
+    }
+
+    private fun defaultEyeBarFor(item: EditableDetection): RectF {
+        val faceRect = item.rect
+        item.eyes?.let { (left, right) ->
+            val strip = BlurEffects.eyeBarFromEyes(
+                android.graphics.Rect(
+                    faceRect.left.toInt(),
+                    faceRect.top.toInt(),
+                    faceRect.right.toInt(),
+                    faceRect.bottom.toInt()
+                ),
+                left,
+                right,
+                imageBounds.right.toInt(),
+                imageBounds.bottom.toInt()
+            )
+            return RectF(strip)
+        }
+        val fallback = BlurEffects.cropToEyeStrip(
+            android.graphics.Rect(
+                faceRect.left.toInt(),
+                faceRect.top.toInt(),
+                faceRect.right.toInt(),
+                faceRect.bottom.toInt()
+            ),
+            imageBounds.right.toInt(),
+            imageBounds.bottom.toInt()
+        )
+        return RectF(fallback)
+    }
+
+    private fun rotatedRectPath(rect: RectF, rotationDegrees: Float): Path {
+        return BlurEffects.rotatedRectPath(rect, rotationDegrees)
+    }
+
+    private fun imageMatrixRotationDegrees(): Float {
+        val values = FloatArray(9)
+        imageMatrix.getValues(values)
+        val radians = kotlin.math.atan2(
+            values[Matrix.MSKEW_X],
+            values[Matrix.MSCALE_X]
+        )
+        return Math.toDegrees(radians.toDouble()).toFloat()
     }
 
     private fun scheduleLongPress() {

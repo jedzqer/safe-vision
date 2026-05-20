@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import kotlin.math.atan2
 
 class DetectionRenderEngine(
@@ -15,7 +16,9 @@ class DetectionRenderEngine(
         val className: String,
         val rect: Rect,
         val leftEye: PointF? = null,
-        val rightEye: PointF? = null
+        val rightEye: PointF? = null,
+        val eyeBarRect: RectF? = null,
+        val eyeBarRotationDegrees: Float? = null
     )
 
     data class RenderSettings(
@@ -293,6 +296,29 @@ class DetectionRenderEngine(
         width: Int,
         height: Int
     ): EyeTarget {
+        val manualEyeBar = detection.eyeBarRect?.let {
+            BlurEffects.clampRect(
+                Rect(
+                    it.left.toInt(),
+                    it.top.toInt(),
+                    it.right.toInt(),
+                    it.bottom.toInt()
+                ),
+                width,
+                height
+            )
+        }
+        if (manualEyeBar != null && manualEyeBar.width() > 0 && manualEyeBar.height() > 0) {
+            return EyeTarget(
+                rect = manualEyeBar,
+                path = BlurEffects.rotatedRectPath(
+                    RectF(manualEyeBar),
+                    detection.eyeBarRotationDegrees ?: 0f
+                ),
+                rotationDegrees = detection.eyeBarRotationDegrees ?: 0f
+            )
+        }
+
         if (detection.leftEye != null && detection.rightEye != null) {
             val strip = BlurEffects.eyeStripFromEyes(faceRect, detection.leftEye, detection.rightEye, width, height)
             if (strip != null && strip.bounds.width() > 0 && strip.bounds.height() > 0) {

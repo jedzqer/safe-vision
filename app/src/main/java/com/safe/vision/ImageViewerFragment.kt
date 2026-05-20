@@ -164,6 +164,7 @@ class ImageViewerFragment : Fragment() {
         btnDoneEdit.setOnClickListener { saveAndExitEditMode() }
         detectionEditorOverlay.onBoxLongPress = { id -> showEditBoxActions(id) }
         detectionEditorOverlay.onDataChanged = { Unit }
+        detectionEditorOverlay.eyeModeResolver = { detection -> isEyeModeEnabledForLabel(detection.label) }
         videoSeekSlider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             updateVideoProgressTexts(value.roundToInt(), currentVideoDurationMs())
@@ -1375,20 +1376,63 @@ class ImageViewerFragment : Fragment() {
 
     private fun showEditBoxActions(id: String) {
         if (!isEditMode) return
+        val item = editableDetections.firstOrNull { it.id == id }
+        val eyeModeEnabled = item?.let { isEyeModeEnabledForLabel(it.label) } == true
+        val actions = buildList {
+            add(getString(R.string.viewer_edit_action_resize))
+            if (eyeModeEnabled) {
+                add(getString(R.string.viewer_edit_action_edit_eye_bar))
+                add(getString(R.string.viewer_edit_action_rotate_eye_bar))
+            }
+            add(getString(R.string.viewer_edit_action_delete))
+        }.toTypedArray()
         MaterialAlertDialogBuilder(requireContext())
-            .setItems(
-                arrayOf(
-                    getString(R.string.viewer_edit_action_resize),
-                    getString(R.string.viewer_edit_action_delete)
-                )
-            ) { _, which ->
-                if (which == 0) {
-                    detectionEditorOverlay.enableResizeMode(id)
-                } else {
-                    detectionEditorOverlay.removeById(id)
+            .setItems(actions) { _, which ->
+                when (actions[which]) {
+                    getString(R.string.viewer_edit_action_resize) -> {
+                        detectionEditorOverlay.enableResizeMode(id)
+                    }
+                    getString(R.string.viewer_edit_action_edit_eye_bar) -> {
+                        detectionEditorOverlay.enableEyeBarEditMode(id)
+                    }
+                    getString(R.string.viewer_edit_action_rotate_eye_bar) -> {
+                        showEyeBarRotationDialog(id)
+                    }
+                    else -> {
+                        detectionEditorOverlay.removeById(id)
+                    }
                 }
             }
             .show()
+    }
+
+    private fun showEyeBarRotationDialog(id: String) {
+        val item = editableDetections.firstOrNull { it.id == id } ?: return
+        if (!isEyeModeEnabledForLabel(item.label)) return
+        val slider = Slider(requireContext()).apply {
+            valueFrom = -180f
+            valueTo = 180f
+            stepSize = 1f
+            value = item.eyeBarRotationDegrees ?: 0f
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.viewer_edit_rotate_eye_bar_title)
+            .setView(slider)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                detectionEditorOverlay.updateEyeBarRotation(id, slider.value)
+            }
+            .show()
+    }
+
+    private fun isEyeModeEnabledForLabel(label: String): Boolean {
+        val effectiveBlurMode = privacyProcessor
+            .let { PrivacySettingsManager.getInstance(requireContext()) }
+            .getEffectiveBlurMode(label)
+        return DetectionConfig.FACE_LABELS.contains(label) && (
+            PrivacySettingsManager.getInstance(requireContext()).isLabelEyeMode(label) ||
+                effectiveBlurMode == PrivacySettingsManager.BLUR_MODE_EYES
+            )
     }
 
     private fun saveAndExitEditMode() {

@@ -175,6 +175,9 @@
     <string name="viewer_edit_no_image">Editing is only supported for images</string>
     <string name="viewer_edit_tip_finish_first">Please finish the current edit first</string>
     <string name="viewer_edit_action_resize">Resize</string>
+    <string name="viewer_edit_action_edit_eye_bar">Edit Eye Bar</string>
+    <string name="viewer_edit_action_rotate_eye_bar">Rotate Eye Bar</string>
+    <string name="viewer_edit_rotate_eye_bar_title">Adjust Eye Bar Rotation</string>
     <string name="viewer_edit_action_delete">Delete</string>
     <string name="viewer_delete_title">Delete Media</string>
     <string name="viewer_delete_message">Delete %1$s?</string>

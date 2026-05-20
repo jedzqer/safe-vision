@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import java.io.File
 
 /**
@@ -70,12 +71,30 @@ class ImagePrivacyProcessor {
                                 it.optDouble(1, rect.exactCenterY().toDouble()).toFloat()
                             )
                         }
+                        val eyeBar = detection.optJSONArray("eye_bar")?.takeIf { it.length() >= 4 }?.let {
+                            val x = it.optDouble(0, rect.left.toDouble()).toFloat()
+                            val y = it.optDouble(1, rect.top.toDouble()).toFloat()
+                            val width = it.optDouble(2, rect.width().toDouble()).toFloat()
+                            val height = it.optDouble(3, rect.height().toDouble()).toFloat()
+                            if (width > 0f && height > 0f) {
+                                RectF(x, y, x + width, y + height)
+                            } else {
+                                null
+                            }
+                        }
+                        val eyeBarRotationDegrees = if (detection.has("eye_bar_rotation")) {
+                            detection.optDouble("eye_bar_rotation", 0.0).toFloat()
+                        } else {
+                            null
+                        }
                         renderItems.add(
                             DetectionRenderEngine.DetectionRenderItem(
                                 className = className,
                                 rect = rect,
                                 leftEye = leftEye,
-                                rightEye = rightEye
+                                rightEye = rightEye,
+                                eyeBarRect = eyeBar,
+                                eyeBarRotationDegrees = eyeBarRotationDegrees
                             )
                         )
                     }
