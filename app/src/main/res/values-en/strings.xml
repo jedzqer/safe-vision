@@ -175,9 +175,9 @@
     <string name="viewer_edit_no_image">Editing is only supported for images</string>
     <string name="viewer_edit_tip_finish_first">Please finish the current edit first</string>
     <string name="viewer_edit_action_resize">Resize</string>
+    <string name="viewer_edit_action_rotate">Rotate</string>
     <string name="viewer_edit_action_edit_eye_bar">Edit Eye Bar</string>
-    <string name="viewer_edit_action_rotate_eye_bar">Rotate Eye Bar</string>
-    <string name="viewer_edit_rotate_eye_bar_title">Adjust Eye Bar Rotation</string>
+    <string name="viewer_edit_rotate_title">Adjust Label Rotation</string>
     <string name="viewer_edit_action_delete">Delete</string>
     <string name="viewer_delete_title">Delete Media</string>
     <string name="viewer_delete_message">Delete %1$s?</string>
@@ -288,7 +288,8 @@
     <string name="settings_label_scale_follow_global">Follow global scale (%1$.1fx)</string>
     <string name="settings_label_scale_effective_summary">Currently effective: %1$.1fx</string>
     <string name="settings_label_eye_mode">Eye Mode</string>
-    <string name="settings_label_chip_eye_suffix">(Eye Mode)</string>
+    <string name="settings_eye_mode_labels_title">Eye Mode Labels</string>
+    <string name="settings_eye_mode_labels_hint">Choose which face labels use eye mode separately</string>
     <string name="settings_label_effect_default">Use global default (%1$s)</string>
     <string name="settings_label_chip_default">%1$s (default: %2$s)</string>
     <string name="settings_label_chip_custom">%1$s (%2$s)</string>

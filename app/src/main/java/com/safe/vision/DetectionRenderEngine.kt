@@ -15,6 +15,7 @@ class DetectionRenderEngine(
     data class DetectionRenderItem(
         val className: String,
         val rect: Rect,
+        val boxRotationDegrees: Float? = null,
         val leftEye: PointF? = null,
         val rightEye: PointF? = null,
         val eyeBarRect: RectF? = null,
@@ -46,7 +47,8 @@ class DetectionRenderEngine(
         val allowCircular: Boolean,
         val usesEyeStrip: Boolean,
         val eyePath: Path?,
-        val rotationDegrees: Float
+        val rotationDegrees: Float,
+        val boxRotationDegrees: Float = 0f
     )
 
     private data class EyeTarget(
@@ -135,7 +137,8 @@ class DetectionRenderEngine(
                         allowCircular = allowCircular,
                         usesEyeStrip = usesEyeStrip,
                         eyePath = scaledEyePath,
-                        rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f
+                        rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f,
+                        boxRotationDegrees = if (usesEyeStrip) 0f else detection.boxRotationDegrees ?: 0f
                     )
                 )
             }
@@ -226,7 +229,7 @@ class DetectionRenderEngine(
                 applyEffect(task.drawRect)
             }
             if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                BlurEffects.drawRectOutline(canvas, task.drawRect)
+                BlurEffects.drawRectOutline(canvas, task.drawRect, rotationDegrees = task.boxRotationDegrees)
             }
         }
     }

@@ -1380,9 +1380,9 @@ class ImageViewerFragment : Fragment() {
         val eyeModeEnabled = item?.let { isEyeModeEnabledForLabel(it.label) } == true
         val actions = buildList {
             add(getString(R.string.viewer_edit_action_resize))
+            add(getString(R.string.viewer_edit_action_rotate))
             if (eyeModeEnabled) {
                 add(getString(R.string.viewer_edit_action_edit_eye_bar))
-                add(getString(R.string.viewer_edit_action_rotate_eye_bar))
             }
             add(getString(R.string.viewer_edit_action_delete))
         }.toTypedArray()
@@ -1392,11 +1392,11 @@ class ImageViewerFragment : Fragment() {
                     getString(R.string.viewer_edit_action_resize) -> {
                         detectionEditorOverlay.enableResizeMode(id)
                     }
+                    getString(R.string.viewer_edit_action_rotate) -> {
+                        showBoxRotationDialog(id)
+                    }
                     getString(R.string.viewer_edit_action_edit_eye_bar) -> {
                         detectionEditorOverlay.enableEyeBarEditMode(id)
-                    }
-                    getString(R.string.viewer_edit_action_rotate_eye_bar) -> {
-                        showEyeBarRotationDialog(id)
                     }
                     else -> {
                         detectionEditorOverlay.removeById(id)
@@ -1406,21 +1406,20 @@ class ImageViewerFragment : Fragment() {
             .show()
     }
 
-    private fun showEyeBarRotationDialog(id: String) {
+    private fun showBoxRotationDialog(id: String) {
         val item = editableDetections.firstOrNull { it.id == id } ?: return
-        if (!isEyeModeEnabledForLabel(item.label)) return
         val slider = Slider(requireContext()).apply {
             valueFrom = -180f
             valueTo = 180f
             stepSize = 1f
-            value = item.eyeBarRotationDegrees ?: 0f
+            value = item.boxRotationDegrees ?: 0f
         }
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.viewer_edit_rotate_eye_bar_title)
+            .setTitle(R.string.viewer_edit_rotate_title)
             .setView(slider)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                detectionEditorOverlay.updateEyeBarRotation(id, slider.value)
+                detectionEditorOverlay.updateBoxRotation(id, slider.value)
             }
             .show()
     }

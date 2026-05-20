@@ -11,6 +11,7 @@ data class EditableDetection(
     val id: String = UUID.randomUUID().toString(),
     val label: String,
     val rect: RectF,
+    val boxRotationDegrees: Float? = null,
     val score: Float? = null,
     val eyes: Pair<PointF, PointF>? = null,
     val eyeBar: RectF? = null,
@@ -36,6 +37,13 @@ object DetectionMetadataIo {
             if (w <= 0f || h <= 0f) continue
             val eyes = parseEyes(obj.optJSONArray("eyes"))
             val eyeBar = parseRect(obj.optJSONArray("eye_bar"))
+            val boxRotationDegrees = if (obj.has("box_rotation")) {
+                obj.optDouble("box_rotation", 0.0).toFloat()
+            } else if (obj.has("eye_bar_rotation") && eyeBar != null) {
+                obj.optDouble("eye_bar_rotation", 0.0).toFloat()
+            } else {
+                null
+            }
             val eyeBarRotationDegrees = if (obj.has("eye_bar_rotation")) {
                 obj.optDouble("eye_bar_rotation", 0.0).toFloat()
             } else {
@@ -46,6 +54,7 @@ object DetectionMetadataIo {
                 EditableDetection(
                     label = label,
                     rect = RectF(x, y, x + w, y + h),
+                    boxRotationDegrees = boxRotationDegrees,
                     score = score,
                     eyes = eyes,
                     eyeBar = eyeBar,
@@ -72,6 +81,9 @@ object DetectionMetadataIo {
                         put(clampedH.toInt())
                     }
                 )
+                item.boxRotationDegrees?.let { rotation ->
+                    put("box_rotation", rotation.toDouble())
+                }
                 item.eyes?.let { (left, right) ->
                     put(
                         "eyes",

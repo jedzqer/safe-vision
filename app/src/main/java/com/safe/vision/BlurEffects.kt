@@ -214,18 +214,28 @@ object BlurEffects {
         return max(4f, minDim * 0.04f)
     }
 
-    fun drawRectOutline(canvas: Canvas, rect: Rect, color: Int = Color.RED) {
+    fun drawRectOutline(
+        canvas: Canvas,
+        rect: Rect,
+        color: Int = Color.RED,
+        rotationDegrees: Float = 0f
+    ) {
         if (rect.width() <= 0 || rect.height() <= 0) return
         val stroke = outlineStrokeWidth(rect)
-        val inset = stroke / 2f
-        val left = rect.left + inset
-        val top = rect.top + inset
-        val right = rect.right - inset
-        val bottom = rect.bottom - inset
-        if (right <= left || bottom <= top) return
         outlinePaint.color = color
         outlinePaint.strokeWidth = stroke
-        canvas.drawRect(left, top, right, bottom, outlinePaint)
+        val insetRect = RectF(
+            rect.left + stroke / 2f,
+            rect.top + stroke / 2f,
+            rect.right - stroke / 2f,
+            rect.bottom - stroke / 2f
+        )
+        if (insetRect.width() <= 0f || insetRect.height() <= 0f) return
+        if (abs(rotationDegrees) > 0.01f) {
+            canvas.drawPath(rotatedRectPath(insetRect, rotationDegrees), outlinePaint)
+        } else {
+            canvas.drawRect(insetRect, outlinePaint)
+        }
     }
 
     fun drawCircularOutline(canvas: Canvas, rect: Rect, color: Int = Color.RED) {

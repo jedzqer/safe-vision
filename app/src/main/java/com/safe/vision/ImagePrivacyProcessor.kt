@@ -56,8 +56,15 @@ class ImagePrivacyProcessor {
                     val y = box.getInt(1)
                     val width = box.getInt(2)
                     val height = box.getInt(3)
-                    val rect = BlurEffects.clampRect(Rect(x, y, x + width, y + height), originalBitmap.width, originalBitmap.height)
-                    if (rect.width() > 0 && rect.height() > 0) {
+                        val rect = BlurEffects.clampRect(Rect(x, y, x + width, y + height), originalBitmap.width, originalBitmap.height)
+                        if (rect.width() > 0 && rect.height() > 0) {
+                        val boxRotationDegrees = if (detection.has("box_rotation")) {
+                            detection.optDouble("box_rotation", 0.0).toFloat()
+                        } else if (detection.has("eye_bar_rotation") && detection.has("eye_bar")) {
+                            detection.optDouble("eye_bar_rotation", 0.0).toFloat()
+                        } else {
+                            null
+                        }
                         val eyes = detection.optJSONArray("eyes")
                         val leftEye = eyes?.optJSONArray(0)?.takeIf { it.length() >= 2 }?.let {
                             PointF(
@@ -91,6 +98,7 @@ class ImagePrivacyProcessor {
                             DetectionRenderEngine.DetectionRenderItem(
                                 className = className,
                                 rect = rect,
+                                boxRotationDegrees = boxRotationDegrees,
                                 leftEye = leftEye,
                                 rightEye = rightEye,
                                 eyeBarRect = eyeBar,

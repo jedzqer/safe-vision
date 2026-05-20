@@ -175,9 +175,9 @@
     <string name="viewer_edit_no_image">仅图片支持编辑</string>
     <string name="viewer_edit_tip_finish_first">请先完成当前编辑</string>
     <string name="viewer_edit_action_resize">缩放</string>
+    <string name="viewer_edit_action_rotate">旋转</string>
     <string name="viewer_edit_action_edit_eye_bar">编辑眼遮挡</string>
-    <string name="viewer_edit_action_rotate_eye_bar">旋转眼遮挡</string>
-    <string name="viewer_edit_rotate_eye_bar_title">调整眼遮挡旋转角度</string>
+    <string name="viewer_edit_rotate_title">调整标签旋转角度</string>
     <string name="viewer_edit_action_delete">删除</string>
     <string name="viewer_delete_title">删除媒体</string>
     <string name="viewer_delete_message">确定要删除 %1$s 吗？</string>
@@ -288,7 +288,8 @@
     <string name="settings_label_scale_follow_global">跟随全局倍率（%1$.1fx）</string>
     <string name="settings_label_scale_effective_summary">当前生效：%1$.1fx</string>
     <string name="settings_label_eye_mode">眼睛模式</string>
-    <string name="settings_label_chip_eye_suffix">（眼睛模式）</string>
+    <string name="settings_eye_mode_labels_title">眼睛模式标签</string>
+    <string name="settings_eye_mode_labels_hint">单独选择哪些脸部标签使用眼睛模式处理</string>
     <string name="settings_label_effect_default">使用全局默认（%1$s）</string>
     <string name="settings_label_chip_default">%1$s（默认：%2$s）</string>
     <string name="settings_label_chip_custom">%1$s（%2$s）</string>

@@ -127,12 +127,25 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun updateBoxRotation(id: String, rotationDegrees: Float) {
+        val idx = items.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val item = items[idx]
+        items[idx] = item.copy(boxRotationDegrees = rotationDegrees)
+        onDataChanged?.invoke()
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         for (item in items) {
             val viewRect = mapRectToView(item.rect)
-            canvas.drawRect(viewRect, fillPaint)
-            canvas.drawRect(viewRect, borderPaint)
+            val boxPath = rotatedRectPath(
+                viewRect,
+                (item.boxRotationDegrees ?: 0f) + imageMatrixRotationDegrees()
+            )
+            canvas.drawPath(boxPath, fillPaint)
+            canvas.drawPath(boxPath, borderPaint)
             drawLabel(canvas, item.label, viewRect)
             if (item.id == resizeTargetId) {
                 drawHandles(canvas, viewRect)

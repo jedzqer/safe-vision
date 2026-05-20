@@ -142,9 +142,9 @@
     <string name="viewer_edit_no_image">편집은 이미지만 지원합니다</string>
     <string name="viewer_edit_tip_finish_first">현재 편집을 먼저 완료해 주세요</string>
     <string name="viewer_edit_action_resize">크기 조절</string>
+    <string name="viewer_edit_action_rotate">회전</string>
     <string name="viewer_edit_action_edit_eye_bar">눈 가리개 편집</string>
-    <string name="viewer_edit_action_rotate_eye_bar">눈 가리개 회전</string>
-    <string name="viewer_edit_rotate_eye_bar_title">눈 가리개 회전 각도 조절</string>
+    <string name="viewer_edit_rotate_title">라벨 회전 각도 조절</string>
     <string name="viewer_edit_action_delete">삭제</string>
     <string name="viewer_delete_title">미디어 삭제</string>
     <string name="viewer_delete_message">%1$s을(를) 삭제하시겠습니까?</string>
@@ -255,7 +255,8 @@
     <string name="settings_label_scale_follow_global">전역 배율 따르기 (%1$.1fx)</string>
     <string name="settings_label_scale_effective_summary">현재 적용값: %1$.1fx</string>
     <string name="settings_label_eye_mode">눈 모드</string>
-    <string name="settings_label_chip_eye_suffix">(눈 모드)</string>
+    <string name="settings_eye_mode_labels_title">눈 모드 라벨</string>
+    <string name="settings_eye_mode_labels_hint">어떤 얼굴 라벨에 눈 모드를 적용할지 별도로 선택하세요</string>
     <string name="settings_label_effect_default">전역 기본값 사용 (%1$s)</string>
     <string name="settings_label_chip_default">%1$s (기본값: %2$s)</string>
     <string name="settings_label_chip_custom">%1$s (%2$s)</string>

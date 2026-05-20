@@ -87,6 +87,7 @@ class SettingsFragment : Fragment() {
     private lateinit var settingsScrollView: NestedScrollView
     private lateinit var labelChipGroup: ChipGroup
     private lateinit var animeLabelChipGroup: ChipGroup
+    private lateinit var eyeModeChipGroup: ChipGroup
     private lateinit var labelSettingsInlineCard: MaterialCardView
     private lateinit var labelSettingsInlineContainer: LinearLayout
     private lateinit var stickerSummary: TextView
@@ -180,6 +181,7 @@ class SettingsFragment : Fragment() {
     private fun refreshLabelChips() {
         refreshLabelChipGroup(labelChipGroup, DetectionConfig.STANDARD_LABELS)
         refreshLabelChipGroup(animeLabelChipGroup, DetectionConfig.ANIME_LABELS)
+        refreshEyeModeChipGroup()
     }
 
     private fun refreshLabelChipGroup(group: ChipGroup, labels: List<String>) {
@@ -190,6 +192,13 @@ class SettingsFragment : Fragment() {
             } else {
                 group.addView(createLabelChip(label))
             }
+        }
+    }
+
+    private fun refreshEyeModeChipGroup() {
+        eyeModeChipGroup.removeAllViews()
+        DetectionConfig.FACE_LABELS.forEach { label ->
+            eyeModeChipGroup.addView(createEyeModeChip(label))
         }
     }
 
@@ -207,6 +216,23 @@ class SettingsFragment : Fragment() {
         chip.setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
         chip.alpha = if (privacySettings.isLabelBlocked(label)) 1f else 0.5f
         chip.setOnClickListener { toggleInlineLabelSettings(label) }
+        return chip
+    }
+
+    private fun createEyeModeChip(label: String): Chip {
+        val chip = Chip(requireContext())
+        chip.text = privacySettings.getLabelDisplayName(label)
+        chip.isCheckable = true
+        chip.isChecked = privacySettings.isLabelEyeMode(label)
+        chip.chipBackgroundColor = colorStateList(R.attr.svColorCard)
+        chip.chipStrokeColor = colorStateList(R.attr.svColorBorder)
+        chip.chipStrokeWidth = resources.displayMetrics.density
+        chip.setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
+        chip.alpha = if (privacySettings.isLabelBlocked(label)) 1f else 0.75f
+        chip.setOnCheckedChangeListener { _, isChecked ->
+            privacySettings.setLabelEyeMode(label, isChecked)
+            refreshLabelChips()
+        }
         return chip
     }
 
@@ -260,23 +286,19 @@ class SettingsFragment : Fragment() {
             return getString(R.string.settings_label_chip_disabled, displayName)
         }
         val override = privacySettings.getLabelEffectOverride(label)
-        val eyeModeEnabled = privacySettings.isLabelEyeMode(label) ||
-            override == PrivacySettingsManager.BLUR_MODE_EYES
-        val eyeSuffix = if (eyeModeEnabled) getString(R.string.settings_label_chip_eye_suffix) else ""
-        val effectiveOverride = if (override == PrivacySettingsManager.BLUR_MODE_EYES) null else override
-        return if (effectiveOverride == null) {
+        return if (override == null) {
             val profile = if (DetectionConfig.ANIME_LABELS.contains(label)) {
                 DetectionConfig.LabelProfile.ANIME
             } else {
                 DetectionConfig.LabelProfile.STANDARD
             }
             val defaultName = privacySettings.getBlurModeName(privacySettings.getBlurMode(profile))
-            getString(R.string.settings_label_chip_default, displayName, defaultName + eyeSuffix)
+            getString(R.string.settings_label_chip_default, displayName, defaultName)
         } else {
             getString(
                 R.string.settings_label_chip_custom,
                 displayName,
-                privacySettings.getBlurModeName(effectiveOverride) + eyeSuffix
+                privacySettings.getBlurModeName(override)
             )
         }
     }
@@ -339,25 +361,6 @@ class SettingsFragment : Fragment() {
             ).apply {
                 topMargin = smallMargin
             }
-        }
-
-        val isFaceLabel = DetectionConfig.FACE_LABELS.contains(label)
-        val eyeModeSwitch = if (isFaceLabel) {
-            SwitchCompat(context).apply {
-                text = getString(R.string.settings_label_eye_mode)
-                setTextColor(primaryTextColor)
-                isChecked = privacySettings.isLabelEyeMode(label) ||
-                    privacySettings.getLabelEffectOverride(label) == PrivacySettingsManager.BLUR_MODE_EYES
-                applySwitchTint(this)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = smallMargin
-                }
-            }
-        } else {
-            null
         }
 
         val effectTitle = TextView(context).apply {
@@ -509,7 +512,6 @@ class SettingsFragment : Fragment() {
         if (!isReverseLocked) {
             container.addView(reverseSwitch)
         }
-        eyeModeSwitch?.let { container.addView(it) }
         container.addView(effectTitle)
         container.addView(effectGroup)
 
@@ -603,9 +605,6 @@ class SettingsFragment : Fragment() {
             applyChanges = { refreshChips ->
                 privacySettings.setLabelEnabled(label, enabledSwitch.isChecked)
                 privacySettings.setLabelReverse(label, reverseSwitch.isChecked && enabledSwitch.isChecked)
-                eyeModeSwitch?.let {
-                    privacySettings.setLabelEyeMode(label, it.isChecked && enabledSwitch.isChecked)
-                }
                 val selectedMode = when (effectGroup.checkedRadioButtonId) {
                     mosaicOption.id -> PrivacySettingsManager.BLUR_MODE_MOSAIC
                     blackOption.id -> PrivacySettingsManager.BLUR_MODE_BLACK
@@ -883,6 +882,7 @@ class SettingsFragment : Fragment() {
         maskScaleSeekBar = view.findViewById(R.id.maskScaleSeekBar)
         labelChipGroup = view.findViewById(R.id.labelChipGroup)
         animeLabelChipGroup = view.findViewById(R.id.animeLabelChipGroup)
+        eyeModeChipGroup = view.findViewById(R.id.eyeModeChipGroup)
         labelSettingsInlineCard = view.findViewById(R.id.labelSettingsInlineCard)
         labelSettingsInlineContainer = view.findViewById(R.id.labelSettingsInlineContainer)
         stickerSummary = view.findViewById(R.id.stickerSummary)
