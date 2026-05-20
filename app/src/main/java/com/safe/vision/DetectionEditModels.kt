@@ -97,7 +97,8 @@ object DetectionMetadataIo {
 
     fun write(file: File, items: List<EditableDetection>) {
         val arr = JSONArray()
-        items.forEach { item ->
+        items.forEach { rawItem ->
+            val item = normalizeForWrite(rawItem)
             val clampedW = item.rect.width().coerceAtLeast(1f)
             val clampedH = item.rect.height().coerceAtLeast(1f)
             val obj = JSONObject().apply {
@@ -150,6 +151,18 @@ object DetectionMetadataIo {
         }
         val profile = DetectionConfig.inferProfile(items.map { it.label })
         file.writeText(DetectionMetadataFormat.build(arr, profile), Charsets.UTF_8)
+    }
+
+    private fun normalizeForWrite(item: EditableDetection): EditableDetection {
+        if (!DetectionConfig.isEyeRegionLabel(item.label)) return item
+        val rect = item.eyeBar ?: item.rect
+        val rotation = item.eyeBarRotationDegrees ?: item.boxRotationDegrees
+        return item.copy(
+            rect = RectF(rect),
+            boxRotationDegrees = rotation,
+            eyeBar = RectF(rect),
+            eyeBarRotationDegrees = rotation
+        )
     }
 
     private fun parseEyes(eyesArray: JSONArray?): Pair<PointF, PointF>? {

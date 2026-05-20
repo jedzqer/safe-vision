@@ -1355,6 +1355,7 @@ class ImageViewerFragment : Fragment() {
             EditableDetection(
                 label = label,
                 rect = rect,
+                eyeBar = if (DetectionConfig.isEyeRegionLabel(label)) RectF(rect) else null,
                 score = 1f
             )
         )
@@ -1376,14 +1377,9 @@ class ImageViewerFragment : Fragment() {
 
     private fun showEditBoxActions(id: String) {
         if (!isEditMode) return
-        val item = editableDetections.firstOrNull { it.id == id }
-        val eyeModeEnabled = item?.let { isEyeModeEnabledForLabel(it.label) } == true
         val actions = buildList {
             add(getString(R.string.viewer_edit_action_resize))
             add(getString(R.string.viewer_edit_action_rotate))
-            if (eyeModeEnabled) {
-                add(getString(R.string.viewer_edit_action_edit_eye_bar))
-            }
             add(getString(R.string.viewer_edit_action_delete))
         }.toTypedArray()
         MaterialAlertDialogBuilder(requireContext())
@@ -1395,9 +1391,6 @@ class ImageViewerFragment : Fragment() {
                     getString(R.string.viewer_edit_action_rotate) -> {
                         showBoxRotationDialog(id)
                     }
-                    getString(R.string.viewer_edit_action_edit_eye_bar) -> {
-                        detectionEditorOverlay.enableEyeBarEditMode(id)
-                    }
                     else -> {
                         detectionEditorOverlay.removeById(id)
                     }
@@ -1408,24 +1401,42 @@ class ImageViewerFragment : Fragment() {
 
     private fun showBoxRotationDialog(id: String) {
         val item = editableDetections.firstOrNull { it.id == id } ?: return
-        val slider = Slider(requireContext()).apply {
-            valueFrom = -180f
-            valueTo = 180f
-            stepSize = 1f
-            value = item.boxRotationDegrees ?: 0f
-        }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.viewer_edit_rotate_title)
-            .setView(slider)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                detectionEditorOverlay.updateBoxRotation(id, slider.value)
-            }
-            .show()
-    }
+        val originalRotation = item.boxRotationDegrees ?: 0f
+        val contentView = layoutInflater.inflate(R.layout.dialog_viewer_rotation_sheet, null)
+        val valueText = contentView.findViewById<TextView>(R.id.rotationValue)
+        val slider = contentView.findViewById<Slider>(R.id.rotationSlider)
+        val cancelButton = contentView.findViewById<MaterialButton>(R.id.rotationCancelButton)
+        val applyButton = contentView.findViewById<MaterialButton>(R.id.rotationApplyButton)
+        val bottomSheetDialog = BottomSheetDialog(requireContext())
+        var applied = false
 
-    private fun isEyeModeEnabledForLabel(label: String): Boolean {
-        return DetectionConfig.isEyeRegionLabel(label)
+        fun updateRotationValue(value: Float) {
+            valueText.text = String.format(Locale.getDefault(), "%d°", value.roundToInt())
+        }
+
+        slider.value = originalRotation
+        updateRotationValue(originalRotation)
+        slider.addOnChangeListener { _, value, _ ->
+            detectionEditorOverlay.updateBoxRotation(id, value)
+            updateRotationValue(value)
+        }
+
+        cancelButton.setOnClickListener {
+            bottomSheetDialog.dismiss()
+        }
+        applyButton.setOnClickListener {
+            applied = true
+            detectionEditorOverlay.updateBoxRotation(id, slider.value)
+            bottomSheetDialog.dismiss()
+        }
+
+        bottomSheetDialog.setOnDismissListener {
+            if (!applied) {
+                detectionEditorOverlay.updateBoxRotation(id, originalRotation)
+            }
+        }
+        bottomSheetDialog.setContentView(contentView)
+        bottomSheetDialog.show()
     }
 
     private fun saveAndExitEditMode() {

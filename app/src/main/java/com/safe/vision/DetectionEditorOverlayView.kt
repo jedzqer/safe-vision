@@ -59,7 +59,6 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
 
     private var activeId: String? = null
     private var resizeTargetId: String? = null
-    private var eyeBarEditTargetId: String? = null
     private var downX = 0f
     private var downY = 0f
     private var lastImageX = 0f
@@ -77,6 +76,9 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         bitmapWidth: Int,
         bitmapHeight: Int
     ) {
+        for (idx in list.indices) {
+            list[idx] = normalizeItem(list[idx])
+        }
         items = list
         imageMatrix = Matrix(matrix)
         imageBounds = RectF(0f, 0f, bitmapWidth.toFloat(), bitmapHeight.toFloat())
@@ -101,29 +103,7 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
 
     fun enableResizeMode(id: String) {
         resizeTargetId = id
-        eyeBarEditTargetId = null
         activeId = id
-        invalidate()
-    }
-
-    fun enableEyeBarEditMode(id: String) {
-        eyeBarEditTargetId = id
-        resizeTargetId = null
-        activeId = id
-        invalidate()
-    }
-
-    fun updateEyeBarRotation(id: String, rotationDegrees: Float) {
-        val idx = items.indexOfFirst { it.id == id }
-        if (idx < 0) return
-        val item = items[idx]
-        if (!isEyeMode(item)) return
-        val baseEyeBar = item.eyeBar ?: defaultEyeBarFor(item)
-        items[idx] = item.copy(
-            eyeBar = clampRect(baseEyeBar),
-            eyeBarRotationDegrees = rotationDegrees
-        )
-        onDataChanged?.invoke()
         invalidate()
     }
 
@@ -131,7 +111,14 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         val idx = items.indexOfFirst { it.id == id }
         if (idx < 0) return
         val item = items[idx]
-        items[idx] = item.copy(boxRotationDegrees = rotationDegrees)
+        items[idx] = if (isEyeMode(item)) {
+            item.copy(
+                boxRotationDegrees = rotationDegrees,
+                eyeBarRotationDegrees = rotationDegrees
+            )
+        } else {
+            item.copy(boxRotationDegrees = rotationDegrees)
+        }
         onDataChanged?.invoke()
         invalidate()
     }
@@ -149,10 +136,6 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
             drawLabel(canvas, item.label, viewRect)
             if (item.id == resizeTargetId) {
                 drawHandles(canvas, viewRect)
-            }
-            if (item.id == eyeBarEditTargetId && isEyeMode(item)) {
-                val eyeBar = item.eyeBar ?: defaultEyeBarFor(item)
-                drawEyeBar(canvas, item, eyeBar)
             }
         }
     }
@@ -185,23 +168,15 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
                 val idx = items.indexOfFirst { it.id == id }
                 if (idx < 0) return true
                 val current = items[idx]
-                if (id == eyeBarEditTargetId && isEyeMode(current)) {
-                    val baseEyeBar = current.eyeBar ?: defaultEyeBarFor(current)
+                val updatedRect = if (activeHandle == ResizeHandle.NONE) {
                     val dx = imagePoint.x - lastImageX
                     val dy = imagePoint.y - lastImageY
-                    val movedEyeBar = clampRect(RectF(baseEyeBar).apply { offset(dx, dy) })
-                    items[idx] = current.copy(eyeBar = movedEyeBar)
+                    RectF(current.rect).apply { offset(dx, dy) }
                 } else {
-                    val updatedRect = if (activeHandle == ResizeHandle.NONE) {
-                        val dx = imagePoint.x - lastImageX
-                        val dy = imagePoint.y - lastImageY
-                        RectF(current.rect).apply { offset(dx, dy) }
-                    } else {
-                        resizeRect(current.rect, imagePoint.x, imagePoint.y, activeHandle)
-                    }
-                    val clamped = clampRect(updatedRect)
-                    items[idx] = current.copy(rect = clamped)
+                    resizeRect(current.rect, imagePoint.x, imagePoint.y, activeHandle)
                 }
+                val clamped = clampRect(updatedRect)
+                items[idx] = updateItemRect(current, clamped)
                 lastImageX = imagePoint.x
                 lastImageY = imagePoint.y
                 onDataChanged?.invoke()
@@ -232,15 +207,6 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         canvas.drawCircle(rect.right, rect.top, handleRadius, handlePaint)
         canvas.drawCircle(rect.left, rect.bottom, handleRadius, handlePaint)
         canvas.drawCircle(rect.right, rect.bottom, handleRadius, handlePaint)
-    }
-
-    private fun drawEyeBar(canvas: Canvas, item: EditableDetection, eyeBar: RectF) {
-        val rotation = item.eyeBarRotationDegrees ?: 0f
-        val viewRect = mapRectToView(eyeBar)
-        val mappedRotation = rotation + imageMatrixRotationDegrees()
-        val path = rotatedRectPath(viewRect, mappedRotation)
-        canvas.drawPath(path, fillPaint)
-        canvas.drawPath(path, borderPaint)
     }
 
     private fun mapRectToView(src: RectF): RectF {
@@ -316,34 +282,27 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         return eyeModeResolver?.invoke(item) == true
     }
 
-    private fun defaultEyeBarFor(item: EditableDetection): RectF {
-        val faceRect = item.rect
-        item.eyes?.let { (left, right) ->
-            val strip = BlurEffects.eyeBarFromEyes(
-                android.graphics.Rect(
-                    faceRect.left.toInt(),
-                    faceRect.top.toInt(),
-                    faceRect.right.toInt(),
-                    faceRect.bottom.toInt()
-                ),
-                left,
-                right,
-                imageBounds.right.toInt(),
-                imageBounds.bottom.toInt()
-            )
-            return RectF(strip)
-        }
-        val fallback = BlurEffects.cropToEyeStrip(
-            android.graphics.Rect(
-                faceRect.left.toInt(),
-                faceRect.top.toInt(),
-                faceRect.right.toInt(),
-                faceRect.bottom.toInt()
-            ),
-            imageBounds.right.toInt(),
-            imageBounds.bottom.toInt()
+    private fun normalizeItem(item: EditableDetection): EditableDetection {
+        if (!isEyeMode(item)) return item
+        val rect = item.eyeBar ?: item.rect
+        val rotation = item.eyeBarRotationDegrees ?: item.boxRotationDegrees
+        return item.copy(
+            rect = RectF(rect),
+            boxRotationDegrees = rotation,
+            eyeBar = RectF(rect),
+            eyeBarRotationDegrees = rotation
         )
-        return RectF(fallback)
+    }
+
+    private fun updateItemRect(item: EditableDetection, rect: RectF): EditableDetection {
+        return if (isEyeMode(item)) {
+            item.copy(
+                rect = RectF(rect),
+                eyeBar = RectF(rect)
+            )
+        } else {
+            item.copy(rect = rect)
+        }
     }
 
     private fun rotatedRectPath(rect: RectF, rotationDegrees: Float): Path {
