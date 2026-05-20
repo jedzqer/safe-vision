@@ -144,9 +144,18 @@ object DetectionConfig {
 
     fun getLabels(profile: LabelProfile): List<String> {
         return when (profile) {
-            LabelProfile.STANDARD -> STANDARD_LABELS + EYE_REGION_LABEL
-            LabelProfile.ANIME -> ANIME_LABELS + EYE_REGION_LABEL
+            LabelProfile.STANDARD -> insertBeforeFirstFace(STANDARD_LABELS)
+            LabelProfile.ANIME -> insertBeforeFirstFace(ANIME_LABELS)
             LabelProfile.MIXED -> LABELS
+        }
+    }
+
+    private fun insertBeforeFirstFace(labels: List<String>): List<String> {
+        val idx = labels.indexOfFirst { FACE_LABELS.contains(it) }
+        return if (idx >= 0) {
+            labels.subList(0, idx) + EYE_REGION_LABEL + labels.subList(idx, labels.size)
+        } else {
+            labels + EYE_REGION_LABEL
         }
     }
 
