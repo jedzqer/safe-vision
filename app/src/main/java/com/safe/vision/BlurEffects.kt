@@ -206,8 +206,13 @@ object BlurEffects {
     }
 
     fun drawCircularOutline(canvas: Canvas, rect: Rect, color: Int = Color.RED) {
-        // 使用矩形描边替代圆形描边，避免额外几何计算
-        drawRectOutline(canvas, rect, color)
+        if (rect.width() <= 0 || rect.height() <= 0) return
+        val stroke = outlineStrokeWidth(rect)
+        val radius = hypot(rect.width() / 2f, rect.height() / 2f) - stroke / 2f
+        if (radius <= 0f) return
+        outlinePaint.color = color
+        outlinePaint.strokeWidth = stroke
+        canvas.drawCircle(rect.exactCenterX(), rect.exactCenterY(), radius, outlinePaint)
     }
 
     fun drawBlack(canvas: Canvas, rect: Rect, color: Int = Color.BLACK) {
