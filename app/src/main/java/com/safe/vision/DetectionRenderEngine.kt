@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import kotlin.math.abs
 import kotlin.math.atan2
 
 class DetectionRenderEngine(
@@ -44,9 +45,10 @@ class DetectionRenderEngine(
         val className: String,
         val renderMode: Int,
         val drawRect: Rect,
+        val effectRect: Rect,
         val allowCircular: Boolean,
         val usesEyeStrip: Boolean,
-        val eyePath: Path?,
+        val clipPath: Path?,
         val rotationDegrees: Float,
         val boxRotationDegrees: Float = 0f
     )
@@ -119,6 +121,22 @@ class DetectionRenderEngine(
             }
             val renderMode = resolveRenderMode(blurMode, settings.defaultBlurMode)
             val allowCircular = settings.useCircularMask && !usesEyeStrip
+            val clipPath = when {
+                usesEyeStrip -> scaledEyePath
+                abs(detection.boxRotationDegrees ?: 0f) > 0.01f -> {
+                    BlurEffects.rotatedRectPath(
+                        RectF(scaledTargetRect),
+                        detection.boxRotationDegrees ?: 0f
+                    )
+                }
+                else -> null
+            }
+            val effectRect = expandedEffectRect(
+                clipPath = clipPath,
+                fallbackRect = scaledTargetRect,
+                width = sourceBitmap.width,
+                height = sourceBitmap.height
+            )
 
             if (settings.reverseLabels.contains(detection.className)) {
                 reverseRects.add(ReverseRect(scaledTargetRect, allowCircular, detection.className))
@@ -133,9 +151,10 @@ class DetectionRenderEngine(
                         className = detection.className,
                         renderMode = renderMode,
                         drawRect = scaledTargetRect,
+                        effectRect = effectRect,
                         allowCircular = allowCircular,
                         usesEyeStrip = usesEyeStrip,
-                        eyePath = scaledEyePath,
+                        clipPath = clipPath,
                         rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f,
                         boxRotationDegrees = if (usesEyeStrip) 0f else detection.boxRotationDegrees ?: 0f
                     )
@@ -202,7 +221,7 @@ class DetectionRenderEngine(
                             source.width,
                             source.height,
                             fitInsideRect = task.usesEyeStrip,
-                            rotationDegrees = task.rotationDegrees
+                            rotationDegrees = if (task.usesEyeStrip) task.rotationDegrees else task.boxRotationDegrees
                         )
                     } else {
                         callbacks.onNormalStickerFallback()
@@ -219,10 +238,10 @@ class DetectionRenderEngine(
                 BlurEffects.drawCircularOutline(canvas, task.drawRect)
             }
         } else {
-            if (task.usesEyeStrip && task.eyePath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
+            if (task.clipPath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
                 val save = canvas.save()
-                canvas.clipPath(task.eyePath)
-                applyEffect(task.drawRect)
+                canvas.clipPath(task.clipPath)
+                applyEffect(task.effectRect)
                 canvas.restoreToCount(save)
             } else {
                 applyEffect(task.drawRect)
@@ -354,5 +373,24 @@ class DetectionRenderEngine(
         } else {
             fallback
         }
+    }
+
+    private fun expandedEffectRect(
+        clipPath: Path?,
+        fallbackRect: Rect,
+        width: Int,
+        height: Int
+    ): Rect {
+        if (clipPath == null) return fallbackRect
+        val bounds = RectF()
+        clipPath.computeBounds(bounds, true)
+        val rect = Rect(
+            kotlin.math.floor(bounds.left.toDouble()).toInt(),
+            kotlin.math.floor(bounds.top.toDouble()).toInt(),
+            kotlin.math.ceil(bounds.right.toDouble()).toInt(),
+            kotlin.math.ceil(bounds.bottom.toDouble()).toInt()
+        )
+        val safe = BlurEffects.clampRect(rect, width, height)
+        return if (safe.width() > 0 && safe.height() > 0) safe else fallbackRect
     }
 }
