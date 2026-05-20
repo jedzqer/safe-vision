@@ -112,6 +112,7 @@ class YoloOnnxRunner(
                 if (enrichFaceLandmarks && detections.any { DetectionConfig.supportsFaceLandmarks(it.className) }) {
                     detections = attachFaceLandmarks(bitmap, detections)
                 }
+                detections = withDerivedEyeRegionDetections(detections)
                 val totalTime = System.currentTimeMillis() - startTime
                 DebugLogManager.addLog(
                     "模型检测",
@@ -396,6 +397,38 @@ class YoloOnnxRunner(
         val optimizedFileName: String,
         val label: String
     )
+
+    companion object {
+        fun withDerivedEyeRegionDetections(detections: List<Detection>): List<Detection> {
+            if (detections.isEmpty()) return detections
+            if (detections.any { DetectionConfig.isEyeRegionLabel(it.className) }) return detections
+            val derived = mutableListOf<Detection>()
+            detections.forEach { detection ->
+                derived.add(detection)
+                if (!DetectionConfig.canDeriveEyeRegion(detection.className)) return@forEach
+                val eyeRect = EyeRegionHelper.deriveEyeRegion(
+                    EyeRegionHelper.EyeRegionSource(
+                        sourceLabel = detection.className,
+                        faceRect = detection.box,
+                        eyes = detection.leftEye?.let { left ->
+                            detection.rightEye?.let { right -> left to right }
+                        },
+                        eyeBar = detection.eyeBar
+                    ),
+                    surfaceWidth = detection.box.right.toInt().coerceAtLeast(1),
+                    surfaceHeight = detection.box.bottom.toInt().coerceAtLeast(1)
+                ) ?: return@forEach
+                derived.add(
+                    detection.copy(
+                        className = DetectionConfig.EYE_REGION_LABEL,
+                        box = eyeRect,
+                        eyeBar = eyeRect
+                    )
+                )
+            }
+            return derived
+        }
+    }
 
 
 }

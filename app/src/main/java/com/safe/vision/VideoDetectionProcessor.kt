@@ -29,12 +29,12 @@ class VideoDetectionProcessor(
         defaultBlurMode: Int,
         labelEffectOverrides: Map<String, Int>
     ): Boolean {
-        val eyeModeByDefault = defaultBlurMode == PrivacySettingsManager.BLUR_MODE_EYES
-        val eyeModeByOverride = labelEffectOverrides.values.any { it == PrivacySettingsManager.BLUR_MODE_EYES }
-        val eyeModeByLabel = blockedLabels.any { label ->
-            DetectionConfig.supportsFaceLandmarks(label) && privacySettings.isLabelEyeMode(label)
-        }
-        return eyeModeByDefault || eyeModeByOverride || eyeModeByLabel
+        val eyeModeByLabel = blockedLabels.contains(DetectionConfig.EYE_REGION_LABEL)
+        val eyeModeByDefault = eyeModeByLabel && defaultBlurMode == PrivacySettingsManager.BLUR_MODE_EYES
+        val eyeModeByOverride = eyeModeByLabel && (
+            labelEffectOverrides[DetectionConfig.EYE_REGION_LABEL] == PrivacySettingsManager.BLUR_MODE_EYES
+        )
+        return eyeModeByLabel || eyeModeByDefault || eyeModeByOverride
     }
 
     fun blendDetections(prev: DetectionFrame, next: DetectionFrame, targetIndex: Int): List<YoloOnnxRunner.Detection> {

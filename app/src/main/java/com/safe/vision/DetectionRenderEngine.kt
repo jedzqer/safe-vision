@@ -87,8 +87,7 @@ class DetectionRenderEngine(
             if (rect.width() <= 0 || rect.height() <= 0) return@forEach
 
             val blurMode = settings.labelEffectOverrides[detection.className] ?: settings.defaultBlurMode
-            val usesEyeStrip = DetectionConfig.FACE_LABELS.contains(detection.className) &&
-                (privacySettings.isLabelEyeMode(detection.className) || blurMode == PrivacySettingsManager.BLUR_MODE_EYES)
+            val usesEyeStrip = DetectionConfig.isEyeRegionLabel(detection.className)
             val eyeTarget = if (usesEyeStrip) {
                 resolveEyeTarget(detection, rect, sourceBitmap.width, sourceBitmap.height)
             } else {

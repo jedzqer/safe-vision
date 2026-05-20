@@ -7,6 +7,8 @@ import kotlin.math.max
  * Keeping them in one place avoids drift between model, UI, and privacy settings.
  */
 object DetectionConfig {
+    const val EYE_REGION_LABEL = "EYE_REGION"
+
     enum class LabelProfile(val formatKey: String) {
         STANDARD("standard"),
         ANIME("anime"),
@@ -54,8 +56,8 @@ object DetectionConfig {
         "Pussy"
     )
 
-    // All supported labels across saved metadata formats.
-    val LABELS: List<String> = STANDARD_LABELS + ANIME_LABELS
+    // All supported labels across saved metadata formats and settings.
+    val LABELS: List<String> = (STANDARD_LABELS + ANIME_LABELS + EYE_REGION_LABEL).distinct()
 
     // Locked labels cannot be disabled in UI.
     val STANDARD_LOCKED_LABELS: List<String> = listOf(
@@ -98,7 +100,8 @@ object DetectionConfig {
         "Face" to "面部",
         "Feet" to "脚部",
         "Nipple" to "乳头",
-        "Pussy" to "阴部"
+        "Pussy" to "阴部",
+        EYE_REGION_LABEL to "眼睛"
     )
 
     val STANDARD_FACE_LABELS: Set<String> = setOf(
@@ -141,8 +144,8 @@ object DetectionConfig {
 
     fun getLabels(profile: LabelProfile): List<String> {
         return when (profile) {
-            LabelProfile.STANDARD -> STANDARD_LABELS
-            LabelProfile.ANIME -> ANIME_LABELS
+            LabelProfile.STANDARD -> STANDARD_LABELS + EYE_REGION_LABEL
+            LabelProfile.ANIME -> ANIME_LABELS + EYE_REGION_LABEL
             LabelProfile.MIXED -> LABELS
         }
     }
@@ -161,6 +164,14 @@ object DetectionConfig {
 
     fun supportsFaceLandmarks(label: String): Boolean {
         return STANDARD_FACE_LABELS.contains(label)
+    }
+
+    fun isEyeRegionLabel(label: String): Boolean {
+        return label == EYE_REGION_LABEL
+    }
+
+    fun canDeriveEyeRegion(label: String): Boolean {
+        return FACE_LABELS.contains(label)
     }
 
     fun inferProfile(labels: Collection<String>): LabelProfile {

@@ -47,62 +47,99 @@ class ImagePrivacyProcessor {
             }
 
             val renderItems = mutableListOf<DetectionRenderEngine.DetectionRenderItem>()
+            val rawRenderItems = mutableListOf<DetectionRenderEngine.DetectionRenderItem>()
             for (i in 0 until detections.length()) {
                 val detection = detections.getJSONObject(i)
                 val className = detection.getString("class")
-                if (privacySettings.isLabelBlocked(className, labelProfile)) {
-                    val box = detection.getJSONArray("box")
-                    val x = box.getInt(0)
-                    val y = box.getInt(1)
-                    val width = box.getInt(2)
-                    val height = box.getInt(3)
-                        val rect = BlurEffects.clampRect(Rect(x, y, x + width, y + height), originalBitmap.width, originalBitmap.height)
-                        if (rect.width() > 0 && rect.height() > 0) {
-                        val boxRotationDegrees = if (detection.has("box_rotation")) {
-                            detection.optDouble("box_rotation", 0.0).toFloat()
-                        } else if (detection.has("eye_bar_rotation") && detection.has("eye_bar")) {
-                            detection.optDouble("eye_bar_rotation", 0.0).toFloat()
-                        } else {
-                            null
-                        }
-                        val eyes = detection.optJSONArray("eyes")
-                        val leftEye = eyes?.optJSONArray(0)?.takeIf { it.length() >= 2 }?.let {
-                            PointF(
-                                it.optDouble(0, rect.exactCenterX().toDouble()).toFloat(),
-                                it.optDouble(1, rect.exactCenterY().toDouble()).toFloat()
-                            )
-                        }
-                        val rightEye = eyes?.optJSONArray(1)?.takeIf { it.length() >= 2 }?.let {
-                            PointF(
-                                it.optDouble(0, rect.exactCenterX().toDouble()).toFloat(),
-                                it.optDouble(1, rect.exactCenterY().toDouble()).toFloat()
-                            )
-                        }
-                        val eyeBar = detection.optJSONArray("eye_bar")?.takeIf { it.length() >= 4 }?.let {
-                            val x = it.optDouble(0, rect.left.toDouble()).toFloat()
-                            val y = it.optDouble(1, rect.top.toDouble()).toFloat()
-                            val width = it.optDouble(2, rect.width().toDouble()).toFloat()
-                            val height = it.optDouble(3, rect.height().toDouble()).toFloat()
-                            if (width > 0f && height > 0f) {
-                                RectF(x, y, x + width, y + height)
-                            } else {
-                                null
-                            }
-                        }
-                        val eyeBarRotationDegrees = if (detection.has("eye_bar_rotation")) {
-                            detection.optDouble("eye_bar_rotation", 0.0).toFloat()
-                        } else {
-                            null
-                        }
+                val box = detection.getJSONArray("box")
+                val x = box.getInt(0)
+                val y = box.getInt(1)
+                val width = box.getInt(2)
+                val height = box.getInt(3)
+                val rect = BlurEffects.clampRect(Rect(x, y, x + width, y + height), originalBitmap.width, originalBitmap.height)
+                if (rect.width() <= 0 || rect.height() <= 0) continue
+                val boxRotationDegrees = if (detection.has("box_rotation")) {
+                    detection.optDouble("box_rotation", 0.0).toFloat()
+                } else if (detection.has("eye_bar_rotation") && detection.has("eye_bar")) {
+                    detection.optDouble("eye_bar_rotation", 0.0).toFloat()
+                } else {
+                    null
+                }
+                val eyes = detection.optJSONArray("eyes")
+                val leftEye = eyes?.optJSONArray(0)?.takeIf { it.length() >= 2 }?.let {
+                    PointF(
+                        it.optDouble(0, rect.exactCenterX().toDouble()).toFloat(),
+                        it.optDouble(1, rect.exactCenterY().toDouble()).toFloat()
+                    )
+                }
+                val rightEye = eyes?.optJSONArray(1)?.takeIf { it.length() >= 2 }?.let {
+                    PointF(
+                        it.optDouble(0, rect.exactCenterX().toDouble()).toFloat(),
+                        it.optDouble(1, rect.exactCenterY().toDouble()).toFloat()
+                    )
+                }
+                val eyeBar = detection.optJSONArray("eye_bar")?.takeIf { it.length() >= 4 }?.let {
+                    val x = it.optDouble(0, rect.left.toDouble()).toFloat()
+                    val y = it.optDouble(1, rect.top.toDouble()).toFloat()
+                    val width = it.optDouble(2, rect.width().toDouble()).toFloat()
+                    val height = it.optDouble(3, rect.height().toDouble()).toFloat()
+                    if (width > 0f && height > 0f) {
+                        RectF(x, y, x + width, y + height)
+                    } else {
+                        null
+                    }
+                }
+                val eyeBarRotationDegrees = if (detection.has("eye_bar_rotation")) {
+                    detection.optDouble("eye_bar_rotation", 0.0).toFloat()
+                } else {
+                    null
+                }
+                rawRenderItems.add(
+                    DetectionRenderEngine.DetectionRenderItem(
+                        className = className,
+                        rect = rect,
+                        boxRotationDegrees = boxRotationDegrees,
+                        leftEye = leftEye,
+                        rightEye = rightEye,
+                        eyeBarRect = eyeBar,
+                        eyeBarRotationDegrees = eyeBarRotationDegrees
+                    )
+                )
+            }
+
+            val hasExplicitEyeRegion = rawRenderItems.any { DetectionConfig.isEyeRegionLabel(it.className) }
+            rawRenderItems.forEach { item ->
+                if (privacySettings.isLabelBlocked(item.className, labelProfile)) {
+                    renderItems.add(item)
+                }
+                if (!hasExplicitEyeRegion && DetectionConfig.canDeriveEyeRegion(item.className)) {
+                    val derivedRect = EyeRegionHelper.deriveEyeRegion(
+                        EyeRegionHelper.EyeRegionSource(
+                            sourceLabel = item.className,
+                            faceRect = RectF(item.rect),
+                            boxRotationDegrees = item.boxRotationDegrees,
+                            eyes = item.leftEye?.let { left -> item.rightEye?.let { right -> left to right } },
+                            eyeBar = item.eyeBarRect,
+                            eyeBarRotationDegrees = item.eyeBarRotationDegrees
+                        ),
+                        originalBitmap.width,
+                        originalBitmap.height
+                    )
+                    if (derivedRect != null && privacySettings.isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, labelProfile)) {
                         renderItems.add(
                             DetectionRenderEngine.DetectionRenderItem(
-                                className = className,
-                                rect = rect,
-                                boxRotationDegrees = boxRotationDegrees,
-                                leftEye = leftEye,
-                                rightEye = rightEye,
-                                eyeBarRect = eyeBar,
-                                eyeBarRotationDegrees = eyeBarRotationDegrees
+                                className = DetectionConfig.EYE_REGION_LABEL,
+                                rect = Rect(
+                                    derivedRect.left.toInt(),
+                                    derivedRect.top.toInt(),
+                                    derivedRect.right.toInt(),
+                                    derivedRect.bottom.toInt()
+                                ),
+                                boxRotationDegrees = item.eyeBarRotationDegrees ?: item.boxRotationDegrees,
+                                leftEye = item.leftEye,
+                                rightEye = item.rightEye,
+                                eyeBarRect = derivedRect,
+                                eyeBarRotationDegrees = item.eyeBarRotationDegrees
                             )
                         )
                     }

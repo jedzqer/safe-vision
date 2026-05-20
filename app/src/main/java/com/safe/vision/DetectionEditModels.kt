@@ -22,7 +22,8 @@ object DetectionMetadataIo {
     fun read(file: File?): MutableList<EditableDetection> {
         if (file == null || !file.exists()) return mutableListOf()
         val text = file.readText(Charsets.UTF_8)
-        val arr = DetectionMetadataFormat.parse(text).detections
+        val metadata = DetectionMetadataFormat.parse(text)
+        val arr = metadata.detections
         val list = mutableListOf<EditableDetection>()
         for (i in 0 until arr.length()) {
             val obj = arr.optJSONObject(i) ?: continue
@@ -62,7 +63,36 @@ object DetectionMetadataIo {
                 )
             )
         }
-        return list
+        val withDerivedEyeRegions = mutableListOf<EditableDetection>()
+        val hasExplicitEyeRegion = list.any { it.label == DetectionConfig.EYE_REGION_LABEL }
+        list.forEach { item ->
+            withDerivedEyeRegions.add(item)
+            if (hasExplicitEyeRegion || !DetectionConfig.canDeriveEyeRegion(item.label)) return@forEach
+            val eyeRect = EyeRegionHelper.deriveEyeRegion(
+                EyeRegionHelper.EyeRegionSource(
+                    sourceLabel = item.label,
+                    faceRect = item.rect,
+                    boxRotationDegrees = item.boxRotationDegrees,
+                    eyes = item.eyes,
+                    eyeBar = item.eyeBar,
+                    eyeBarRotationDegrees = item.eyeBarRotationDegrees
+                ),
+                surfaceWidth = item.rect.right.toInt().coerceAtLeast(1),
+                surfaceHeight = item.rect.bottom.toInt().coerceAtLeast(1)
+            ) ?: return@forEach
+            withDerivedEyeRegions.add(
+                EditableDetection(
+                    label = DetectionConfig.EYE_REGION_LABEL,
+                    rect = eyeRect,
+                    boxRotationDegrees = item.eyeBarRotationDegrees ?: item.boxRotationDegrees,
+                    score = item.score,
+                    eyes = item.eyes,
+                    eyeBar = eyeRect,
+                    eyeBarRotationDegrees = item.eyeBarRotationDegrees
+                )
+            )
+        }
+        return withDerivedEyeRegions
     }
 
     fun write(file: File, items: List<EditableDetection>) {

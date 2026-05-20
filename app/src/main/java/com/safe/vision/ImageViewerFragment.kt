@@ -164,7 +164,7 @@ class ImageViewerFragment : Fragment() {
         btnDoneEdit.setOnClickListener { saveAndExitEditMode() }
         detectionEditorOverlay.onBoxLongPress = { id -> showEditBoxActions(id) }
         detectionEditorOverlay.onDataChanged = { Unit }
-        detectionEditorOverlay.eyeModeResolver = { detection -> isEyeModeEnabledForLabel(detection.label) }
+        detectionEditorOverlay.eyeModeResolver = { detection -> DetectionConfig.isEyeRegionLabel(detection.label) }
         videoSeekSlider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             updateVideoProgressTexts(value.roundToInt(), currentVideoDurationMs())
@@ -1425,13 +1425,7 @@ class ImageViewerFragment : Fragment() {
     }
 
     private fun isEyeModeEnabledForLabel(label: String): Boolean {
-        val effectiveBlurMode = privacyProcessor
-            .let { PrivacySettingsManager.getInstance(requireContext()) }
-            .getEffectiveBlurMode(label)
-        return DetectionConfig.FACE_LABELS.contains(label) && (
-            PrivacySettingsManager.getInstance(requireContext()).isLabelEyeMode(label) ||
-                effectiveBlurMode == PrivacySettingsManager.BLUR_MODE_EYES
-            )
+        return DetectionConfig.isEyeRegionLabel(label)
     }
 
     private fun saveAndExitEditMode() {

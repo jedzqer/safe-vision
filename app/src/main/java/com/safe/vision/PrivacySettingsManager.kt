@@ -497,7 +497,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun isLabelEyeMode(label: String): Boolean {
-        return getEyeModeLabels(resolveProfileForLabel(label)).contains(label)
+        if (DetectionConfig.isEyeRegionLabel(label)) return true
+        if (!DetectionConfig.canDeriveEyeRegion(label)) return false
+        val profile = resolveProfileForLabel(label)
+        if (isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) return false
+        return getEyeModeLabels(profile).contains(label)
     }
 
     fun setLabelEyeMode(label: String, enabled: Boolean) {
@@ -658,6 +662,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
 
     private fun resolveProfileForLabel(label: String): DetectionConfig.LabelProfile {
         return when {
+            DetectionConfig.isEyeRegionLabel(label) -> getCurrentProfile()
             DetectionConfig.ANIME_LABELS.contains(label) -> DetectionConfig.LabelProfile.ANIME
             else -> DetectionConfig.LabelProfile.STANDARD
         }
@@ -866,6 +871,15 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             if (DetectionConfig.FACE_LABELS.contains(label)) out.add(label)
         }
         return if (out.isEmpty()) default else out.toList()
+    }
+
+    fun migrateLegacyEyeModeLabelsToEyeRegion(profile: DetectionConfig.LabelProfile) {
+        val legacyEyeModeLabels = getEyeModeLabels(profile)
+        if (legacyEyeModeLabels.isEmpty()) return
+        if (isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) return
+        val currentLabels = LinkedHashSet(getBlockedLabels(profile))
+        currentLabels.add(DetectionConfig.EYE_REGION_LABEL)
+        setBlockedLabels(profile, currentLabels.toList())
     }
 
     private fun parseOverrides(obj: JSONObject?): Map<String, Int> {

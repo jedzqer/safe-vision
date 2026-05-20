@@ -150,8 +150,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             if (rect.width() <= 0 || rect.height() <= 0) return@forEach
 
             val blurMode = labelOverrides[className] ?: defaultBlurMode
-            val usesEyeStrip = DetectionConfig.FACE_LABELS.contains(className) &&
-                (privacySettings.isLabelEyeMode(className) || blurMode == PrivacySettingsManager.BLUR_MODE_EYES)
+            val usesEyeStrip = DetectionConfig.isEyeRegionLabel(className)
             val eyeTarget = if (usesEyeStrip) resolveEyeTarget(detection, rect) else null
             val targetRect = eyeTarget?.rect ?: rect
             val maskScale = privacySettings.getEffectiveMaskScale(className)

@@ -50,7 +50,7 @@ object MediaSaveHelper {
 
     private fun buildMetadataJson(detections: List<YoloOnnxRunner.Detection>): String {
         val array = JSONArray()
-        detections.forEach { detection ->
+        YoloOnnxRunner.withDerivedEyeRegionDetections(detections).forEach { detection ->
             val box = detection.box
             val obj = JSONObject().apply {
                 put("class", detection.className)

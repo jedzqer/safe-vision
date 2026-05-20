@@ -87,7 +87,6 @@ class SettingsFragment : Fragment() {
     private lateinit var settingsScrollView: NestedScrollView
     private lateinit var labelChipGroup: ChipGroup
     private lateinit var animeLabelChipGroup: ChipGroup
-    private lateinit var eyeModeChipGroup: ChipGroup
     private lateinit var labelSettingsInlineCard: MaterialCardView
     private lateinit var labelSettingsInlineContainer: LinearLayout
     private lateinit var stickerSummary: TextView
@@ -179,9 +178,8 @@ class SettingsFragment : Fragment() {
     }
     
     private fun refreshLabelChips() {
-        refreshLabelChipGroup(labelChipGroup, DetectionConfig.STANDARD_LABELS)
-        refreshLabelChipGroup(animeLabelChipGroup, DetectionConfig.ANIME_LABELS)
-        refreshEyeModeChipGroup()
+        refreshLabelChipGroup(labelChipGroup, DetectionConfig.getLabels(DetectionConfig.LabelProfile.STANDARD))
+        refreshLabelChipGroup(animeLabelChipGroup, DetectionConfig.getLabels(DetectionConfig.LabelProfile.ANIME))
     }
 
     private fun refreshLabelChipGroup(group: ChipGroup, labels: List<String>) {
@@ -192,13 +190,6 @@ class SettingsFragment : Fragment() {
             } else {
                 group.addView(createLabelChip(label))
             }
-        }
-    }
-
-    private fun refreshEyeModeChipGroup() {
-        eyeModeChipGroup.removeAllViews()
-        DetectionConfig.FACE_LABELS.forEach { label ->
-            eyeModeChipGroup.addView(createEyeModeChip(label))
         }
     }
 
@@ -216,23 +207,6 @@ class SettingsFragment : Fragment() {
         chip.setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
         chip.alpha = if (privacySettings.isLabelBlocked(label)) 1f else 0.5f
         chip.setOnClickListener { toggleInlineLabelSettings(label) }
-        return chip
-    }
-
-    private fun createEyeModeChip(label: String): Chip {
-        val chip = Chip(requireContext())
-        chip.text = privacySettings.getLabelDisplayName(label)
-        chip.isCheckable = true
-        chip.isChecked = privacySettings.isLabelEyeMode(label)
-        chip.chipBackgroundColor = colorStateList(R.attr.svColorCard)
-        chip.chipStrokeColor = colorStateList(R.attr.svColorBorder)
-        chip.chipStrokeWidth = resources.displayMetrics.density
-        chip.setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
-        chip.alpha = if (privacySettings.isLabelBlocked(label)) 1f else 0.75f
-        chip.setOnCheckedChangeListener { _, isChecked ->
-            privacySettings.setLabelEyeMode(label, isChecked)
-            refreshLabelChips()
-        }
         return chip
     }
 
@@ -847,6 +821,8 @@ class SettingsFragment : Fragment() {
         // 初始化管理器
         privacySettings = PrivacySettingsManager.getInstance(requireContext())
         appSettings = AppSettingsManager.getInstance(requireContext())
+        privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.STANDARD)
+        privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.ANIME)
         
         // 调试相关UI
         debugToggle = view.findViewById(R.id.debugToggle)
@@ -882,7 +858,6 @@ class SettingsFragment : Fragment() {
         maskScaleSeekBar = view.findViewById(R.id.maskScaleSeekBar)
         labelChipGroup = view.findViewById(R.id.labelChipGroup)
         animeLabelChipGroup = view.findViewById(R.id.animeLabelChipGroup)
-        eyeModeChipGroup = view.findViewById(R.id.eyeModeChipGroup)
         labelSettingsInlineCard = view.findViewById(R.id.labelSettingsInlineCard)
         labelSettingsInlineContainer = view.findViewById(R.id.labelSettingsInlineContainer)
         stickerSummary = view.findViewById(R.id.stickerSummary)

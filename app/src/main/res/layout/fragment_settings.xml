@@ -589,41 +589,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:singleLine="false" />
 
-    <TextView
-        android:id="@+id/eyeModeLabelsLabel"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="@string/settings_eye_mode_labels_title"
-        android:textAppearance="?attr/textAppearanceBody1"
-        android:textColor="?attr/svColorTextPrimary"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/animeLabelChipGroup" />
-
-    <TextView
-        android:id="@+id/eyeModeLabelsHint"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="@string/settings_eye_mode_labels_hint"
-        android:textAppearance="?attr/textAppearanceBody2"
-        android:textColor="?attr/svColorTextSecondary"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/eyeModeLabelsLabel" />
-
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/eyeModeChipGroup"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        app:chipSpacing="8dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/eyeModeLabelsHint"
-        app:singleLine="false" />
-
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/labelSettingsInlineCard"
         android:layout_width="0dp"
@@ -637,7 +602,7 @@
         app:cardElevation="6dp"
         app:strokeColor="?attr/svColorAccent"
         app:strokeWidth="1dp"
-        app:layout_constraintTop_toBottomOf="@id/eyeModeChipGroup"
+        app:layout_constraintTop_toBottomOf="@id/animeLabelChipGroup"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
