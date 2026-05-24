@@ -285,6 +285,9 @@ class DetectionRenderEngine(
                     stickerProvider(null)
                 }
                 if (stickerBitmap != null) {
+                    // Pre-composite the original image so semi-transparent stickers
+                    // blend against the underlying photo instead of a transparent bitmap.
+                    outputCanvas.drawBitmap(base, 0f, 0f, null)
                     BlurEffects.drawSticker(outputCanvas, stickerBitmap, fullRect, base.width, base.height)
                 } else {
                     callbacks.onReverseStickerFallback()
