@@ -677,15 +677,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun isDisableLockedInProfile(label: String, profile: DetectionConfig.LabelProfile): Boolean {
-        return DetectionConfig.getLockedLabels(profile).contains(label) && !hasReverseOverride(profile)
+        return DetectionConfig.getLockedLabels(profile).contains(label)
     }
 
     private fun isReverseLockedInProfile(label: String, profile: DetectionConfig.LabelProfile): Boolean {
         return DetectionConfig.getLockedLabels(profile).contains(label)
-    }
-
-    private fun hasReverseOverride(profile: DetectionConfig.LabelProfile): Boolean {
-        return getReverseLabels(profile).isNotEmpty()
     }
 
     private fun captureCurrentSnapshot(name: String): PrivacyPreset {
@@ -1105,7 +1101,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun normalizeProtectedLabelState(profile: DetectionConfig.LabelProfile) {
-        if (hasReverseOverride(profile)) return
         val protected = DetectionConfig.getLockedLabels(profile)
         if (protected.isEmpty()) return
         val currentLabels = LinkedHashSet(readStoredBlockedLabels(profile) ?: emptyList())
