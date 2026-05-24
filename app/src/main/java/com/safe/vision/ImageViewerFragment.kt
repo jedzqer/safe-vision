@@ -123,7 +123,6 @@ class ImageViewerFragment : Fragment() {
     private var editingMetadataFile: File? = null
     private lateinit var backPressedCallback: OnBackPressedCallback
     private var hostContentPadding: IntArray? = null
-    private var contentViewPadding: IntArray? = null
     private var shouldRestoreFullscreenAfterLoad = false
 
     private data class MetadataLabelCacheEntry(
@@ -1436,8 +1435,7 @@ class ImageViewerFragment : Fragment() {
         cancelRandomPlay()
         val activity = requireActivity()
         val tabLayout = activity.findViewById<TabLayout?>(R.id.tabLayout)
-        val contentView = activity.findViewById<View?>(android.R.id.content)
-        val hostRoot = (contentView as? ViewGroup)?.getChildAt(0)
+        val hostRoot = activity.findViewById<View?>(R.id.mainRoot)
         if (hostContentPadding == null && hostRoot != null) {
             hostContentPadding = intArrayOf(
                 hostRoot.paddingLeft,
@@ -1446,17 +1444,8 @@ class ImageViewerFragment : Fragment() {
                 hostRoot.paddingBottom
             )
         }
-        if (contentViewPadding == null && contentView != null) {
-            contentViewPadding = intArrayOf(
-                contentView.paddingLeft,
-                contentView.paddingTop,
-                contentView.paddingRight,
-                contentView.paddingBottom
-            )
-        }
         tabLayout?.visibility = View.GONE
         hostRoot?.setPadding(0, 0, 0, 0)
-        contentView?.setPadding(0, 0, 0, 0)
         imageInfo.visibility = View.GONE
         animeMetadataBadge.visibility = View.GONE
         randomCountdownView.visibility = View.GONE
@@ -1471,13 +1460,9 @@ class ImageViewerFragment : Fragment() {
         backPressedCallback.isEnabled = false
         val activity = requireActivity()
         activity.findViewById<TabLayout?>(R.id.tabLayout)?.visibility = View.VISIBLE
-        val contentView = activity.findViewById<View?>(android.R.id.content)
-        val hostRoot = (contentView as? ViewGroup)?.getChildAt(0)
+        val hostRoot = activity.findViewById<View?>(R.id.mainRoot)
         hostContentPadding?.let { padding ->
             hostRoot?.setPadding(padding[0], padding[1], padding[2], padding[3])
-        }
-        contentViewPadding?.let { padding ->
-            contentView?.setPadding(padding[0], padding[1], padding[2], padding[3])
         }
         updateMediaContainerFullscreenState(false)
         showSystemBars()
