@@ -4,13 +4,16 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.LruCache
 
 /**
  * 贴纸加载与缓存工具，支持默认贴纸和用户自定义贴纸。
  */
 object StickerLoader {
 
-    private val cachedBitmaps = linkedMapOf<String, Bitmap>()
+    private val cachedBitmaps: LruCache<String, Bitmap> = LruCache(
+        (Runtime.getRuntime().maxMemory() / 16).toInt().coerceAtLeast(1)
+    )
 
     fun loadSticker(context: Context, settings: PrivacySettingsManager, label: String? = null): Bitmap? {
         val customUri = settings.getStickerUriForLabel(label)
@@ -26,13 +29,14 @@ object StickerLoader {
             loadFromUri(context, customUri) ?: loadFromAssets(context)
         }
 
-        bitmap?.let { cachedBitmaps[sourceKey] = it }
+        bitmap?.let { cachedBitmaps.put(sourceKey, it) }
         return bitmap
     }
 
     fun clearCache() {
-        cachedBitmaps.values.forEach { it.recycle() }
-        cachedBitmaps.clear()
+        val snapshot = cachedBitmaps.snapshot()
+        cachedBitmaps.evictAll()
+        snapshot.values.forEach { if (!it.isRecycled) it.recycle() }
     }
 
     private fun loadFromAssets(context: Context): Bitmap? {

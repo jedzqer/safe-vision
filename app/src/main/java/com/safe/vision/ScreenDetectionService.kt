@@ -273,6 +273,9 @@ class ScreenDetectionService : Service() {
         runCatching { mediaProjection?.stop() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "停止 MediaProjection 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         mediaProjection = null
+        runCatching { yoloRunner?.close() }
+        yoloRunner = null
+        currentVariant = null
         overlayMetrics = null
     }
 

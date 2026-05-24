@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
 import kotlin.math.ceil
@@ -20,7 +21,7 @@ import kotlin.math.min
  */
 class FaceLandmarkOnnxRunner(
     context: Context
-) {
+) : Closeable {
     private val environment = OrtEnvironment.getEnvironment()
     private val inputSize = 320
     private val session: OrtSession
@@ -258,6 +259,10 @@ class FaceLandmarkOnnxRunner(
             }
         }
         return FloatArray(anchors.size) { anchors[it] }
+    }
+
+    override fun close() {
+        runCatching { session.close() }
     }
 
     data class FaceDetection(

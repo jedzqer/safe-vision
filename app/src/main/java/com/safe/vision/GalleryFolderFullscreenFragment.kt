@@ -780,11 +780,10 @@ private class FolderMediaAdapter(
         }
 
         private fun readDuration(videoFile: File): String {
+            val retriever = MediaMetadataRetriever()
             return try {
-                val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(videoFile.absolutePath)
                 val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                retriever.release()
                 if (durationMs == null) {
                     "--:--"
                 } else {
@@ -795,6 +794,8 @@ private class FolderMediaAdapter(
                 }
             } catch (_: Exception) {
                 "--:--"
+            } finally {
+                retriever.release()
             }
         }
     }

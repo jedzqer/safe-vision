@@ -22,6 +22,7 @@ object YoloModelProvider {
 
     fun clear() {
         synchronized(this) {
+            runners.values.forEach { runCatching { it.close() } }
             runners.clear()
         }
     }

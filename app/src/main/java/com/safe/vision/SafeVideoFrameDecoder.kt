@@ -65,6 +65,7 @@ class SafeVideoFrameDecoder(
 
     fun nextFrame(indexHint: Int): DecodedVideoFrame? {
         if (outputDone) return null
+        var tryAgainCount = 0
         while (true) {
             if (!inputDone) {
                 val inputIndex = decoder.dequeueInputBuffer(10_000)
@@ -91,8 +92,10 @@ class SafeVideoFrameDecoder(
             when {
                 outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
                     if (inputDone) {
-                        outputDone = true
-                        return null
+                        if (++tryAgainCount >= 50) {
+                            outputDone = true
+                            return null
+                        }
                     }
                 }
                 outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> continue

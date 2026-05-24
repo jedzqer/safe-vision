@@ -16,6 +16,7 @@ object FaceLandmarkModelProvider {
 
     fun clear() {
         synchronized(this) {
+            runCatching { runner?.close() }
             runner = null
         }
     }

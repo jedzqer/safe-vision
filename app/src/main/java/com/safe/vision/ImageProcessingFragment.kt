@@ -268,35 +268,35 @@ class ImageProcessingFragment : Fragment() {
         }
         
         // 监听批量处理状态
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             batchManager.processingState.collect { state ->
                 updateBatchUI(state)
             }
         }
-        
+
         // 监听批量处理进度
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             batchManager.progress.collect { progress ->
                 updateBatchProgress(progress)
             }
         }
 
         // 监听视频处理状态
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             videoProcessingManager.state.collect { state ->
                 updateVideoState(state)
             }
         }
 
         // 监听视频处理进度
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             videoProcessingManager.progress.collect { progress ->
                 updateVideoProgress(progress)
             }
         }
-        
+
         // 监听批量处理结果
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             batchManager.results.collect { results ->
                 batchResultsAdapter.updateResults(results)
             }

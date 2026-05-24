@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
 import kotlin.math.max
@@ -22,7 +23,7 @@ import kotlin.math.min
 class YoloOnnxRunner(
     context: Context,
     private val variant: DetectionModelVariant = DetectionModelVariant.STANDARD
-) {
+) : Closeable {
 
     private val appContext = context.applicationContext
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment()
@@ -397,6 +398,11 @@ class YoloOnnxRunner(
         val optimizedFileName: String,
         val label: String
     )
+
+    override fun close() {
+        runCatching { faceLandmarkRunner?.close() }
+        runCatching { session.close() }
+    }
 
     companion object {
         fun withDerivedEyeRegionDetections(detections: List<Detection>): List<Detection> {

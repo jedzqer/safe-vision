@@ -40,6 +40,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
     private val inferenceMutex = Mutex()
     private val resultsMutex = Mutex()
     
+    @Volatile
     private var yoloRunner: YoloOnnxRunner? = null
     private var isModelLoaded = false
     private var loadedModelVariant: DetectionModelVariant? = null
@@ -247,10 +248,9 @@ class BatchProcessingManager private constructor(private val context: Context) {
             safeDeleteTempFile(task.tempFile)
             // 释放URI权限
             releaseUriPermission(task.uri)
+            processedCount.incrementAndGet()
+            updateProgress()
         }
-        
-        processedCount.incrementAndGet()
-        updateProgress()
     }
     
     private suspend fun processImage(task: BatchProcessingTask): BatchProcessingResult {

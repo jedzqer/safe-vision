@@ -482,6 +482,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                             var lastReportedPercentage = 0
                             var nextFrameIndex = 0
                             val pendingFrames = HashMap<Int, RenderedFrame>()
+                            try {
 
                             suspend fun encodeFrame(frame: RenderedFrame) {
                                 try {
@@ -551,6 +552,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
                                 nextFrameIndex++
                             }
                             drainEncoder(endOfStream = true)
+                            } finally {
+                                pendingFrames.values.forEach { if (!it.bitmap.isRecycled) it.bitmap.recycle() }
+                                pendingFrames.clear()
+                            }
                         }
                     }
                     val allJobs = mutableListOf(decodeJob, detectJob, renderCloserJob, encodeJob)
