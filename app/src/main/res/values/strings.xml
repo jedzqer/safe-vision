@@ -161,6 +161,7 @@
     <string name="viewer_share_no_media">没有可分享的媒体</string>
     <string name="viewer_share_error_generic">无法分享当前媒体，请稍后重试</string>
     <string name="viewer_share_error">分享失败：%1$s</string>
+    <string name="viewer_enter_fullscreen">全屏查看图片</string>
     <string name="viewer_actions_title">媒体操作：%1$s</string>
     <string name="viewer_actions_title_simple">媒体操作</string>
     <string name="viewer_action_delete">删除</string>

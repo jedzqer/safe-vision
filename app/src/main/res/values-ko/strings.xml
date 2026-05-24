@@ -128,6 +128,7 @@
     <string name="viewer_share_no_media">공유할 미디어가 없습니다</string>
     <string name="viewer_share_error_generic">현재 미디어를 공유할 수 없습니다. 잠시 후 다시 시도해 주세요.</string>
     <string name="viewer_share_error">공유 실패: %1$s</string>
+    <string name="viewer_enter_fullscreen">이미지를 전체 화면으로 보기</string>
     <string name="viewer_actions_title">미디어 작업: %1$s</string>
     <string name="viewer_actions_title_simple">미디어 작업</string>
     <string name="viewer_action_delete">삭제</string>

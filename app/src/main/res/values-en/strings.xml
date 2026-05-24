@@ -161,6 +161,7 @@
     <string name="viewer_share_no_media">No media to share</string>
     <string name="viewer_share_error_generic">Unable to share the current media. Please try again later.</string>
     <string name="viewer_share_error">Share failed: %1$s</string>
+    <string name="viewer_enter_fullscreen">View image fullscreen</string>
     <string name="viewer_actions_title">Media Actions: %1$s</string>
     <string name="viewer_actions_title_simple">Media Actions</string>
     <string name="viewer_action_delete">Delete</string>

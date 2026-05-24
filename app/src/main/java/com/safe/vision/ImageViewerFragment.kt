@@ -18,15 +18,21 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
+import androidx.activity.OnBackPressedCallback
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.tabs.TabLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
@@ -47,6 +53,13 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 class ImageViewerFragment : Fragment() {
+    companion object {
+        private const val STATE_CURRENT_MEDIA_PATH = "current_media_path"
+        private const val STATE_PENDING_MEDIA_PATH = "pending_media_path"
+        private const val STATE_RESTORE_FULLSCREEN = "restore_fullscreen"
+    }
+
+    private lateinit var mediaContainer: View
     private lateinit var fullSizeImage: ImageView
     private lateinit var fullSizeVideo: VideoView
     private lateinit var imageInfo: TextView
@@ -55,6 +68,7 @@ class ImageViewerFragment : Fragment() {
     private lateinit var randomCountdownView: CircularCountdownView
     private lateinit var detectionEditorOverlay: DetectionEditorOverlayView
     private lateinit var editToolbar: LinearLayout
+    private lateinit var btnEnterFullscreen: ImageButton
     private lateinit var btnAddBox: MaterialButton
     private lateinit var btnDoneEdit: MaterialButton
     private lateinit var videoSeekContainer: LinearLayout
@@ -104,8 +118,12 @@ class ImageViewerFragment : Fragment() {
     private var randomQueueEmptyToastKey: String? = null
     private val metadataLabelCache = mutableMapOf<String, MetadataLabelCacheEntry>()
     private var isEditMode = false
+    private var isImageFullscreen = false
     private var editableDetections: MutableList<EditableDetection> = mutableListOf()
     private var editingMetadataFile: File? = null
+    private lateinit var backPressedCallback: OnBackPressedCallback
+    private var hostContentPadding: IntArray? = null
+    private var shouldRestoreFullscreenAfterLoad = false
 
     private data class MetadataLabelCacheEntry(
         val lastModified: Long,
@@ -123,6 +141,7 @@ class ImageViewerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        mediaContainer = view.findViewById(R.id.mediaContainer)
         fullSizeImage = view.findViewById(R.id.fullSizeImage)
         fullSizeVideo = view.findViewById(R.id.fullSizeVideo)
         imageInfo = view.findViewById(R.id.imageInfo)
@@ -131,12 +150,16 @@ class ImageViewerFragment : Fragment() {
         randomCountdownView = view.findViewById(R.id.randomCountdownView)
         detectionEditorOverlay = view.findViewById(R.id.detectionEditorOverlay)
         editToolbar = view.findViewById(R.id.editToolbar)
+        btnEnterFullscreen = view.findViewById(R.id.btnEnterFullscreen)
         btnAddBox = view.findViewById(R.id.btnAddBox)
         btnDoneEdit = view.findViewById(R.id.btnDoneEdit)
         videoSeekContainer = view.findViewById(R.id.videoSeekContainer)
         videoSeekSlider = view.findViewById(R.id.videoSeekSlider)
         videoPositionText = view.findViewById(R.id.videoPositionText)
         videoDurationText = view.findViewById(R.id.videoDurationText)
+        pendingTargetPath = savedInstanceState?.getString(STATE_PENDING_MEDIA_PATH)
+            ?: savedInstanceState?.getString(STATE_CURRENT_MEDIA_PATH)
+        shouldRestoreFullscreenAfterLoad = savedInstanceState?.getBoolean(STATE_RESTORE_FULLSCREEN, false) == true
         
         // 初始化隐私处理器
         privacyProcessor = ImagePrivacyProcessor(requireContext())
@@ -159,6 +182,15 @@ class ImageViewerFragment : Fragment() {
             }
             DebugLogManager.addLog("媒体浏览", "视频播放失败: ${failedFile.name}, what=$what extra=$extra")
             true
+        }
+        backPressedCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                exitImageFullscreen()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
+        btnEnterFullscreen.setOnClickListener {
+            enterImageFullscreen()
         }
         btnAddBox.setOnClickListener { showAddLabelDialog() }
         btnDoneEdit.setOnClickListener { saveAndExitEditMode() }
@@ -352,7 +384,6 @@ class ImageViewerFragment : Fragment() {
             true
         }
 
-        val mediaContainer = view.findViewById<View>(R.id.mediaContainer)
         mediaContainer?.setOnTouchListener { touchedView, event ->
             if (isEditMode) return@setOnTouchListener true
             // 图片场景下由 fullSizeImage 独占处理点击翻页，避免容器与图片双通道重复触发
@@ -422,6 +453,16 @@ class ImageViewerFragment : Fragment() {
         loadMedia()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_PENDING_MEDIA_PATH, pendingTargetPath)
+        outState.putString(STATE_CURRENT_MEDIA_PATH, allMedia.getOrNull(currentIndex)?.absolutePath)
+        outState.putBoolean(
+            STATE_RESTORE_FULLSCREEN,
+            isImageFullscreen || shouldRestoreFullscreenAfterLoad
+        )
+    }
+
     private fun loadMedia() {
         val currentPath = allMedia.getOrNull(currentIndex)?.absolutePath
         val rootDir = requireContext().getExternalFilesDir(null) ?: requireContext().filesDir
@@ -442,11 +483,13 @@ class ImageViewerFragment : Fragment() {
         rebuildRandomCandidatesIfNeeded(force = true)
 
         if (allMedia.isEmpty()) {
+            exitImageFullscreen()
             emptyText.visibility = View.VISIBLE
             fullSizeImage.visibility = View.GONE
             fullSizeVideo.visibility = View.GONE
             imageInfo.visibility = View.GONE
             animeMetadataBadge.visibility = View.GONE
+            btnEnterFullscreen.visibility = View.GONE
             hideVideoSeekControls()
             currentProcessedBitmap = null
             currentMetadataFile = null
@@ -491,10 +534,14 @@ class ImageViewerFragment : Fragment() {
         val mediaFile = allMedia[currentIndex]
         val isVideo = isVideoFile(mediaFile)
         currentMetadataFile = null
+        if (isVideo && isImageFullscreen) {
+            exitImageFullscreen()
+        }
 
         if (isVideo) {
             currentProcessedBitmap = null
             animeMetadataBadge.visibility = View.GONE
+            btnEnterFullscreen.visibility = View.GONE
             fullSizeVideo.stopPlayback()
             stopVideoProgressUpdates()
             fullSizeImage.visibility = View.GONE
@@ -562,6 +609,7 @@ class ImageViewerFragment : Fragment() {
                 } else {
                     detectionEditorOverlay.setImageMatrix(imageMatrix)
                 }
+                updateImageChromeVisibility()
                 
                 DebugLogManager.addLog("媒体浏览", "显示图片: ${mediaFile.name}")
                 if (metadataFile != null) {
@@ -570,12 +618,31 @@ class ImageViewerFragment : Fragment() {
             } catch (e: Exception) {
                 fullSizeImage.setImageResource(android.R.drawable.ic_menu_report_image)
                 animeMetadataBadge.visibility = View.GONE
+                btnEnterFullscreen.visibility = View.GONE
                 DebugLogManager.addLog("媒体浏览", "加载图片失败: ${e.message}")
             }
         }
 
         // 更新信息文本
         imageInfo.text = getString(R.string.viewer_image_info, currentIndex + 1, allMedia.size)
+        if (!isImageFullscreen) {
+            imageInfo.visibility = View.VISIBLE
+        }
+        if (!isVideo && shouldRestoreFullscreenAfterLoad) {
+            fullSizeImage.post {
+                if (isAdded &&
+                    view != null &&
+                    !isImageFullscreen &&
+                    currentIndex in allMedia.indices &&
+                    !isVideoFile(allMedia[currentIndex])
+                ) {
+                    enterImageFullscreen()
+                }
+                shouldRestoreFullscreenAfterLoad = false
+            }
+        } else if (isVideo) {
+            shouldRestoreFullscreenAfterLoad = false
+        }
         restartRandomPlayCountdown()
     }
 
@@ -588,7 +655,7 @@ class ImageViewerFragment : Fragment() {
             DebugLogManager.addLog("媒体浏览", "读取动漫元数据标记失败: ${metadataFile?.name}, ${error.message}")
             false
         }
-        animeMetadataBadge.visibility = if (isAnimeMetadata) View.VISIBLE else View.GONE
+        animeMetadataBadge.visibility = if (isAnimeMetadata && !isImageFullscreen) View.VISIBLE else View.GONE
     }
 
     private fun resetImageZoom(bitmap: Bitmap): Boolean {
@@ -1206,6 +1273,9 @@ class ImageViewerFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        if (isImageFullscreen) {
+            exitImageFullscreen()
+        }
         cancelRandomPlay()
         stopMetronome()
         randomQueueBuildJob?.cancel()
@@ -1220,6 +1290,9 @@ class ImageViewerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        if (isImageFullscreen) {
+            exitImageFullscreen()
+        }
         stopVideoProgressUpdates()
         super.onDestroyView()
     }
@@ -1313,6 +1386,7 @@ class ImageViewerFragment : Fragment() {
         cancelRandomPlay()
         editToolbar.visibility = View.VISIBLE
         detectionEditorOverlay.visibility = View.VISIBLE
+        btnEnterFullscreen.visibility = View.GONE
         detectionEditorOverlay.setEditorData(
             editableDetections,
             imageMatrix,
@@ -1327,6 +1401,98 @@ class ImageViewerFragment : Fragment() {
         detectionEditorOverlay.visibility = View.GONE
         editableDetections = mutableListOf()
         editingMetadataFile = null
+        updateImageChromeVisibility()
+    }
+
+    private fun enterImageFullscreen() {
+        if (isImageFullscreen || isEditMode || fullSizeImage.visibility != View.VISIBLE || currentProcessedBitmap == null) {
+            return
+        }
+        isImageFullscreen = true
+        backPressedCallback.isEnabled = true
+        cancelRandomPlay()
+        val activity = requireActivity()
+        val tabLayout = activity.findViewById<TabLayout?>(R.id.tabLayout)
+        val hostRoot = activity.findViewById<View?>(android.R.id.content)?.let { content ->
+            (content as? ViewGroup)?.getChildAt(0)
+        }
+        if (hostContentPadding == null && hostRoot != null) {
+            hostContentPadding = intArrayOf(
+                hostRoot.paddingLeft,
+                hostRoot.paddingTop,
+                hostRoot.paddingRight,
+                hostRoot.paddingBottom
+            )
+        }
+        tabLayout?.visibility = View.GONE
+        hostRoot?.setPadding(0, 0, 0, 0)
+        imageInfo.visibility = View.GONE
+        animeMetadataBadge.visibility = View.GONE
+        randomCountdownView.visibility = View.GONE
+        btnEnterFullscreen.visibility = View.GONE
+        updateMediaContainerFullscreenState(true)
+        hideSystemBars()
+    }
+
+    private fun exitImageFullscreen() {
+        if (!isImageFullscreen) return
+        isImageFullscreen = false
+        backPressedCallback.isEnabled = false
+        val activity = requireActivity()
+        activity.findViewById<TabLayout?>(R.id.tabLayout)?.visibility = View.VISIBLE
+        val hostRoot = activity.findViewById<View?>(android.R.id.content)?.let { content ->
+            (content as? ViewGroup)?.getChildAt(0)
+        }
+        hostContentPadding?.let { padding ->
+            hostRoot?.setPadding(padding[0], padding[1], padding[2], padding[3])
+        }
+        updateMediaContainerFullscreenState(false)
+        showSystemBars()
+        if (allMedia.isNotEmpty()) {
+            imageInfo.visibility = View.VISIBLE
+        }
+        updateAnimeMetadataBadge(currentMetadataFile)
+        updateImageChromeVisibility()
+        if (appSettings.isRandomPlayEnabled()) {
+            restartRandomPlayCountdown()
+        }
+    }
+
+    private fun updateImageChromeVisibility() {
+        val shouldShowFullscreenButton = !isImageFullscreen &&
+            !isEditMode &&
+            fullSizeImage.visibility == View.VISIBLE &&
+            currentProcessedBitmap != null
+        btnEnterFullscreen.visibility = if (shouldShowFullscreenButton) View.VISIBLE else View.GONE
+        if (!isImageFullscreen && allMedia.isNotEmpty()) {
+            imageInfo.visibility = View.VISIBLE
+        }
+    }
+
+    private fun updateMediaContainerFullscreenState(fullscreen: Boolean) {
+        val layoutParams = mediaContainer.layoutParams as? ConstraintLayout.LayoutParams ?: return
+        if (fullscreen) {
+            layoutParams.bottomToTop = ConstraintLayout.LayoutParams.UNSET
+            layoutParams.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+        } else {
+            layoutParams.bottomToBottom = ConstraintLayout.LayoutParams.UNSET
+            layoutParams.bottomToTop = R.id.imageInfo
+        }
+        mediaContainer.layoutParams = layoutParams
+    }
+
+    private fun hideSystemBars() {
+        val window = requireActivity().window
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    private fun showSystemBars() {
+        val window = requireActivity().window
+        WindowInsetsControllerCompat(window, window.decorView)
+            .show(WindowInsetsCompat.Type.systemBars())
     }
 
     private fun showAddLabelDialog() {
