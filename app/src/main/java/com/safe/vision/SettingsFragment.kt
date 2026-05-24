@@ -2239,57 +2239,13 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showSupportDialog() {
-        val context = requireContext()
-        val scrollView = AndroidScrollView(context)
-        val padding = (16 * resources.displayMetrics.density).toInt()
-        val imageTopMargin = (12 * resources.displayMetrics.density).toInt()
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, padding)
-        }
-
-        val messageView = TextView(context).apply {
-            text = getString(R.string.support_message)
-            textSize = 14f
-            setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
-        }
-
-        val imageView = ImageView(context).apply {
-            adjustViewBounds = true
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = imageTopMargin
-            }
-        }
-
-        val stickerBitmap = try {
-            context.assets.open("support.jpg").use { stream ->
-                BitmapFactory.decodeStream(stream)
-            }
-        } catch (e: Exception) {
-            DebugLogManager.addLog("设置", "加载赞赏码失败: ${e.message}")
-            null
-        }
-
-        if (stickerBitmap != null) {
-            imageView.setImageBitmap(stickerBitmap)
-        }
-
-        container.addView(messageView)
-        container.addView(imageView)
-        scrollView.addView(container)
-        DialogUtils.ensureDialogLayoutParams(scrollView)
-
-        DialogUtils.builder(context)
-            .setTitle(R.string.support_title)
-            .setView(scrollView)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
-
-        DebugLogManager.addLog("设置", "打开赞赏弹窗")
+        val supportUrl = "https://github.com/jedzqer/safe-vision/blob/main/support/support.md"
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(supportUrl)
+        )
+        startActivity(intent)
+        DebugLogManager.addLog("设置", "打开赞赏页面")
     }
 
     private data class LanguageOption(val preference: String, val label: String)
