@@ -311,6 +311,10 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_korean">Korean</string>
     <string name="settings_language_changed">Language switched to: %1$s</string>
+    <string name="settings_about_button">About</string>
+    <string name="settings_about_dialog_title">About Safe Vision</string>
+    <string name="settings_about_version">Version: %1$s</string>
+    <string name="settings_about_source_code">Source Code</string>
     <string name="support_title">Support the Project</string>
     <string name="support_button">Support the Project</string>
     <string name="support_message">If you think this app is pretty good, feel free to support it. Even a tiny amount helps 😸. If you want to support it but cannot, that is also fine. I still appreciate the thought 😎</string>

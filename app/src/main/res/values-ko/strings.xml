@@ -278,6 +278,10 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_korean">한국어</string>
     <string name="settings_language_changed">언어가 %1$s(으)로 변경되었습니다</string>
+    <string name="settings_about_button">앱 정보</string>
+    <string name="settings_about_dialog_title">Safe Vision 정보</string>
+    <string name="settings_about_version">버전: %1$s</string>
+    <string name="settings_about_source_code">소스 코드</string>
     <string name="support_title">프로젝트 후원</string>
     <string name="support_button">프로젝트 후원</string>
     <string name="support_message">이 앱이 괜찮다고 느껴지면 후원해 주세요. 아주 작은 금액도 큰 도움이 됩니다 😸. 후원하고 싶지만 어려운 경우라도 괜찮습니다. 마음만으로도 감사합니다 😎</string>

@@ -56,6 +56,7 @@ class SettingsFragment : Fragment() {
     private lateinit var shareLogsButton: Button
     private lateinit var joinGroupButton: Button
     private lateinit var languageButton: Button
+    private lateinit var aboutButton: Button
     private lateinit var supportButton: Button
     
     // 遮挡设置相关UI
@@ -865,6 +866,7 @@ class SettingsFragment : Fragment() {
         resetStickerButton = view.findViewById(R.id.resetStickerButton)
         supportButton = view.findViewById(R.id.supportButton)
         languageButton = view.findViewById(R.id.languageButton)
+        aboutButton = view.findViewById(R.id.aboutButton)
 
         uploadViaFileSystemSwitch = view.findViewById(R.id.uploadViaFileSystemSwitch)
         videoSpeedButton = view.findViewById(R.id.videoSpeedButton)
@@ -888,6 +890,7 @@ class SettingsFragment : Fragment() {
         setupDebugFeatures()
         setupCommunitySection()
         setupLanguageSection()
+        setupAboutSection()
         setupSupportSection()
         setupInlineLabelCardDismiss()
         
@@ -2081,6 +2084,34 @@ class SettingsFragment : Fragment() {
         languageButton.setOnClickListener {
             showLanguageDialog()
         }
+    }
+
+    private fun setupAboutSection() {
+        aboutButton.setOnClickListener {
+            showAboutDialog()
+        }
+    }
+
+    private fun showAboutDialog() {
+        val context = requireContext()
+        val versionName = context.packageManager
+            .getPackageInfo(context.packageName, 0).versionName
+        val repoUrl = "https://github.com/jedzqer/safe-vision"
+        DialogUtils.builder(context)
+            .setTitle(R.string.settings_about_dialog_title)
+            .setMessage(
+                "${getString(R.string.settings_about_version, versionName)}\n\n" +
+                "${getString(R.string.settings_about_source_code)}: $repoUrl"
+            )
+            .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.settings_about_source_code) { _, _ ->
+                val intent = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(repoUrl)
+                )
+                startActivity(intent)
+            }
+            .show()
     }
 
     private fun showLanguageDialog() {
