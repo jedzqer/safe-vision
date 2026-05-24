@@ -43,8 +43,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         private const val KEY_REVERSE_PRE_RENDER_ENABLED = "reverse_pre_render_enabled"
         private const val KEY_PRIVACY_PRESETS = "privacy_presets"
         private const val KEY_ACTIVE_PRESET_NAME = "active_preset_name"
-        private const val KEY_EYE_REGION_DEFAULT_OFF_MIGRATED = "eye_region_default_off_migrated"
-        
         // 遮挡模式
         const val BLUR_MODE_MOSAIC = 0  // 马赛克
         const val BLUR_MODE_BLACK = 1   // 纯黑
@@ -304,7 +302,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val blockedLabels: List<String>,
         val labelEffectOverrides: Map<String, Int>,
         val reverseLabels: List<String>,
-        val eyeModeLabels: List<String>,
         val maskOutlineLabels: List<String>,
         val reversePreRenderEnabled: Boolean
     )
@@ -474,54 +471,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         setReverseLabels(profile, currentLabels.toList())
     }
 
-    fun getEyeModeLabels(): List<String> {
-        return getEyeModeLabels(getCurrentProfile())
-    }
-
-    fun getEyeModeLabels(profile: DetectionConfig.LabelProfile): List<String> {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_EYE_MODE_LABELS else KEY_EYE_MODE_LABELS
-        val labelsJson = sharedPrefs.getString(key, null)
-            ?: return emptyList()
-        return try {
-            val jsonArray = JSONArray(labelsJson)
-            val labels = mutableListOf<String>()
-            for (i in 0 until jsonArray.length()) {
-                val label = jsonArray.getString(i)
-                if (DetectionConfig.getLabels(profile).contains(label) && DetectionConfig.FACE_LABELS.contains(label)) {
-                    labels.add(label)
-                }
-            }
-            labels.toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    fun isLabelEyeMode(label: String): Boolean {
-        if (DetectionConfig.isEyeRegionLabel(label)) {
-            val profile = getCurrentProfile()
-            return !isLabelBlocked(label, profile)
-        }
-        if (!DetectionConfig.canDeriveEyeRegion(label)) return false
-        val profile = resolveProfileForLabel(label)
-        if (isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) return false
-        return getEyeModeLabels(profile).contains(label)
-    }
-
-    fun setLabelEyeMode(label: String, enabled: Boolean) {
-        if (!DetectionConfig.FACE_LABELS.contains(label)) {
-            return
-        }
-        val profile = resolveProfileForLabel(label)
-        val currentLabels = LinkedHashSet(getEyeModeLabels(profile))
-        if (enabled) {
-            currentLabels.add(label)
-        } else {
-            currentLabels.remove(label)
-        }
-        setEyeModeLabels(profile, currentLabels.toList())
-    }
-    
     /**
      * 获取所有可用的标签选项
      */
@@ -717,10 +666,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 getReverseLabels(DetectionConfig.LabelProfile.STANDARD),
                 getReverseLabels(DetectionConfig.LabelProfile.ANIME)
             ),
-            eyeModeLabels = mergeLabelLists(
-                getEyeModeLabels(DetectionConfig.LabelProfile.STANDARD),
-                getEyeModeLabels(DetectionConfig.LabelProfile.ANIME)
-            ),
             maskOutlineLabels = mergeLabelLists(
                 getMaskOutlineLabels(DetectionConfig.LabelProfile.STANDARD),
                 getMaskOutlineLabels(DetectionConfig.LabelProfile.ANIME)
@@ -773,14 +718,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         )
         setReverseLabels(DetectionConfig.LabelProfile.STANDARD, standardReverse)
         setReverseLabels(DetectionConfig.LabelProfile.ANIME, animeReverse)
-        setEyeModeLabels(
-            DetectionConfig.LabelProfile.STANDARD,
-            filterLabelsForProfile(preset.eyeModeLabels, DetectionConfig.LabelProfile.STANDARD)
-        )
-        setEyeModeLabels(
-            DetectionConfig.LabelProfile.ANIME,
-            filterLabelsForProfile(preset.eyeModeLabels, DetectionConfig.LabelProfile.ANIME)
-        )
         setMaskOutlineLabels(
             DetectionConfig.LabelProfile.STANDARD,
             filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.STANDARD)
@@ -818,6 +755,18 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         if (!isValidBlurMode(animeBlurMode)) return null
         val stickerUri = obj.opt("stickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         val animeStickerUri = obj.opt("animeStickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: stickerUri
+        val legacyEyeModeLabels = parseFaceLabelList(obj.optJSONArray("eyeModeLabels"))
+        val blockedLabels = parseLabelList(
+            obj.optJSONArray("blockedLabels"),
+            includeLocked = true,
+            default = emptyList()
+        ).let { parsed ->
+            if (legacyEyeModeLabels.isEmpty()) {
+                parsed
+            } else {
+                LinkedHashSet(parsed).apply { add(DetectionConfig.EYE_REGION_LABEL) }.toList()
+            }
+        }
         return PrivacyPreset(
             name = name,
             blurMode = blurMode,
@@ -834,17 +783,9 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             animeStickerUri = animeStickerUri,
             labelStickerUris = parseLabelStickerUris(obj.optJSONObject("labelStickerUris")),
             labelMaskScales = parseScaleOverrides(obj.optJSONObject("labelMaskScales")),
-            blockedLabels = parseLabelList(
-                obj.optJSONArray("blockedLabels"),
-                includeLocked = true,
-                default = emptyList()
-            ),
+            blockedLabels = blockedLabels,
             labelEffectOverrides = parseOverrides(obj.optJSONObject("labelEffectOverrides")),
             reverseLabels = parseLabelList(obj.optJSONArray("reverseLabels"), includeLocked = false, default = emptyList()),
-            eyeModeLabels = parseFaceLabelList(
-                obj.optJSONArray("eyeModeLabels"),
-                DetectionConfig.STANDARD_FACE_LABELS.toList()
-            ),
             maskOutlineLabels = parseLabelList(obj.optJSONArray("maskOutlineLabels"), includeLocked = true, default = DetectionConfig.LABELS),
             reversePreRenderEnabled = obj.optBoolean("reversePreRenderEnabled", true)
         )
@@ -873,26 +814,15 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         return if (out.isEmpty()) default else out.toList()
     }
 
-    fun migrateLegacyEyeModeLabelsToEyeRegion(profile: DetectionConfig.LabelProfile) {
-        val legacyEyeModeLabels = getEyeModeLabels(profile)
-        if (legacyEyeModeLabels.isEmpty()) return
-        if (!isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) {
-            val currentLabels = LinkedHashSet(getBlockedLabels(profile))
-            currentLabels.add(DetectionConfig.EYE_REGION_LABEL)
-            setBlockedLabels(profile, currentLabels.toList())
-        }
-        setEyeModeLabels(profile, emptyList())
-    }
-
-    fun migrateEyeRegionDefaultOff() {
-        if (sharedPrefs.getBoolean(KEY_EYE_REGION_DEFAULT_OFF_MIGRATED, false)) return
-        for (profile in listOf(DetectionConfig.LabelProfile.STANDARD, DetectionConfig.LabelProfile.ANIME)) {
-            val currentLabels = LinkedHashSet(getBlockedLabels(profile))
-            if (currentLabels.remove(DetectionConfig.EYE_REGION_LABEL)) {
-                setBlockedLabels(profile, currentLabels.toList())
-            }
-        }
-        sharedPrefs.edit().putBoolean(KEY_EYE_REGION_DEFAULT_OFF_MIGRATED, true).apply()
+    fun migrateLegacyEyeModeSettings() {
+        migrateLegacyEyeModeSettingsForProfile(
+            DetectionConfig.LabelProfile.STANDARD,
+            KEY_EYE_MODE_LABELS
+        )
+        migrateLegacyEyeModeSettingsForProfile(
+            DetectionConfig.LabelProfile.ANIME,
+            KEY_ANIME_EYE_MODE_LABELS
+        )
     }
 
     private fun parseOverrides(obj: JSONObject?): Map<String, Int> {
@@ -953,7 +883,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     private fun serializePreset(preset: PrivacyPreset): JSONObject {
         val blocked = JSONArray().apply { preset.blockedLabels.forEach { put(it) } }
         val reverse = JSONArray().apply { preset.reverseLabels.forEach { put(it) } }
-        val eye = JSONArray().apply { preset.eyeModeLabels.forEach { put(it) } }
         val outline = JSONArray().apply { preset.maskOutlineLabels.forEach { put(it) } }
         val overrides = JSONObject().apply {
             preset.labelEffectOverrides.forEach { (label, mode) -> put(label, mode) }
@@ -978,7 +907,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             .put("blockedLabels", blocked)
             .put("labelEffectOverrides", overrides)
             .put("reverseLabels", reverse)
-            .put("eyeModeLabels", eye)
             .put("maskOutlineLabels", outline)
             .put("reversePreRenderEnabled", preset.reversePreRenderEnabled)
     }
@@ -1036,6 +964,39 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         labels.filter { allowed.contains(it) }.distinct().forEach { jsonArray.put(it) }
         val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLOCKED_LABELS else KEY_BLOCKED_LABELS
         sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
+    }
+
+    private fun migrateLegacyEyeModeSettingsForProfile(
+        profile: DetectionConfig.LabelProfile,
+        legacyKey: String
+    ) {
+        val legacyLabels = readLegacyEyeModeLabels(profile, legacyKey)
+        if (legacyLabels.isNotEmpty()) {
+            val currentLabels = LinkedHashSet(getBlockedLabels(profile))
+            currentLabels.add(DetectionConfig.EYE_REGION_LABEL)
+            setBlockedLabels(profile, currentLabels.toList())
+        }
+        sharedPrefs.edit().remove(legacyKey).apply()
+    }
+
+    private fun readLegacyEyeModeLabels(
+        profile: DetectionConfig.LabelProfile,
+        legacyKey: String
+    ): List<String> {
+        val labelsJson = sharedPrefs.getString(legacyKey, null) ?: return emptyList()
+        return try {
+            val jsonArray = JSONArray(labelsJson)
+            val labels = mutableListOf<String>()
+            for (i in 0 until jsonArray.length()) {
+                val label = jsonArray.getString(i)
+                if (DetectionConfig.getLabels(profile).contains(label) && DetectionConfig.FACE_LABELS.contains(label)) {
+                    labels.add(label)
+                }
+            }
+            labels
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     private fun readStoredReverseLabels(profile: DetectionConfig.LabelProfile): List<String>? {
@@ -1109,15 +1070,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         if (updated != currentLabels) {
             setBlockedLabels(profile, updated.toList())
         }
-    }
-
-    private fun setEyeModeLabels(profile: DetectionConfig.LabelProfile, labels: List<String>) {
-        val jsonArray = JSONArray()
-        labels
-            .filter { DetectionConfig.getLabels(profile).contains(it) && DetectionConfig.FACE_LABELS.contains(it) }
-            .forEach { jsonArray.put(it) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_EYE_MODE_LABELS else KEY_EYE_MODE_LABELS
-        sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
     }
 
     private fun readLabelStickerUris(): MutableMap<String, String> {

@@ -180,8 +180,19 @@ class SettingsFragment : Fragment() {
     }
     
     private fun refreshLabelChips() {
-        refreshLabelChipGroup(labelChipGroup, DetectionConfig.getLabels(DetectionConfig.LabelProfile.STANDARD))
-        refreshLabelChipGroup(animeLabelChipGroup, DetectionConfig.getLabels(DetectionConfig.LabelProfile.ANIME))
+        refreshLabelChipGroup(labelChipGroup, labelsForSettingsGroup(DetectionConfig.LabelProfile.STANDARD))
+        refreshLabelChipGroup(animeLabelChipGroup, labelsForSettingsGroup(DetectionConfig.LabelProfile.ANIME))
+    }
+
+    private fun labelsForSettingsGroup(profile: DetectionConfig.LabelProfile): List<String> {
+        val activeProfile = if (appSettings.getDetectionModelVariant() == DetectionModelVariant.ANIME) {
+            DetectionConfig.LabelProfile.ANIME
+        } else {
+            DetectionConfig.LabelProfile.STANDARD
+        }
+        return DetectionConfig.getLabels(profile).filterNot { label ->
+            DetectionConfig.isEyeRegionLabel(label) && profile != activeProfile
+        }
     }
 
     private fun refreshLabelChipGroup(group: ChipGroup, labels: List<String>) {
@@ -823,9 +834,7 @@ class SettingsFragment : Fragment() {
         // 初始化管理器
         privacySettings = PrivacySettingsManager.getInstance(requireContext())
         appSettings = AppSettingsManager.getInstance(requireContext())
-        privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.STANDARD)
-        privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.ANIME)
-        privacySettings.migrateEyeRegionDefaultOff()
+        privacySettings.migrateLegacyEyeModeSettings()
         
         // 调试相关UI
         debugToggle = view.findViewById(R.id.debugToggle)
