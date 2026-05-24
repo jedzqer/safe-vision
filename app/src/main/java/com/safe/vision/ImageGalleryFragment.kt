@@ -374,10 +374,14 @@ class ImageGalleryFragment : Fragment() {
             private fun bindPreview(view: ImageView, file: File?, isVideo: Boolean) {
                 val placeholder = if (isVideo) android.R.drawable.ic_media_play else android.R.drawable.ic_menu_gallery
                 view.setImageResource(placeholder)
+                view.tag = file?.absolutePath
                 if (file == null) return
                 val kind = if (isVideo) ThumbnailCacheManager.MediaKind.VIDEO else ThumbnailCacheManager.MediaKind.IMAGE
+                val expectedPath = file.absolutePath
                 thumbnailCacheManager.load(file, kind, PREVIEW_SIZE) { bitmap ->
-                    if (bitmap != null) view.setImageBitmap(bitmap) else view.setImageResource(placeholder)
+                    if (view.tag == expectedPath) {
+                        if (bitmap != null) view.setImageBitmap(bitmap) else view.setImageResource(placeholder)
+                    }
                 }
             }
         }

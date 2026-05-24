@@ -163,6 +163,7 @@
     <string name="settings_theme_title">主題風格</string>
     <string name="settings_theme_summary">選擇你喜歡的配色方案</string>
     <string name="settings_theme_default">預設：黑底紅色</string>
+    <string name="settings_theme_black_red">黑紅：黑底紅色（經典）</string>
     <string name="settings_theme_pastel">Pastel：#BBD8FF / #FFD4C4 / #2B3A67</string>
     <string name="settings_theme_deep_sea">Deep Sea：#114468 / #EF6837 / #2DE2E6</string>
     <string name="settings_theme_custom">自訂主題</string>

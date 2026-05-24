@@ -588,45 +588,52 @@ class ImageViewerFragment : Fragment() {
             hideVideoSeekControls()
             fullSizeImage.visibility = View.VISIBLE
             // 加载图片
-            try {
-                val bitmap = BitmapFactory.decodeFile(mediaFile.absolutePath)
-                if (bitmap == null) {
-                    fullSizeImage.setImageResource(android.R.drawable.ic_menu_report_image)
-                    DebugLogManager.addLog("媒体浏览", "加载图片失败: ${mediaFile.name}")
-                    return
-                }
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val bitmap = withContext(Dispatchers.IO) {
+                        BitmapFactory.decodeFile(mediaFile.absolutePath)
+                    }
+                    if (!isAdded) return@launch
+                    if (bitmap == null) {
+                        fullSizeImage.setImageResource(android.R.drawable.ic_menu_report_image)
+                        DebugLogManager.addLog("媒体浏览", "加载图片失败: ${mediaFile.name}")
+                        return@launch
+                    }
 
-                // 查找对应的元数据文件
-                val metadataFile = findMetadataFile(mediaFile)
-                currentMetadataFile = metadataFile
-                updateAnimeMetadataBadge(metadataFile)
-                
-                // 应用隐私遮挡
-                val processedBitmap = privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
-                currentProcessedBitmap = processedBitmap
+                    // 查找对应的元数据文件
+                    val metadataFile = findMetadataFile(mediaFile)
+                    currentMetadataFile = metadataFile
+                    updateAnimeMetadataBadge(metadataFile)
 
-                // 先重置矩阵再设置位图，避免新图先按旧缩放状态绘制一帧导致“闪一下”
-                val zoomApplied = resetImageZoom(processedBitmap)
-                fullSizeImage.setImageBitmap(processedBitmap)
-                if (!zoomApplied) {
-                    fullSizeImage.post {
-                        resetImageZoom(processedBitmap)
+                    // 应用隐私遮挡
+                    val processedBitmap = privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+                    if (!isAdded) return@launch
+                    currentProcessedBitmap = processedBitmap
+
+                    // 先重置矩阵再设置位图，避免新图先按旧缩放状态绘制一帧导致"闪一下"
+                    val zoomApplied = resetImageZoom(processedBitmap)
+                    fullSizeImage.setImageBitmap(processedBitmap)
+                    if (!zoomApplied) {
+                        fullSizeImage.post {
+                            resetImageZoom(processedBitmap)
+                            detectionEditorOverlay.setImageMatrix(imageMatrix)
+                        }
+                    } else {
                         detectionEditorOverlay.setImageMatrix(imageMatrix)
                     }
-                } else {
-                    detectionEditorOverlay.setImageMatrix(imageMatrix)
+                    updateImageChromeVisibility()
+
+                    DebugLogManager.addLog("媒体浏览", "显示图片: ${mediaFile.name}")
+                    if (metadataFile != null) {
+                        DebugLogManager.addLog("媒体浏览", "应用隐私遮挡，使用元数据: ${metadataFile.name}")
+                    }
+                } catch (e: Exception) {
+                    if (!isAdded) return@launch
+                    fullSizeImage.setImageResource(android.R.drawable.ic_menu_report_image)
+                    animeMetadataBadge.visibility = View.GONE
+                    btnEnterFullscreen.visibility = View.GONE
+                    DebugLogManager.addLog("媒体浏览", "加载图片失败: ${e.message}")
                 }
-                updateImageChromeVisibility()
-                
-                DebugLogManager.addLog("媒体浏览", "显示图片: ${mediaFile.name}")
-                if (metadataFile != null) {
-                    DebugLogManager.addLog("媒体浏览", "应用隐私遮挡，使用元数据: ${metadataFile.name}")
-                }
-            } catch (e: Exception) {
-                fullSizeImage.setImageResource(android.R.drawable.ic_menu_report_image)
-                animeMetadataBadge.visibility = View.GONE
-                btnEnterFullscreen.visibility = View.GONE
-                DebugLogManager.addLog("媒体浏览", "加载图片失败: ${e.message}")
             }
         }
 
@@ -891,7 +898,7 @@ class ImageViewerFragment : Fragment() {
         }
     }
 
-    private fun exportImageToGallery(imageFile: File): Boolean {
+    private suspend fun exportImageToGallery(imageFile: File): Boolean {
         var insertedUri: Uri? = null
         return try {
             val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return false
@@ -1016,69 +1023,73 @@ class ImageViewerFragment : Fragment() {
     }
 
     private fun shareImage(mediaFile: File) {
-        val processedBitmap = currentProcessedBitmap ?: run {
-            val bitmap = BitmapFactory.decodeFile(mediaFile.absolutePath)
-            if (bitmap == null) {
-                Toast.makeText(requireContext(), R.string.viewer_share_error_generic, Toast.LENGTH_SHORT).show()
-                DebugLogManager.addLog("媒体浏览", "分享失败: 图片解码失败 ${mediaFile.name}")
-                return
-            }
-            val metadataFile = currentMetadataFile ?: findMetadataFile(mediaFile)
-            currentMetadataFile = metadataFile
-            privacyProcessor.applyPrivacyBlur(bitmap, metadataFile).also {
-                currentProcessedBitmap = it
-            }
-        }
-
-        try {
-            val cacheDir = requireContext().externalCacheDir ?: requireContext().cacheDir
-            val shareDir = File(cacheDir, "shared_images")
-            if (!shareDir.exists() && !shareDir.mkdirs()) {
-                throw IllegalStateException("无法创建分享目录")
-            }
-
-            val extension = when (mediaFile.extension.lowercase()) {
-                "png" -> "png"
-                "webp" -> "webp"
-                else -> "jpg"
-            }
-            val shareFile = File(
-                shareDir,
-                "${mediaFile.nameWithoutExtension}_shared.$extension"
-            )
-
-            FileOutputStream(shareFile).use { output ->
-                val format = when (extension) {
-                    "png" -> Bitmap.CompressFormat.PNG
-                    "webp" -> Bitmap.CompressFormat.WEBP
-                    else -> Bitmap.CompressFormat.JPEG
+        viewLifecycleOwner.lifecycleScope.launch {
+            val processedBitmap = currentProcessedBitmap ?: run {
+                val bitmap = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeFile(mediaFile.absolutePath)
                 }
-                if (!processedBitmap.compress(format, 95, output)) {
-                    throw IllegalStateException("图片压缩失败")
+                if (bitmap == null) {
+                    Toast.makeText(requireContext(), R.string.viewer_share_error_generic, Toast.LENGTH_SHORT).show()
+                    DebugLogManager.addLog("媒体浏览", "分享失败: 图片解码失败 ${mediaFile.name}")
+                    return@launch
+                }
+                val metadataFile = currentMetadataFile ?: findMetadataFile(mediaFile)
+                currentMetadataFile = metadataFile
+                privacyProcessor.applyPrivacyBlur(bitmap, metadataFile).also {
+                    currentProcessedBitmap = it
                 }
             }
 
-            val uri = FileProvider.getUriForFile(
-                requireContext(),
-                "${requireContext().packageName}.fileprovider",
-                shareFile
-            )
+            try {
+                val shareFile = withContext(Dispatchers.IO) {
+                    val cacheDir = requireContext().externalCacheDir ?: requireContext().cacheDir
+                    val shareDir = File(cacheDir, "shared_images")
+                    if (!shareDir.exists() && !shareDir.mkdirs()) {
+                        throw IllegalStateException("无法创建分享目录")
+                    }
 
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/*"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val extension = when (mediaFile.extension.lowercase()) {
+                        "png" -> "png"
+                        "webp" -> "webp"
+                        else -> "jpg"
+                    }
+                    val file = File(shareDir, "${mediaFile.nameWithoutExtension}_shared.$extension")
+
+                    FileOutputStream(file).use { output ->
+                        val format = when (extension) {
+                            "png" -> Bitmap.CompressFormat.PNG
+                            "webp" -> Bitmap.CompressFormat.WEBP
+                            else -> Bitmap.CompressFormat.JPEG
+                        }
+                        if (!processedBitmap.compress(format, 95, output)) {
+                            throw IllegalStateException("图片压缩失败")
+                        }
+                    }
+                    file
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    requireContext(),
+                    "${requireContext().packageName}.fileprovider",
+                    shareFile
+                )
+
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/*"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                startActivity(Intent.createChooser(intent, getString(R.string.viewer_share_title)))
+                DebugLogManager.addLog("媒体浏览", "分享图片: ${shareFile.name}")
+            } catch (e: Exception) {
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.viewer_share_error, e.message ?: ""),
+                    Toast.LENGTH_SHORT
+                ).show()
+                DebugLogManager.addLog("媒体浏览", "分享失败: ${e.message}")
             }
-
-            startActivity(Intent.createChooser(intent, getString(R.string.viewer_share_title)))
-            DebugLogManager.addLog("媒体浏览", "分享图片: ${shareFile.name}")
-        } catch (e: Exception) {
-            Toast.makeText(
-                requireContext(),
-                getString(R.string.viewer_share_error, e.message ?: ""),
-                Toast.LENGTH_SHORT
-            ).show()
-            DebugLogManager.addLog("媒体浏览", "分享失败: ${e.message}")
         }
     }
 
@@ -1300,6 +1311,10 @@ class ImageViewerFragment : Fragment() {
         if (isImageFullscreen) {
             exitImageFullscreen()
         }
+        cancelRandomPlay()
+        stopMetronome()
+        randomQueueBuildJob?.cancel()
+        randomQueueBuildJob = null
         stopVideoProgressUpdates()
         super.onDestroyView()
     }

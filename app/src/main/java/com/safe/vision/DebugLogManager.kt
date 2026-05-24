@@ -78,14 +78,16 @@ object DebugLogManager {
         }
 
         val activeListeners = mutableListOf<(String) -> Unit>()
+        val deadRefs = mutableListOf<WeakReference<(String) -> Unit>>()
         listeners.forEach { ref ->
             val callback = ref.get()
             if (callback != null) {
                 activeListeners.add(callback)
             } else {
-                listeners.remove(ref)
+                deadRefs.add(ref)
             }
         }
+        if (deadRefs.isNotEmpty()) listeners.removeAll(deadRefs.toSet())
         activeListeners.forEach { it(logLine) }
 
         pendingWrites.add(logLine)

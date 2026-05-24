@@ -11,7 +11,7 @@ import androidx.core.graphics.ColorUtils
 
 enum class AppTheme(val prefValue: String, @StyleRes val styleRes: Int, val labelRes: Int) {
     DEFAULT("default", R.style.Theme_SafeVision, R.string.settings_theme_default),
-    BLACK_RED("black_red", R.style.Theme_SafeVision_BlackRed, R.string.settings_theme_default),
+    BLACK_RED("black_red", R.style.Theme_SafeVision_BlackRed, R.string.settings_theme_black_red),
     PASTEL("pastel", R.style.Theme_SafeVision_Pastel, R.string.settings_theme_pastel),
     DEEP_SEA("deep_sea", R.style.Theme_SafeVision_DeepSea, R.string.settings_theme_deep_sea),
     CUSTOM("custom", R.style.Theme_SafeVision_Custom, R.string.settings_theme_custom);

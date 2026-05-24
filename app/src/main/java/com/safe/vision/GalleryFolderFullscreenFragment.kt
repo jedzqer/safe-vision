@@ -590,7 +590,7 @@ class GalleryFolderFullscreenFragment : Fragment() {
         }
     }
 
-    private fun saveImageToGallery(appContext: Context, imageFile: File): Boolean {
+    private suspend fun saveImageToGallery(appContext: Context, imageFile: File): Boolean {
         var insertedUri: android.net.Uri? = null
         return try {
             val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return false

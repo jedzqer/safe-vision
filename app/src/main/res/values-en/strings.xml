@@ -196,6 +196,7 @@
     <string name="settings_theme_title">Theme Style</string>
     <string name="settings_theme_summary">Choose your preferred color scheme</string>
     <string name="settings_theme_default">Default: black background with red</string>
+    <string name="settings_theme_black_red">Black Red: black background with red (classic)</string>
     <string name="settings_theme_pastel">Pastel: #BBD8FF / #FFD4C4 / #2B3A67</string>
     <string name="settings_theme_deep_sea">Deep Sea: #114468 / #EF6837 / #2DE2E6</string>
     <string name="settings_theme_custom">Custom Theme</string>

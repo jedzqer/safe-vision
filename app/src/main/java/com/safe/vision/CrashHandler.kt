@@ -43,7 +43,6 @@ object CrashHandler {
                 System.err.println("处理异常时出错: ${e.message}")
                 e.printStackTrace()
             } finally {
-                // 强制退出应用
                 exitProcess(1)
             }
         }

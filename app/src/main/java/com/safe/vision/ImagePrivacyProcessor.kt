@@ -6,6 +6,8 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 图片隐私处理器，用于对图片中的敏感区域进行遮挡处理
@@ -27,13 +29,13 @@ class ImagePrivacyProcessor {
      * @param metadataFile 对应的元数据文件，可为空
      * @return 处理后的图片
      */
-    fun applyPrivacyBlur(originalBitmap: Bitmap, metadataFile: File?): Bitmap {
+    suspend fun applyPrivacyBlur(originalBitmap: Bitmap, metadataFile: File?): Bitmap {
         if (metadataFile == null || !metadataFile.exists()) {
             return originalBitmap
         }
         
         try {
-            val metadata = metadataFile.readText()
+            val metadata = withContext(Dispatchers.IO) { metadataFile.readText() }
             val metadataDoc = DetectionMetadataFormat.parse(metadata)
             val detections = metadataDoc.detections
             val labelProfile = metadataDoc.labelProfile
