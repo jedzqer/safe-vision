@@ -825,6 +825,7 @@ class SettingsFragment : Fragment() {
         appSettings = AppSettingsManager.getInstance(requireContext())
         privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.STANDARD)
         privacySettings.migrateLegacyEyeModeLabelsToEyeRegion(DetectionConfig.LabelProfile.ANIME)
+        privacySettings.migrateEyeRegionDefaultOff()
         
         // 调试相关UI
         debugToggle = view.findViewById(R.id.debugToggle)

@@ -43,6 +43,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         private const val KEY_REVERSE_PRE_RENDER_ENABLED = "reverse_pre_render_enabled"
         private const val KEY_PRIVACY_PRESETS = "privacy_presets"
         private const val KEY_ACTIVE_PRESET_NAME = "active_preset_name"
+        private const val KEY_EYE_REGION_DEFAULT_OFF_MIGRATED = "eye_region_default_off_migrated"
         
         // 遮挡模式
         const val BLUR_MODE_MOSAIC = 0  // 马赛克
@@ -480,7 +481,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     fun getEyeModeLabels(profile: DetectionConfig.LabelProfile): List<String> {
         val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_EYE_MODE_LABELS else KEY_EYE_MODE_LABELS
         val labelsJson = sharedPrefs.getString(key, null)
-            ?: return if (profile == DetectionConfig.LabelProfile.ANIME) emptyList() else DetectionConfig.STANDARD_FACE_LABELS.toList()
+            ?: return emptyList()
         return try {
             val jsonArray = JSONArray(labelsJson)
             val labels = mutableListOf<String>()
@@ -879,10 +880,23 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     fun migrateLegacyEyeModeLabelsToEyeRegion(profile: DetectionConfig.LabelProfile) {
         val legacyEyeModeLabels = getEyeModeLabels(profile)
         if (legacyEyeModeLabels.isEmpty()) return
-        if (isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) return
-        val currentLabels = LinkedHashSet(getBlockedLabels(profile))
-        currentLabels.add(DetectionConfig.EYE_REGION_LABEL)
-        setBlockedLabels(profile, currentLabels.toList())
+        if (!isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) {
+            val currentLabels = LinkedHashSet(getBlockedLabels(profile))
+            currentLabels.add(DetectionConfig.EYE_REGION_LABEL)
+            setBlockedLabels(profile, currentLabels.toList())
+        }
+        setEyeModeLabels(profile, emptyList())
+    }
+
+    fun migrateEyeRegionDefaultOff() {
+        if (sharedPrefs.getBoolean(KEY_EYE_REGION_DEFAULT_OFF_MIGRATED, false)) return
+        for (profile in listOf(DetectionConfig.LabelProfile.STANDARD, DetectionConfig.LabelProfile.ANIME)) {
+            val currentLabels = LinkedHashSet(getBlockedLabels(profile))
+            if (currentLabels.remove(DetectionConfig.EYE_REGION_LABEL)) {
+                setBlockedLabels(profile, currentLabels.toList())
+            }
+        }
+        sharedPrefs.edit().putBoolean(KEY_EYE_REGION_DEFAULT_OFF_MIGRATED, true).apply()
     }
 
     private fun parseOverrides(obj: JSONObject?): Map<String, Int> {
