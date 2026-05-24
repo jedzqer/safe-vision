@@ -497,7 +497,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun isLabelEyeMode(label: String): Boolean {
-        if (DetectionConfig.isEyeRegionLabel(label)) return true
+        if (DetectionConfig.isEyeRegionLabel(label)) {
+            val profile = getCurrentProfile()
+            return !isLabelBlocked(label, profile)
+        }
         if (!DetectionConfig.canDeriveEyeRegion(label)) return false
         val profile = resolveProfileForLabel(label)
         if (isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, profile)) return false
