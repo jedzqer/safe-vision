@@ -333,6 +333,13 @@
     <string name="settings_video_speed_lowest">Lowest Quality (skip 7 frames)</string>
     <string name="settings_video_speed_dialog_title">Choose Video Processing Speed</string>
 
+    <!-- Viewer scroll direction -->
+    <string name="settings_viewer_scroll_mode_title">Viewer Paging Direction</string>
+    <string name="settings_viewer_scroll_mode_summary">When enabled, swipe up/down to navigate; otherwise swipe left/right</string>
+    <string name="settings_viewer_scroll_mode_switch">Vertical swipe to page</string>
+    <string name="settings_viewer_scroll_mode_toast_enabled">Switched to vertical swipe paging</string>
+    <string name="settings_viewer_scroll_mode_toast_disabled">Switched to horizontal swipe paging</string>
+
     <!-- Shuffle -->
     <string name="settings_random_browse_title">Shuffle Browse</string>
     <string name="settings_random_play_title">Shuffle Play</string>

@@ -229,14 +229,16 @@ class ImageViewerFragment : Fragment() {
                     val dx = event.x - videoTouchStartX
                     val dy = event.y - videoTouchStartY
                     val swipeThreshold = touchSlop * 3
-                    val isHorizontalSwipe = abs(dx) >= swipeThreshold && abs(dx) > abs(dy)
-                    if (isHorizontalSwipe && !videoSwipeHandled) {
+                    val verticalScroll = appSettings.isViewerVerticalScrollEnabled()
+                    val isNavSwipe = if (verticalScroll) {
+                        abs(dy) >= swipeThreshold && abs(dy) > abs(dx)
+                    } else {
+                        abs(dx) >= swipeThreshold && abs(dx) > abs(dy)
+                    }
+                    if (isNavSwipe && !videoSwipeHandled) {
                         videoSwipeHandled = true
-                        if (dx > 0f) {
-                            showPreviousMedia()
-                        } else {
-                            showNextMedia()
-                        }
+                        val forward = if (verticalScroll) dy < 0f else dx < 0f
+                        if (forward) showNextMedia() else showPreviousMedia()
                         true
                     } else {
                         false
@@ -348,24 +350,29 @@ class ImageViewerFragment : Fragment() {
                     val deltaX = event.x - swipeStartX
                     val deltaY = event.y - swipeStartY
                     val swipeThreshold = touchSlop * 3
+                    val verticalScroll = appSettings.isViewerVerticalScrollEnabled()
                     val isHorizontalSwipe = !isScaling &&
                         !isDragging &&
                         currentScale <= minScale + 0.0005f &&
                         abs(deltaX) >= swipeThreshold &&
                         abs(deltaX) > abs(deltaY)
-                    if (isHorizontalSwipe) {
-                        if (deltaX > 0f) {
-                            showPreviousMedia()
-                        } else {
-                            showNextMedia()
-                        }
+                    val isVerticalSwipe = verticalScroll &&
+                        !isScaling &&
+                        !isDragging &&
+                        currentScale <= minScale + 0.0005f &&
+                        abs(deltaY) >= swipeThreshold &&
+                        abs(deltaY) > abs(deltaX)
+                    val isNavSwipe = if (verticalScroll) isVerticalSwipe else isHorizontalSwipe
+                    if (isNavSwipe) {
+                        val forward = if (verticalScroll) deltaY < 0f else deltaX < 0f
+                        if (forward) showNextMedia() else showPreviousMedia()
                     }
                     val isTap = !isScaling &&
                         !isDragging &&
                         currentScale <= minScale + 0.0005f &&
                         abs(event.x - downTouchX) <= touchSlop &&
                         abs(event.y - downTouchY) <= touchSlop
-                    if (!isHorizontalSwipe && isTap) {
+                    if (!isNavSwipe && isTap) {
                         val width = fullSizeImage.width.takeIf { it > 0 } ?: 0
                         if (width > 0) {
                             when {
@@ -375,7 +382,7 @@ class ImageViewerFragment : Fragment() {
                             }
                         }
                     }
-                    val consumed = isScaling || isDragging || event.pointerCount > 1 || isTap || isHorizontalSwipe
+                    val consumed = isScaling || isDragging || event.pointerCount > 1 || isTap || isNavSwipe
                     isDragging = false
                     isScaling = false
                     return@setOnTouchListener consumed
@@ -415,13 +422,13 @@ class ImageViewerFragment : Fragment() {
                     val deltaX = x - swipeStartX
                     val deltaY = event.y - swipeStartY
                     val swipeThreshold = touchSlop * 3
+                    val verticalScroll = appSettings.isViewerVerticalScrollEnabled()
                     val isHorizontalSwipe = abs(deltaX) >= swipeThreshold && abs(deltaX) > abs(deltaY)
-                    if (isHorizontalSwipe) {
-                        if (deltaX > 0f) {
-                            showPreviousMedia()
-                        } else {
-                            showNextMedia()
-                        }
+                    val isVerticalSwipe = abs(deltaY) >= swipeThreshold && abs(deltaY) > abs(deltaX)
+                    val isNavSwipe = if (verticalScroll) isVerticalSwipe else isHorizontalSwipe
+                    if (isNavSwipe) {
+                        val forward = if (verticalScroll) deltaY < 0f else deltaX < 0f
+                        if (forward) showNextMedia() else showPreviousMedia()
                     } else {
                         when {
                             x < width / 3f -> showPreviousMedia()

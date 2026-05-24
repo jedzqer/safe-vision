@@ -692,6 +692,45 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- 上下滑动翻页设置 -->
+    <TextView
+        android:id="@+id/viewerScrollModeLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_viewer_scroll_mode_title"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:textColor="?attr/svColorTextPrimary"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/videoSpeedSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/viewerScrollModeSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_viewer_scroll_mode_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/viewerScrollModeLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Switch
+        android:id="@+id/viewerVerticalScrollSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_viewer_scroll_mode_switch"
+        android:textColor="?attr/svColorTextPrimary"
+        android:thumbTint="?attr/svColorPrimary"
+        android:trackTint="@color/switch_track_tint"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/viewerScrollModeSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- 随机浏览设置 -->
     <TextView
         android:id="@+id/randomBrowseLabel"
@@ -702,7 +741,7 @@
         android:textColor="?attr/svColorTextPrimary"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
-        app:layout_constraintTop_toBottomOf="@id/videoSpeedSummary"
+        app:layout_constraintTop_toBottomOf="@id/viewerVerticalScrollSwitch"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

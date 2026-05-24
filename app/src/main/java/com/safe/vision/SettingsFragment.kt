@@ -97,6 +97,7 @@ class SettingsFragment : Fragment() {
     private lateinit var uploadViaFileSystemSwitch: android.widget.Switch
     private lateinit var videoSpeedButton: Button
     private lateinit var videoSpeedSummary: TextView
+    private lateinit var viewerVerticalScrollSwitch: android.widget.Switch
     private lateinit var randomBrowseSwitch: android.widget.Switch
     private lateinit var randomQueueButton: Button
     private lateinit var randomQueueSummary: TextView
@@ -871,6 +872,7 @@ class SettingsFragment : Fragment() {
         uploadViaFileSystemSwitch = view.findViewById(R.id.uploadViaFileSystemSwitch)
         videoSpeedButton = view.findViewById(R.id.videoSpeedButton)
         videoSpeedSummary = view.findViewById(R.id.videoSpeedSummary)
+        viewerVerticalScrollSwitch = view.findViewById(R.id.viewerVerticalScrollSwitch)
         randomBrowseSwitch = view.findViewById(R.id.randomBrowseSwitch)
         randomQueueButton = view.findViewById(R.id.randomQueueButton)
         randomQueueSummary = view.findViewById(R.id.randomQueueSummary)
@@ -885,6 +887,7 @@ class SettingsFragment : Fragment() {
         setupPrivacySettings()
         setupUploadSettings()
         setupVideoSpeedSettings()
+        setupViewerScrollModeSettings()
         setupRandomPlaySettings()
         setupMetronomeSettings()
         setupDebugFeatures()
@@ -1715,6 +1718,16 @@ class SettingsFragment : Fragment() {
         updateVideoSpeedSummary()
         videoSpeedButton.setOnClickListener {
             showVideoSpeedDialog()
+        }
+    }
+
+    private fun setupViewerScrollModeSettings() {
+        viewerVerticalScrollSwitch.isChecked = appSettings.isViewerVerticalScrollEnabled()
+        viewerVerticalScrollSwitch.setOnCheckedChangeListener { _, isChecked ->
+            appSettings.setViewerVerticalScrollEnabled(isChecked)
+            val msgRes = if (isChecked) R.string.settings_viewer_scroll_mode_toast_enabled
+                         else R.string.settings_viewer_scroll_mode_toast_disabled
+            Toast.makeText(requireContext(), msgRes, Toast.LENGTH_SHORT).show()
         }
     }
 

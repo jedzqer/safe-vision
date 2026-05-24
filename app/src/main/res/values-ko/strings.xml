@@ -300,6 +300,13 @@
     <string name="settings_video_speed_lowest">최저 품질 (7프레임 건너뜀)</string>
     <string name="settings_video_speed_dialog_title">동영상 처리 속도 선택</string>
 
+    <!-- Viewer scroll direction -->
+    <string name="settings_viewer_scroll_mode_title">뷰어 페이지 방향</string>
+    <string name="settings_viewer_scroll_mode_summary">활성화하면 위아래 스와이프로 이동, 비활성화하면 좌우 스와이프로 이동</string>
+    <string name="settings_viewer_scroll_mode_switch">세로 스와이프로 페이지 전환</string>
+    <string name="settings_viewer_scroll_mode_toast_enabled">세로 스와이프 페이지 전환으로 변경됨</string>
+    <string name="settings_viewer_scroll_mode_toast_disabled">가로 스와이프 페이지 전환으로 변경됨</string>
+
     <!-- Shuffle -->
     <string name="settings_random_browse_title">랜덤 탐색</string>
     <string name="settings_random_play_title">랜덤 재생</string>

@@ -300,6 +300,13 @@
     <string name="settings_video_speed_lowest">最低品質（跳7幀）</string>
     <string name="settings_video_speed_dialog_title">選擇影片處理速度</string>
 
+    <!-- 翻頁方向 -->
+    <string name="settings_viewer_scroll_mode_title">瀏覽翻頁方向</string>
+    <string name="settings_viewer_scroll_mode_summary">開啟後，上下滑動切換媒體；關閉時為左右滑動</string>
+    <string name="settings_viewer_scroll_mode_switch">上下滑動翻頁</string>
+    <string name="settings_viewer_scroll_mode_toast_enabled">已切換為上下滑動翻頁</string>
+    <string name="settings_viewer_scroll_mode_toast_disabled">已切換為左右滑動翻頁</string>
+
     <!-- 隨機播放 -->
     <string name="settings_random_browse_title">隨機瀏覽</string>
     <string name="settings_random_play_title">隨機播放</string>
