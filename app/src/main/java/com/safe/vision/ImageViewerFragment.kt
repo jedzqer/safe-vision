@@ -555,9 +555,13 @@ class ImageViewerFragment : Fragment() {
                 val zoomApplied = resetImageZoom(processedBitmap)
                 fullSizeImage.setImageBitmap(processedBitmap)
                 if (!zoomApplied) {
-                    fullSizeImage.post { resetImageZoom(processedBitmap) }
+                    fullSizeImage.post {
+                        resetImageZoom(processedBitmap)
+                        detectionEditorOverlay.setImageMatrix(imageMatrix)
+                    }
+                } else {
+                    detectionEditorOverlay.setImageMatrix(imageMatrix)
                 }
-                detectionEditorOverlay.setImageMatrix(imageMatrix)
                 
                 DebugLogManager.addLog("媒体浏览", "显示图片: ${mediaFile.name}")
                 if (metadataFile != null) {
