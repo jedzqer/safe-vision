@@ -40,6 +40,7 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_SELECTED_OUTPUT_FOLDER = "selected_output_folder"
         private const val KEY_CUSTOM_IMAGE_FOLDERS = "custom_image_folders"
         private const val KEY_VIEWER_VERTICAL_SCROLL = "viewer_vertical_scroll"
+        private const val KEY_LAST_VIEWED_MEDIA_PATH = "last_viewed_media_path"
         private const val DEFAULT_VIDEO_SKIP_STRIDE = 3
         private const val DEFAULT_RANDOM_PLAY_INTERVAL_SECONDS = 10
         private const val DEFAULT_METRONOME_INTERVAL_SECONDS = 1.0f
@@ -283,6 +284,14 @@ class AppSettingsManager private constructor(context: Context) {
 
     fun setViewerVerticalScrollEnabled(enabled: Boolean) {
         sharedPreferences.edit().putBoolean(KEY_VIEWER_VERTICAL_SCROLL, enabled).apply()
+    }
+
+    fun getLastViewedMediaPath(): String? {
+        return sharedPreferences.getString(KEY_LAST_VIEWED_MEDIA_PATH, null)
+    }
+
+    fun saveLastViewedMediaPath(path: String) {
+        sharedPreferences.edit().putString(KEY_LAST_VIEWED_MEDIA_PATH, path).apply()
     }
 
     fun getSelectedOutputFolder(): String {

@@ -513,7 +513,11 @@ class ImageViewerFragment : Fragment() {
                 if (fallbackIndex >= 0) {
                     showMedia(fallbackIndex)
                 } else {
-                    showMedia(0)
+                    val lastPath = appSettings.getLastViewedMediaPath()
+                    val lastIndex = lastPath?.let { path ->
+                        allMedia.indexOfFirst { it.absolutePath == path }
+                    } ?: -1
+                    showMedia(if (lastIndex >= 0) lastIndex else 0)
                 }
             }
             restartRandomPlayCountdown()
@@ -539,6 +543,7 @@ class ImageViewerFragment : Fragment() {
         currentIndex = if (index >= allMedia.size) 0 else if (index < 0) allMedia.size - 1 else index
 
         val mediaFile = allMedia[currentIndex]
+        appSettings.saveLastViewedMediaPath(mediaFile.absolutePath)
         val isVideo = isVideoFile(mediaFile)
         currentMetadataFile = null
         if (isVideo && isImageFullscreen) {
