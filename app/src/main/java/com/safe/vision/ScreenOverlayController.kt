@@ -2,7 +2,6 @@ package com.safe.vision
 
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.Bitmap
 import android.os.Build
 import android.provider.Settings
 import android.util.DisplayMetrics
@@ -69,24 +68,23 @@ object ScreenOverlayController {
 
     fun showFullscreenOverlay(
         context: Context,
-        bitmap: Bitmap,
+        frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics,
         mode: ScreenOverlayMode
     ): Boolean {
         val host = hostFor(context, mode) ?: return false
-        host.showFullscreenOverlay(bitmap, metrics)
+        host.showFullscreenOverlay(frame, metrics)
         return true
     }
 
     fun showRegionOverlays(
         context: Context,
-        bitmap: Bitmap,
-        regions: List<ScreenPrivacyMaskRenderer.OverlayRegion>,
+        frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics,
         mode: ScreenOverlayMode
     ): Boolean {
         val host = hostFor(context, mode) ?: return false
-        host.showRegionOverlays(bitmap, regions, metrics)
+        host.showRegionOverlays(frame, metrics)
         return true
     }
 

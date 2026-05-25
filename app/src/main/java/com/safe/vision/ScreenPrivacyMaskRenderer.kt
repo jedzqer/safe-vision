@@ -2,39 +2,47 @@ package com.safe.vision
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.PointF
 import android.graphics.Rect
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
 class ScreenPrivacyMaskRenderer(context: Context) {
-    data class OverlayRegion(
+    data class DrawTask(
         val label: String,
-        val rect: Rect
+        val renderMode: Int,
+        val drawRect: Rect,
+        val allowCircular: Boolean,
+        val usesEyeStrip: Boolean,
+        val eyePath: Path?,
+        val rotationDegrees: Float,
+        val drawOutline: Boolean
+    )
+
+    data class ClearRegion(
+        val rect: Rect,
+        val circular: Boolean,
+        val path: Path?,
+        val drawOutline: Boolean
     )
 
     data class OverlayFrame(
-        val bitmap: Bitmap,
-        val regions: List<OverlayRegion>,
+        val sourceBitmap: Bitmap,
+        val drawTasks: List<DrawTask>,
+        val reverseMode: Int?,
+        val reverseRegions: List<ClearRegion>,
+        val reversePreRender: Boolean
+    ) {
         val requiresFullscreenOverlay: Boolean
-    )
+            get() = reverseMode != null
+    }
 
     companion object {
         private const val EYE_STRIP_ASPECT_MAX = 3f
     }
 
-    private val appContext = context.applicationContext
-    private val privacySettings = PrivacySettingsManager.getInstance(appContext)
-    private val clearPaint = Paint().apply {
-        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-    }
+    private val privacySettings = PrivacySettingsManager.getInstance(context.applicationContext)
 
     fun render(
         sourceBitmap: Bitmap,
@@ -69,8 +77,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             val rotationDegrees: Float = 0f
         )
 
-        data class NormalRenderTask(
-            val className: String,
+        data class PendingTask(
+            val label: String,
             val renderMode: Int,
             val drawRect: Rect,
             val allowCircular: Boolean,
@@ -79,11 +87,11 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             val rotationDegrees: Float
         )
 
-        data class ReverseRegion(
+        data class PendingReverseRegion(
             val rect: Rect,
             val circular: Boolean,
-            val label: String,
-            val path: Path? = null
+            val path: Path?,
+            val drawOutline: Boolean
         )
 
         fun resolveEyeTarget(detection: YoloOnnxRunner.Detection, faceRect: Rect): EyeTarget {
@@ -121,8 +129,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             )
         }
 
-        val normalTasks = mutableListOf<NormalRenderTask>()
-        val reverseRegions = mutableListOf<ReverseRegion>()
+        val drawTasks = mutableListOf<DrawTask>()
+        val reverseRegions = mutableListOf<PendingReverseRegion>()
         var reverseBlurMode: Int? = null
         var reverseModeMixed = false
 
@@ -171,14 +179,20 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             }
             val renderMode = resolveRenderMode(blurMode, defaultBlurMode)
             val allowCircular = useCircularMask && !usesEyeStrip
+            val safeRect = BlurEffects.clampRect(
+                scaledTargetRect,
+                sourceBitmap.width,
+                sourceBitmap.height
+            )
+            if (safeRect.width() <= 0 || safeRect.height() <= 0) return@forEach
 
             if (reverseLabels.contains(className)) {
                 reverseRegions.add(
-                    ReverseRegion(
-                        rect = scaledTargetRect,
+                    PendingReverseRegion(
+                        rect = Rect(safeRect),
                         circular = allowCircular,
-                        label = className,
-                        path = if (usesEyeStrip) scaledEyePath else null
+                        path = scaledEyePath?.let(::Path),
+                        drawOutline = shouldOutline(className)
                     )
                 )
                 if (reverseBlurMode == null) {
@@ -187,173 +201,25 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                     reverseModeMixed = true
                 }
             } else {
-                normalTasks.add(
-                    NormalRenderTask(
-                        className = className,
+                drawTasks.add(
+                    DrawTask(
+                        label = className,
                         renderMode = renderMode,
-                        drawRect = scaledTargetRect,
+                        drawRect = Rect(safeRect),
                         allowCircular = allowCircular,
                         usesEyeStrip = usesEyeStrip,
-                        eyePath = scaledEyePath,
-                        rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f
+                        eyePath = scaledEyePath?.let(::Path),
+                        rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f,
+                        drawOutline = shouldOutline(className) &&
+                            renderMode != PrivacySettingsManager.BLUR_MODE_STICKER
                     )
                 )
             }
         }
 
-        if (normalTasks.isEmpty() && reverseRegions.isEmpty()) {
+        if (drawTasks.isEmpty() && reverseRegions.isEmpty()) {
+            sourceBitmap.recycle()
             return null
-        }
-
-        val regionRects = normalTasks.mapNotNull { task ->
-            val rect = BlurEffects.clampRect(task.drawRect, sourceBitmap.width, sourceBitmap.height)
-            if (rect.width() > 0 && rect.height() > 0) {
-                OverlayRegion(task.className, rect)
-            } else {
-                null
-            }
-        }.sortedWith(
-            compareBy<OverlayRegion> { it.label }
-                .thenBy { it.rect.centerX() }
-                .thenBy { it.rect.centerY() }
-        )
-
-        val outputBitmap = Bitmap.createBitmap(
-            sourceBitmap.width,
-            sourceBitmap.height,
-            Bitmap.Config.ARGB_8888
-        )
-        val canvas = Canvas(outputBitmap)
-
-        fun applyEffect(
-            targetCanvas: Canvas,
-            mode: Int,
-            rect: Rect,
-            className: String,
-            usesEyeStrip: Boolean,
-            rotationDegrees: Float
-        ) {
-            when (mode) {
-                PrivacySettingsManager.BLUR_MODE_MOSAIC -> {
-                    BlurEffects.drawMosaic(targetCanvas, sourceBitmap, rect, privacySettings.getMosaicBlockSize())
-                }
-                PrivacySettingsManager.BLUR_MODE_BLACK -> BlurEffects.drawBlack(targetCanvas, rect)
-                PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
-                    BlurEffects.drawGaussian(targetCanvas, sourceBitmap, rect, privacySettings.getGaussianRadius())
-                }
-                PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                    val sticker = StickerLoader.loadSticker(appContext, privacySettings, className)
-                    if (sticker != null) {
-                        // Pre-composite the current screen content with the sticker so
-                        // semi-transparent PNGs don't rely on system overlay blending.
-                        targetCanvas.drawBitmap(sourceBitmap, rect, rect, null)
-                        BlurEffects.drawSticker(
-                            targetCanvas,
-                            sticker,
-                            rect,
-                            sourceBitmap.width,
-                            sourceBitmap.height,
-                            fitInsideRect = usesEyeStrip,
-                            rotationDegrees = rotationDegrees
-                        )
-                    } else {
-                        BlurEffects.drawMosaic(targetCanvas, sourceBitmap, rect, privacySettings.getMosaicBlockSize())
-                    }
-                }
-                PrivacySettingsManager.BLUR_MODE_SOBEL -> {
-                    BlurEffects.drawSobelEdge(targetCanvas, sourceBitmap, rect)
-                }
-                else -> {
-                    BlurEffects.drawMosaic(targetCanvas, sourceBitmap, rect, privacySettings.getMosaicBlockSize())
-                }
-            }
-        }
-
-        fun clearRegion(targetCanvas: Canvas, rect: Rect) {
-            if (rect.width() <= 0 || rect.height() <= 0) return
-            targetCanvas.drawRect(rect, clearPaint)
-        }
-
-        fun renderNormalTask(task: NormalRenderTask) {
-            if (task.allowCircular) {
-                val circleBounds = BlurEffects.circumscribedCircleBounds(
-                    task.drawRect,
-                    sourceBitmap.width,
-                    sourceBitmap.height
-                )
-                BlurEffects.drawWithCircularClip(canvas, task.drawRect) {
-                    applyEffect(canvas, task.renderMode, circleBounds, task.className, task.usesEyeStrip, task.rotationDegrees)
-                }
-                if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                    BlurEffects.drawCircularOutline(canvas, task.drawRect)
-                }
-                return
-            }
-
-            if (task.usesEyeStrip && task.eyePath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                val checkpoint = canvas.save()
-                canvas.clipPath(task.eyePath)
-                applyEffect(canvas, task.renderMode, task.drawRect, task.className, task.usesEyeStrip, task.rotationDegrees)
-                canvas.restoreToCount(checkpoint)
-            } else {
-                applyEffect(canvas, task.renderMode, task.drawRect, task.className, task.usesEyeStrip, task.rotationDegrees)
-            }
-            if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                BlurEffects.drawRectOutline(canvas, task.drawRect)
-            }
-        }
-
-        fun clearRegion(region: ReverseRegion) {
-            if (region.circular) {
-                BlurEffects.drawWithCircularClip(canvas, region.rect) {
-                    clearRegion(canvas, region.rect)
-                }
-            } else if (region.path != null) {
-                val checkpoint = canvas.save()
-                canvas.clipPath(region.path)
-                clearRegion(canvas, region.rect)
-                canvas.restoreToCount(checkpoint)
-            } else {
-                clearRegion(canvas, region.rect)
-            }
-
-            if (shouldOutline(region.label)) {
-                if (region.circular) {
-                    BlurEffects.drawCircularOutline(canvas, region.rect)
-                } else {
-                    BlurEffects.drawRectOutline(canvas, region.rect)
-                }
-            }
-        }
-
-        fun applyReverseMask(mode: Int) {
-            val fullRect = Rect(0, 0, sourceBitmap.width, sourceBitmap.height)
-            when (mode) {
-                PrivacySettingsManager.BLUR_MODE_MOSAIC -> {
-                    BlurEffects.drawMosaic(canvas, sourceBitmap, fullRect, privacySettings.getMosaicBlockSize())
-                }
-                PrivacySettingsManager.BLUR_MODE_BLACK -> canvas.drawColor(Color.BLACK)
-                PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
-                    BlurEffects.drawGaussian(canvas, sourceBitmap, fullRect, privacySettings.getGaussianRadius())
-                }
-                PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                    val sticker = StickerLoader.loadSticker(appContext, privacySettings)
-                    if (sticker != null) {
-                        // Render the sampled screen frame first, then blend the sticker
-                        // inside our bitmap to keep alpha behavior consistent in overlay mode.
-                        canvas.drawBitmap(sourceBitmap, 0f, 0f, null)
-                        BlurEffects.drawSticker(canvas, sticker, fullRect, sourceBitmap.width, sourceBitmap.height)
-                    } else {
-                        BlurEffects.drawMosaic(canvas, sourceBitmap, fullRect, privacySettings.getMosaicBlockSize())
-                    }
-                }
-                PrivacySettingsManager.BLUR_MODE_SOBEL -> {
-                    BlurEffects.drawSobelEdge(canvas, sourceBitmap, fullRect)
-                }
-                else -> BlurEffects.drawMosaic(canvas, sourceBitmap, fullRect, privacySettings.getMosaicBlockSize())
-            }
-
-            reverseRegions.forEach(::clearRegion)
         }
 
         if (reverseRegions.isNotEmpty() && reverseModeMixed) {
@@ -363,17 +229,27 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             )
         }
 
-        if (reverseRegions.isNotEmpty() && privacySettings.isReversePreRenderEnabled()) {
-            applyReverseMask(if (reverseModeMixed) defaultBlurMode else reverseBlurMode ?: defaultBlurMode)
-        }
-        normalTasks.forEach(::renderNormalTask)
-        if (reverseRegions.isNotEmpty() && !privacySettings.isReversePreRenderEnabled()) {
-            applyReverseMask(if (reverseModeMixed) defaultBlurMode else reverseBlurMode ?: defaultBlurMode)
-        }
         return OverlayFrame(
-            bitmap = outputBitmap,
-            regions = regionRects,
-            requiresFullscreenOverlay = reverseRegions.isNotEmpty()
+            sourceBitmap = sourceBitmap,
+            drawTasks = drawTasks.sortedWith(
+                compareBy<DrawTask> { it.label }
+                    .thenBy { it.drawRect.centerX() }
+                    .thenBy { it.drawRect.centerY() }
+            ),
+            reverseMode = if (reverseRegions.isNotEmpty()) {
+                if (reverseModeMixed) defaultBlurMode else reverseBlurMode ?: defaultBlurMode
+            } else {
+                null
+            },
+            reverseRegions = reverseRegions.map { region ->
+                ClearRegion(
+                    rect = Rect(region.rect),
+                    circular = region.circular,
+                    path = region.path?.let(::Path),
+                    drawOutline = region.drawOutline
+                )
+            },
+            reversePreRender = privacySettings.isReversePreRenderEnabled()
         )
     }
 }
