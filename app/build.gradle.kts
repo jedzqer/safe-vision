@@ -11,8 +11,8 @@ android {
         applicationId = "com.safe.vision"
         minSdk = 24
         targetSdk = 36
-        versionCode = 48
-        versionName = "1.20.4"
+        versionCode = 49
+        versionName = "1.20.5"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

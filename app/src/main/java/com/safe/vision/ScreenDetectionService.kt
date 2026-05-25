@@ -38,8 +38,8 @@ class ScreenDetectionService : Service() {
         private const val NOTIFICATION_ID = 3002
         private const val FLICKER_WINDOW_SIZE = 4
         private const val SHOW_THRESHOLD = 2
-        private const val HIDE_THRESHOLD = 1
-        private const val CLEAR_DELAY_MS = 800L
+        private const val HIDE_TIMEOUT_ACCESSIBILITY_MS = 500L
+        private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 300L
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -231,6 +231,10 @@ class ScreenDetectionService : Service() {
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
         val metrics = overlayMetrics ?: return
         val hasDetection = frame != null
+        val hideTimeoutMs = when (overlayMode) {
+            ScreenOverlayMode.ACCESSIBILITY -> HIDE_TIMEOUT_ACCESSIBILITY_MS
+            ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS
+        }
 
         // 滑动窗口采样
         if (detectionWindow.size >= FLICKER_WINDOW_SIZE) detectionWindow.removeFirst()
@@ -238,11 +242,15 @@ class ScreenDetectionService : Service() {
         if (hasDetection) lastPositiveTimeMs = System.currentTimeMillis()
 
         val positiveCount = detectionWindow.count { it }
-        val withinClearDelay = System.currentTimeMillis() - lastPositiveTimeMs < CLEAR_DELAY_MS
+        val withinHideTimeout = if (overlayVisible) {
+            System.currentTimeMillis() - lastPositiveTimeMs < hideTimeoutMs
+        } else {
+            false
+        }
 
         // 迟滞判断：已显示时要求更低的正帧数才维持；未显示时要求更高才触发
         val shouldShow = if (overlayVisible) {
-            positiveCount > HIDE_THRESHOLD || withinClearDelay
+            positiveCount > 1 || withinHideTimeout
         } else {
             positiveCount >= SHOW_THRESHOLD
         }
