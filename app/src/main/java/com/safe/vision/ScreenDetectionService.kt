@@ -41,6 +41,8 @@ class ScreenDetectionService : Service() {
         private const val SHOW_THRESHOLD = 2
         private const val HIDE_TIMEOUT_ACCESSIBILITY_MS = 500L
         private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 300L
+        private const val ACCESSIBILITY_OVERLAY_CONNECT_TIMEOUT_MS = 2_000L
+        private const val ACCESSIBILITY_OVERLAY_CONNECT_POLL_MS = 100L
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -138,9 +140,7 @@ class ScreenDetectionService : Service() {
 
                 val appSettings = AppSettingsManager.getInstance(applicationContext)
                 overlayMode = appSettings.getScreenDetectionOverlayMode()
-                if (!ScreenOverlayController.isOverlayReady(applicationContext, overlayMode)) {
-                    error(overlayUnavailableMessage(overlayMode))
-                }
+                ensureOverlayReady()
 
                 val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
                 overlayMetrics = metrics
@@ -341,6 +341,27 @@ class ScreenDetectionService : Service() {
             ScreenOverlayMode.ACCESSIBILITY -> getString(R.string.screen_detection_status_accessibility_missing)
             ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> getString(R.string.screen_detection_status_overlay_missing)
         }
+    }
+
+    private suspend fun ensureOverlayReady() {
+        if (ScreenOverlayController.isOverlayReady(applicationContext, overlayMode)) return
+        if (!ScreenOverlayController.isOverlayPermissionGranted(applicationContext, overlayMode)) {
+            error(overlayUnavailableMessage(overlayMode))
+        }
+        if (overlayMode != ScreenOverlayMode.ACCESSIBILITY) {
+            error(overlayUnavailableMessage(overlayMode))
+        }
+
+        DebugLogManager.addLog("屏幕检测", "等待无障碍遮挡服务连接")
+        val deadline = System.currentTimeMillis() + ACCESSIBILITY_OVERLAY_CONNECT_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            delay(ACCESSIBILITY_OVERLAY_CONNECT_POLL_MS)
+            if (ScreenOverlayController.isOverlayReady(applicationContext, overlayMode)) {
+                DebugLogManager.addLog("屏幕检测", "无障碍遮挡服务已连接，继续启动")
+                return
+            }
+        }
+        error(overlayUnavailableMessage(overlayMode))
     }
 
     private fun updateNotification(status: String) {

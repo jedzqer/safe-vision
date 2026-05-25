@@ -50,6 +50,16 @@ internal class ScreenOverlayWindowHost(
 
         val windowMetrics = windowManager.maximumWindowMetrics
         val bounds = windowMetrics.bounds
+        if (windowType == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY) {
+            return OverlayMetrics(
+                widthPixels = bounds.width().coerceAtLeast(1),
+                heightPixels = bounds.height().coerceAtLeast(1),
+                densityDpi = context.resources.displayMetrics.densityDpi,
+                contentOffsetX = bounds.left,
+                contentOffsetY = bounds.top
+            )
+        }
+
         val insets = windowMetrics.windowInsets.getInsetsIgnoringVisibility(
             WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
         )

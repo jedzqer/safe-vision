@@ -16,13 +16,9 @@ object ScreenOverlayController {
     private var systemAlertWindowHost: ScreenOverlayWindowHost? = null
 
     fun bindAccessibilityService(context: Context) {
-        val overlayContext = createOverlayWindowContext(
-            context,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        )
-        val windowManager = overlayContext.getSystemService(WindowManager::class.java) ?: return
+        val windowManager = context.getSystemService(WindowManager::class.java) ?: return
         accessibilityHost = ScreenOverlayWindowHost(
-            context = overlayContext,
+            context = context,
             windowManager = windowManager,
             windowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             touchThrough = true
