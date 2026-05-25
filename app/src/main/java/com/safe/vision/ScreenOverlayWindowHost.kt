@@ -18,12 +18,16 @@ internal class ScreenOverlayWindowHost(
     companion object {
         private const val MIN_SLOT_REUSE_DISTANCE_DP = 72f
         private const val SLOT_REUSE_DISTANCE_MULTIPLIER = 1.5f
+        private const val MAX_POOLED_REGION_SLOTS = 12
     }
 
     private data class RegionOverlaySlot(
         val view: ScreenMaskOverlayView,
-        var label: String,
-        var lastRegion: Rect
+        val layoutParams: WindowManager.LayoutParams,
+        var label: String = "",
+        val lastRegion: Rect = Rect(),
+        var attached: Boolean = false,
+        var inUse: Boolean = false
     )
 
     private var maskOverlayView: ScreenMaskOverlayView? = null
@@ -41,9 +45,13 @@ internal class ScreenOverlayWindowHost(
         } else {
             windowManager.updateViewLayout(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
         }
-        maskOverlayView?.setRegionBounds(0, 0)
-        maskOverlayView?.setContentOffset(metrics.contentOffsetX, metrics.contentOffsetY)
-        maskOverlayView?.setFrame(frame)
+        maskOverlayView?.bindFrame(
+            frame = frame,
+            left = 0,
+            top = 0,
+            contentOffsetX = metrics.contentOffsetX,
+            contentOffsetY = metrics.contentOffsetY
+        )
         maskOverlayView?.visibility = View.VISIBLE
     }
 
@@ -52,49 +60,37 @@ internal class ScreenOverlayWindowHost(
         metrics: OverlayMetrics
     ) {
         swapActiveFrameBitmap(frame.sourceBitmap)
-        val safeTasks = frame.drawTasks.mapNotNull { task ->
-            val safe = BlurEffects.clampRect(task.drawRect, frame.sourceBitmap.width, frame.sourceBitmap.height)
-            if (safe.width() > 0 && safe.height() > 0) {
-                task.copy(drawRect = Rect(safe))
-            } else {
-                null
+        markAllRegionSlotsUnused()
+
+        frame.drawTasks.forEach { task ->
+            val safeRect = clampTaskRect(task.drawRect, frame.sourceBitmap.width, frame.sourceBitmap.height)
+            if (safeRect.width() <= 0 || safeRect.height() <= 0) {
+                return@forEach
             }
-        }
 
-        val reusableSlots = maskRegionOverlaySlots.toMutableList()
-        val nextSlots = ArrayList<RegionOverlaySlot>(safeTasks.size)
-
-        safeTasks.forEach { task ->
-            val slot = takeBestSlot(task, reusableSlots, metrics)
-            val view = slot.view
-            view.release()
-            view.alpha = 0f
-            view.visibility = View.INVISIBLE
-            windowManager.updateViewLayout(view, createRegionMaskLayoutParams(task.drawRect, metrics))
-            view.setRegionBounds(task.drawRect.left, task.drawRect.top)
-            view.setContentOffset(metrics.contentOffsetX, metrics.contentOffsetY)
-            view.setFrame(
-                ScreenPrivacyMaskRenderer.OverlayFrame(
-                    sourceBitmap = frame.sourceBitmap,
-                    drawTasks = listOf(task),
-                    reverseMode = null,
-                    reverseRegions = emptyList(),
-                    reversePreRender = false
-                )
+            val safeTask = if (safeRect == task.drawRect) task else task.copy(drawRect = safeRect)
+            val slot = takeBestSlot(safeTask, safeRect, metrics) ?: obtainRegionSlot(metrics)
+            attachRegionSlotIfNeeded(slot)
+            slot.inUse = true
+            slot.view.alpha = 0f
+            slot.view.visibility = View.INVISIBLE
+            updateRegionLayout(slot.layoutParams, safeRect, metrics)
+            windowManager.updateViewLayout(slot.view, slot.layoutParams)
+            slot.view.bindRegionTask(
+                bitmap = frame.sourceBitmap,
+                task = safeTask,
+                left = safeRect.left,
+                top = safeRect.top,
+                contentOffsetX = metrics.contentOffsetX,
+                contentOffsetY = metrics.contentOffsetY
             )
-            view.alpha = 1f
-            view.visibility = View.VISIBLE
-            slot.label = task.label
-            slot.lastRegion = Rect(task.drawRect)
-            nextSlots += slot
+            slot.view.alpha = 1f
+            slot.view.visibility = View.VISIBLE
+            slot.label = safeTask.label
+            slot.lastRegion.set(safeRect)
         }
 
-        reusableSlots.forEach { slot ->
-            runCatching { windowManager.removeView(slot.view) }
-            slot.view.release()
-        }
-        maskRegionOverlaySlots.clear()
-        maskRegionOverlaySlots += nextSlots
+        recycleUnusedRegionSlots()
     }
 
     fun clearMaskOverlays() {
@@ -105,10 +101,13 @@ internal class ScreenOverlayWindowHost(
 
     fun clearRegionOverlays() {
         maskRegionOverlaySlots.forEach { slot ->
-            slot.view.release()
-            runCatching { windowManager.removeView(slot.view) }
+            slot.inUse = false
+            if (slot.attached) {
+                slot.view.visibility = View.INVISIBLE
+                slot.view.release(false)
+            }
         }
-        maskRegionOverlaySlots.clear()
+        trimRegionSlotPool(0)
     }
 
     fun clearFullscreenOverlay() {
@@ -122,8 +121,10 @@ internal class ScreenOverlayWindowHost(
             runCatching { windowManager.removeView(view) }
         }
         maskRegionOverlaySlots.forEach { slot ->
-            slot.view.release()
-            runCatching { windowManager.removeView(slot.view) }
+            if (slot.attached) {
+                slot.view.release(false)
+                runCatching { windowManager.removeView(slot.view) }
+            }
         }
         maskOverlayView = null
         maskRegionOverlaySlots.clear()
@@ -143,33 +144,29 @@ internal class ScreenOverlayWindowHost(
 
     private fun takeBestSlot(
         task: ScreenPrivacyMaskRenderer.DrawTask,
-        reusableSlots: MutableList<RegionOverlaySlot>,
+        targetRect: Rect,
         metrics: OverlayMetrics
-    ): RegionOverlaySlot {
-        val sameLabelIndex = reusableSlots
-            .withIndex()
-            .filter {
-                it.value.label == task.label &&
-                    canReuseSlot(it.value.lastRegion, task.drawRect, metrics)
+    ): RegionOverlaySlot? {
+        var bestSameLabel: RegionOverlaySlot? = null
+        var bestSameLabelDistance = Long.MAX_VALUE
+        var bestAny: RegionOverlaySlot? = null
+        var bestAnyDistance = Long.MAX_VALUE
+
+        maskRegionOverlaySlots.forEach { slot ->
+            if (slot.inUse || !slot.attached || !canReuseSlot(slot.lastRegion, targetRect, metrics)) {
+                return@forEach
             }
-            .minByOrNull { movementDistanceSquared(it.value.lastRegion, task.drawRect) }
-            ?.index
-
-        val slotIndex = sameLabelIndex ?: reusableSlots
-            .withIndex()
-            .filter { canReuseSlot(it.value.lastRegion, task.drawRect, metrics) }
-            .minByOrNull { movementDistanceSquared(it.value.lastRegion, task.drawRect) }
-            ?.index
-
-        if (slotIndex != null) {
-            return reusableSlots.removeAt(slotIndex)
+            val distance = movementDistanceSquared(slot.lastRegion, targetRect)
+            if (slot.label == task.label && distance < bestSameLabelDistance) {
+                bestSameLabel = slot
+                bestSameLabelDistance = distance
+            }
+            if (distance < bestAnyDistance) {
+                bestAny = slot
+                bestAnyDistance = distance
+            }
         }
-
-        val view = createOverlayView().apply {
-            visibility = View.INVISIBLE
-        }
-        windowManager.addView(view, createRegionMaskLayoutParams(Rect(0, 0, 1, 1), metrics))
-        return RegionOverlaySlot(view, task.label, Rect(task.drawRect))
+        return bestSameLabel ?: bestAny
     }
 
     private fun canReuseSlot(previous: Rect, current: Rect, metrics: OverlayMetrics): Boolean {
@@ -189,6 +186,69 @@ internal class ScreenOverlayWindowHost(
         val dw = previous.width().toLong() - current.width().toLong()
         val dh = previous.height().toLong() - current.height().toLong()
         return dx * dx + dy * dy + abs(dw) * abs(dw) / 4L + abs(dh) * abs(dh) / 4L
+    }
+
+    private fun markAllRegionSlotsUnused() {
+        maskRegionOverlaySlots.forEach { it.inUse = false }
+    }
+
+    private fun recycleUnusedRegionSlots() {
+        maskRegionOverlaySlots.forEach { slot ->
+            if (slot.inUse || !slot.attached) return@forEach
+            slot.view.visibility = View.INVISIBLE
+            slot.view.release(false)
+        }
+        trimRegionSlotPool(MAX_POOLED_REGION_SLOTS)
+    }
+
+    private fun trimRegionSlotPool(maxSlots: Int) {
+        if (maskRegionOverlaySlots.size <= maxSlots) return
+        val iterator = maskRegionOverlaySlots.iterator()
+        while (maskRegionOverlaySlots.size > maxSlots && iterator.hasNext()) {
+            val slot = iterator.next()
+            if (slot.inUse || !slot.attached) continue
+            runCatching { windowManager.removeView(slot.view) }
+            slot.attached = false
+            iterator.remove()
+        }
+    }
+
+    private fun obtainRegionSlot(metrics: OverlayMetrics): RegionOverlaySlot {
+        val slot = maskRegionOverlaySlots.firstOrNull { !it.inUse && !it.attached }
+        if (slot != null) {
+            return slot
+        }
+        return RegionOverlaySlot(
+            view = createOverlayView().apply {
+                visibility = View.INVISIBLE
+            },
+            layoutParams = createRegionMaskLayoutParams(Rect(0, 0, 1, 1), metrics)
+        ).also { maskRegionOverlaySlots += it }
+    }
+
+    private fun attachRegionSlotIfNeeded(slot: RegionOverlaySlot) {
+        if (slot.attached) return
+        windowManager.addView(slot.view, slot.layoutParams)
+        slot.attached = true
+    }
+
+    private fun clampTaskRect(region: Rect, width: Int, height: Int): Rect {
+        val left = region.left.coerceAtLeast(0)
+        val top = region.top.coerceAtLeast(0)
+        val right = region.right.coerceAtMost(width)
+        val bottom = region.bottom.coerceAtMost(height)
+        return Rect(left, top, right, bottom)
+    }
+
+    private fun updateRegionLayout(
+        layoutParams: WindowManager.LayoutParams,
+        region: Rect,
+        metrics: OverlayMetrics
+    ) {
+        layoutParams.width = region.width()
+        layoutParams.height = region.height()
+        layoutParams.x = region.left - metrics.contentOffsetX
+        layoutParams.y = region.top - metrics.contentOffsetY
     }
 
     private fun createOverlayView(): ScreenMaskOverlayView {

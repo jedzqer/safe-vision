@@ -24,6 +24,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
     private var sourceBitmap: Bitmap? = null
     private var drawTasks: List<ScreenPrivacyMaskRenderer.DrawTask> = emptyList()
+    private var singleDrawTask: ScreenPrivacyMaskRenderer.DrawTask? = null
     private var reverseMode: Int? = null
     private var reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion> = emptyList()
     private var reversePreRender: Boolean = false
@@ -44,53 +45,127 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         if (localReverseMode != null && reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
-        drawTasks.forEach { drawTask(canvas, bitmap, it) }
+        val localSingleTask = singleDrawTask
+        if (localSingleTask != null) {
+            drawTask(canvas, bitmap, localSingleTask)
+        } else {
+            drawTasks.forEach { drawTask(canvas, bitmap, it) }
+        }
         if (localReverseMode != null && !reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
         canvas.restore()
     }
 
-    fun setFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
-        updateSourceBitmap(frame?.sourceBitmap)
-        drawTasks = frame?.drawTasks.orEmpty()
-        reverseMode = frame?.reverseMode
-        reverseRegions = frame?.reverseRegions.orEmpty()
-        reversePreRender = frame?.reversePreRender == true
-        invalidate()
+    fun bindFrame(
+        frame: ScreenPrivacyMaskRenderer.OverlayFrame?,
+        left: Int,
+        top: Int,
+        contentOffsetX: Int,
+        contentOffsetY: Int
+    ) {
+        val changed = updateState(
+            bitmap = frame?.sourceBitmap,
+            tasks = frame?.drawTasks.orEmpty(),
+            singleTask = null,
+            reverseMode = frame?.reverseMode,
+            reverseRegions = frame?.reverseRegions.orEmpty(),
+            reversePreRender = frame?.reversePreRender == true,
+            left = left,
+            top = top,
+            contentOffsetX = contentOffsetX.toFloat(),
+            contentOffsetY = contentOffsetY.toFloat()
+        )
+        if (changed) invalidate()
     }
 
-    fun setRegionBounds(left: Int, top: Int) {
-        if (regionLeft == left && regionTop == top) return
-        regionLeft = left
-        regionTop = top
-        invalidate()
+    fun bindRegionTask(
+        bitmap: Bitmap?,
+        task: ScreenPrivacyMaskRenderer.DrawTask?,
+        left: Int,
+        top: Int,
+        contentOffsetX: Int,
+        contentOffsetY: Int
+    ) {
+        val changed = updateState(
+            bitmap = bitmap,
+            tasks = emptyList(),
+            singleTask = task,
+            reverseMode = null,
+            reverseRegions = emptyList(),
+            reversePreRender = false,
+            left = left,
+            top = top,
+            contentOffsetX = contentOffsetX.toFloat(),
+            contentOffsetY = contentOffsetY.toFloat()
+        )
+        if (changed) invalidate()
     }
 
-    fun setContentOffset(x: Int, y: Int) {
-        val newX = x.toFloat()
-        val newY = y.toFloat()
-        if (contentOffsetX == newX && contentOffsetY == newY) return
-        contentOffsetX = newX
-        contentOffsetY = newY
-        invalidate()
+    fun release(shouldInvalidate: Boolean = true) {
+        val changed = updateState(
+            bitmap = null,
+            tasks = emptyList(),
+            singleTask = null,
+            reverseMode = null,
+            reverseRegions = emptyList(),
+            reversePreRender = false,
+            left = 0,
+            top = 0,
+            contentOffsetX = 0f,
+            contentOffsetY = 0f
+        )
+        if (changed && shouldInvalidate) invalidate()
     }
 
-    fun release() {
-        sourceBitmap = null
-        drawTasks = emptyList()
-        reverseMode = null
-        reverseRegions = emptyList()
-        reversePreRender = false
-        regionLeft = 0
-        regionTop = 0
-        contentOffsetX = 0f
-        contentOffsetY = 0f
-        invalidate()
-    }
-
-    private fun updateSourceBitmap(bitmap: Bitmap?) {
-        sourceBitmap = bitmap
+    private fun updateState(
+        bitmap: Bitmap?,
+        tasks: List<ScreenPrivacyMaskRenderer.DrawTask>,
+        singleTask: ScreenPrivacyMaskRenderer.DrawTask?,
+        reverseMode: Int?,
+        reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion>,
+        reversePreRender: Boolean,
+        left: Int,
+        top: Int,
+        contentOffsetX: Float,
+        contentOffsetY: Float
+    ): Boolean {
+        var changed = false
+        if (sourceBitmap !== bitmap) {
+            sourceBitmap = bitmap
+            changed = true
+        }
+        if (drawTasks != tasks) {
+            drawTasks = tasks
+            changed = true
+        }
+        if (this.singleDrawTask != singleTask) {
+            this.singleDrawTask = singleTask
+            changed = true
+        }
+        if (this.reverseMode != reverseMode) {
+            this.reverseMode = reverseMode
+            changed = true
+        }
+        if (this.reverseRegions != reverseRegions) {
+            this.reverseRegions = reverseRegions
+            changed = true
+        }
+        if (this.reversePreRender != reversePreRender) {
+            this.reversePreRender = reversePreRender
+            changed = true
+        }
+        if (regionLeft != left || regionTop != top) {
+            regionLeft = left
+            regionTop = top
+            changed = true
+        }
+        if (this.contentOffsetX != contentOffsetX || this.contentOffsetY != contentOffsetY) {
+            this.contentOffsetX = contentOffsetX
+            this.contentOffsetY = contentOffsetY
+            changed = true
+        }
+        return changed
     }
 
     private fun drawTask(
