@@ -35,6 +35,7 @@ internal class ScreenOverlayWindowHost(
     private var maskOverlayView: ScreenMaskOverlayView? = null
     private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
     private var activeFrameBitmap: android.graphics.Bitmap? = null
+    private var renderGeneration: Long = 0L
 
     fun resolveOverlayMetrics(): OverlayMetrics {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -78,6 +79,7 @@ internal class ScreenOverlayWindowHost(
         frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics
     ) {
+        val generation = ++renderGeneration
         swapActiveFrameBitmap(frame.sourceBitmap)
         if (maskOverlayView == null) {
             maskOverlayView = createOverlayView()
@@ -85,18 +87,17 @@ internal class ScreenOverlayWindowHost(
         } else {
             windowManager.updateViewLayout(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
         }
-        maskOverlayView?.bindFrame(
-            frame = frame,
-            windowOriginX = metrics.contentOffsetX,
-            windowOriginY = metrics.contentOffsetY
-        )
-        maskOverlayView?.visibility = View.VISIBLE
+        maskOverlayView?.let { view ->
+            bindFullscreenFrame(view, frame, metrics, generation)
+            view.visibility = View.VISIBLE
+        }
     }
 
     fun showRegionOverlays(
         frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics
     ) {
+        val generation = ++renderGeneration
         swapActiveFrameBitmap(frame.sourceBitmap)
         markAllRegionSlotsUnused()
 
@@ -114,12 +115,7 @@ internal class ScreenOverlayWindowHost(
             slot.view.visibility = View.INVISIBLE
             updateRegionLayout(slot.layoutParams, safeRect, metrics)
             windowManager.updateViewLayout(slot.view, slot.layoutParams)
-            slot.view.bindRegionTask(
-                bitmap = frame.sourceBitmap,
-                task = safeTask,
-                windowOriginX = safeRect.left,
-                windowOriginY = safeRect.top
-            )
+            bindRegionTask(slot.view, frame.sourceBitmap, safeTask, safeRect, metrics, generation)
             slot.view.alpha = 1f
             slot.view.visibility = View.VISIBLE
             slot.label = safeTask.label
@@ -130,12 +126,14 @@ internal class ScreenOverlayWindowHost(
     }
 
     fun clearMaskOverlays() {
+        renderGeneration++
         clearFullscreenOverlay()
         clearRegionOverlays()
         releaseActiveFrameBitmap()
     }
 
     fun clearRegionOverlays() {
+        renderGeneration++
         maskRegionOverlaySlots.forEach { slot ->
             slot.inUse = false
             if (slot.attached) {
@@ -147,6 +145,7 @@ internal class ScreenOverlayWindowHost(
     }
 
     fun clearFullscreenOverlay() {
+        renderGeneration++
         maskOverlayView?.release()
         maskOverlayView?.visibility = View.INVISIBLE
     }
@@ -287,6 +286,71 @@ internal class ScreenOverlayWindowHost(
         layoutParams.y = region.top - metrics.contentOffsetY
     }
 
+    private fun bindFullscreenFrame(
+        view: ScreenMaskOverlayView,
+        frame: ScreenPrivacyMaskRenderer.OverlayFrame,
+        metrics: OverlayMetrics,
+        generation: Long
+    ) {
+        val (originX, originY) = resolveViewOrigin(view, metrics.contentOffsetX, metrics.contentOffsetY)
+        view.bindFrame(
+            frame = frame,
+            windowOriginX = originX,
+            windowOriginY = originY
+        )
+        view.post {
+            if (maskOverlayView !== view || renderGeneration != generation || !view.isAttachedToWindow) {
+                return@post
+            }
+            val (resolvedX, resolvedY) = resolveViewOrigin(view, metrics.contentOffsetX, metrics.contentOffsetY)
+            view.bindFrame(
+                frame = frame,
+                windowOriginX = resolvedX,
+                windowOriginY = resolvedY
+            )
+        }
+    }
+
+    private fun bindRegionTask(
+        view: ScreenMaskOverlayView,
+        bitmap: android.graphics.Bitmap,
+        task: ScreenPrivacyMaskRenderer.DrawTask,
+        region: Rect,
+        metrics: OverlayMetrics,
+        generation: Long
+    ) {
+        val (originX, originY) = resolveViewOrigin(view, region.left, region.top)
+        view.bindRegionTask(
+            bitmap = bitmap,
+            task = task,
+            windowOriginX = originX,
+            windowOriginY = originY
+        )
+        view.post {
+            if (renderGeneration != generation || !view.isAttachedToWindow) {
+                return@post
+            }
+            val (resolvedX, resolvedY) = resolveViewOrigin(view, region.left, region.top)
+            view.bindRegionTask(
+                bitmap = bitmap,
+                task = task,
+                windowOriginX = resolvedX,
+                windowOriginY = resolvedY
+            )
+        }
+    }
+
+    private fun resolveViewOrigin(
+        view: View,
+        fallbackX: Int,
+        fallbackY: Int
+    ): Pair<Int, Int> {
+        if (!view.isAttachedToWindow) return fallbackX to fallbackY
+        val location = IntArray(2)
+        view.getLocationOnScreen(location)
+        return location[0] to location[1]
+    }
+
     private fun createOverlayView(): ScreenMaskOverlayView {
         return ScreenMaskOverlayView(context).apply {
             isClickable = !touchThrough
@@ -303,12 +367,16 @@ internal class ScreenOverlayWindowHost(
             metrics.widthPixels,
             metrics.heightPixels,
             windowType,
-            baseWindowFlags(),
+            baseWindowFlags() or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = metrics.contentOffsetX
             y = metrics.contentOffsetY
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
             alpha = 1f
         }
     }
