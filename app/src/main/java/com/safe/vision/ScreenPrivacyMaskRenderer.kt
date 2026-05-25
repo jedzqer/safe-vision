@@ -218,7 +218,6 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
 
         if (drawTasks.isEmpty() && reverseRegions.isEmpty()) {
-            sourceBitmap.recycle()
             return null
         }
 

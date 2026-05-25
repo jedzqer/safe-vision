@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -127,7 +128,7 @@ class ScreenDetectionService : Service() {
         }
 
         detectionJob = serviceScope.launch {
-            runCatching {
+            try {
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_starting))
                 val projectionManager = getSystemService(MediaProjectionManager::class.java)
                 val projection = projectionManager.getMediaProjection(resultCode, resultData)
@@ -181,10 +182,15 @@ class ScreenDetectionService : Service() {
                 updateNotification(getString(R.string.screen_detection_notification_running))
 
                 detectionLoop(variant)
-            }.onFailure { error ->
+            } catch (e: CancellationException) {
+                throw e
+            } catch (error: Throwable) {
                 DebugLogManager.addLog("屏幕检测", "启动失败: ${error.message}", DebugLogManager.LogLevel.ERROR)
                 DebugLogManager.addLog("屏幕检测", error.stackTraceToString(), DebugLogManager.LogLevel.ERROR)
-                stopDetection(error.message ?: getString(R.string.screen_detection_status_start_failed))
+                stopDetection(
+                    error.message ?: getString(R.string.screen_detection_status_start_failed),
+                    cancelJob = false
+                )
             }
         }
     }
@@ -212,7 +218,9 @@ class ScreenDetectionService : Service() {
                 RenderResult(detections.size, overlayFrame)
             }
 
-            bitmap.recycle()
+            if (renderResult.overlayFrame == null && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
             applyOverlayFrame(renderResult.overlayFrame)
 
             val status = if (renderResult.detectionCount == 0) {
@@ -295,8 +303,10 @@ class ScreenDetectionService : Service() {
         }
     }
 
-    private fun stopDetection(status: String) {
-        detectionJob?.cancel()
+    private fun stopDetection(status: String, cancelJob: Boolean = true) {
+        if (cancelJob) {
+            detectionJob?.cancel()
+        }
         detectionJob = null
         ScreenDetectionStateHolder.setIdle(status)
         updateNotification(status)
