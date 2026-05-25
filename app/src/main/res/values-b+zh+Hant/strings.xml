@@ -283,7 +283,7 @@
     <string name="settings_about_button">關於軟體</string>
     <string name="settings_about_dialog_title">關於 Safe Vision</string>
     <string name="settings_about_version">版本：%1$s</string>
-    <string name="settings_about_source_code">開源地址</string>
+    <string name="settings_about_source_code">打開項目頁面</string>
     <string name="support_title">贊助支持</string>
     <string name="support_button">贊助支持</string>
     <string name="support_message">如果你覺得軟體還不錯的話，可以贊助一下哦，就算一毛錢也不要緊😸。如果想贊助，但沒辦法贊助也沒關係，你的好意我會心領的😎</string>

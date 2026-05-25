@@ -316,7 +316,7 @@
     <string name="settings_about_button">关于软件</string>
     <string name="settings_about_dialog_title">关于 Safe Vision</string>
     <string name="settings_about_version">版本：%1$s</string>
-    <string name="settings_about_source_code">开源地址</string>
+    <string name="settings_about_source_code">打开项目页面</string>
     <string name="support_title">赞赏支持</string>
     <string name="support_button">赞赏支持</string>
     <string name="support_message">如果你觉得软件还不错的话，可以赞赏一下哦，就算一毛钱也不要紧😸。如果想赞赏，但没办法赞赏也没关系，你的好意我会心领的😎</string>
