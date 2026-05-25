@@ -90,8 +90,9 @@ internal class ScreenOverlayWindowHost(
     fun clearRegionOverlays() {
         maskRegionOverlaySlots.forEach { slot ->
             slot.view.release()
-            slot.view.visibility = View.INVISIBLE
+            runCatching { windowManager.removeView(slot.view) }
         }
+        maskRegionOverlaySlots.clear()
     }
 
     fun clearFullscreenOverlay() {

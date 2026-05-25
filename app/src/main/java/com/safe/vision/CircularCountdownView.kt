@@ -2,12 +2,13 @@ package com.safe.vision
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 
 /**
  * Simple circular countdown indicator with center text.
@@ -19,19 +20,29 @@ class CircularCountdownView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    private val onSurfaceColor: Int = run {
+        val tv = TypedValue()
+        context.theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, tv, true)
+        if (tv.type >= TypedValue.TYPE_FIRST_COLOR_INT && tv.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+            tv.data
+        } else {
+            ContextCompat.getColor(context, android.R.color.white)
+        }
+    }
+
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 8f
-        color = Color.parseColor("#40FFFFFF")
+        color = ColorUtils.setAlphaComponent(onSurfaceColor, 64)
     }
     private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 8f
-        color = ContextCompat.getColor(context, android.R.color.white)
+        color = onSurfaceColor
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = onSurfaceColor
         textSize = 36f
         textAlign = Paint.Align.CENTER
     }

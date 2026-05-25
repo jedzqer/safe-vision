@@ -127,7 +127,10 @@ class ThumbnailCacheManager private constructor(context: Context) {
             val frame = retriever.frameAtTime
             retriever.release()
             frame?.let { source ->
-                val scaled = Bitmap.createScaledBitmap(source, targetPx, targetPx, true)
+                val scale = targetPx.toFloat() / maxOf(source.width, source.height)
+                val w = (source.width * scale).toInt().coerceAtLeast(1)
+                val h = (source.height * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(source, w, h, true)
                 if (scaled != source) source.recycle()
                 scaled
             }

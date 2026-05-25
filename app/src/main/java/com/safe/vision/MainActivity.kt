@@ -99,7 +99,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeShowFirstLaunchDialog() {
-        val prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         if (prefs.getBoolean("welcome_shown", false)) return
 
         val messageView = android.widget.TextView(this).apply {
