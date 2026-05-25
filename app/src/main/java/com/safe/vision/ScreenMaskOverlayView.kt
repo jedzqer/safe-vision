@@ -28,20 +28,16 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     private var reverseMode: Int? = null
     private var reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion> = emptyList()
     private var reversePreRender: Boolean = false
-    private var contentOffsetX: Float = 0f
-    private var contentOffsetY: Float = 0f
-    private var regionLeft: Int = 0
-    private var regionTop: Int = 0
+    private var windowOriginX: Float = 0f
+    private var windowOriginY: Float = 0f
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val bitmap = sourceBitmap?.takeIf { !it.isRecycled } ?: return
         val localReverseMode = reverseMode
-        val offsetX = -contentOffsetX - regionLeft
-        val offsetY = -contentOffsetY - regionTop
 
         canvas.save()
-        canvas.translate(offsetX, offsetY)
+        canvas.translate(-windowOriginX, -windowOriginY)
         if (localReverseMode != null && reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
@@ -59,10 +55,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
     fun bindFrame(
         frame: ScreenPrivacyMaskRenderer.OverlayFrame?,
-        left: Int,
-        top: Int,
-        contentOffsetX: Int,
-        contentOffsetY: Int
+        windowOriginX: Int,
+        windowOriginY: Int
     ) {
         val changed = updateState(
             bitmap = frame?.sourceBitmap,
@@ -71,10 +65,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = frame?.reverseMode,
             reverseRegions = frame?.reverseRegions.orEmpty(),
             reversePreRender = frame?.reversePreRender == true,
-            left = left,
-            top = top,
-            contentOffsetX = contentOffsetX.toFloat(),
-            contentOffsetY = contentOffsetY.toFloat()
+            windowOriginX = windowOriginX.toFloat(),
+            windowOriginY = windowOriginY.toFloat()
         )
         if (changed) invalidate()
     }
@@ -82,10 +74,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     fun bindRegionTask(
         bitmap: Bitmap?,
         task: ScreenPrivacyMaskRenderer.DrawTask?,
-        left: Int,
-        top: Int,
-        contentOffsetX: Int,
-        contentOffsetY: Int
+        windowOriginX: Int,
+        windowOriginY: Int
     ) {
         val changed = updateState(
             bitmap = bitmap,
@@ -94,10 +84,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = null,
             reverseRegions = emptyList(),
             reversePreRender = false,
-            left = left,
-            top = top,
-            contentOffsetX = contentOffsetX.toFloat(),
-            contentOffsetY = contentOffsetY.toFloat()
+            windowOriginX = windowOriginX.toFloat(),
+            windowOriginY = windowOriginY.toFloat()
         )
         if (changed) invalidate()
     }
@@ -110,10 +98,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = null,
             reverseRegions = emptyList(),
             reversePreRender = false,
-            left = 0,
-            top = 0,
-            contentOffsetX = 0f,
-            contentOffsetY = 0f
+            windowOriginX = 0f,
+            windowOriginY = 0f
         )
         if (changed && shouldInvalidate) invalidate()
     }
@@ -125,10 +111,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         reverseMode: Int?,
         reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion>,
         reversePreRender: Boolean,
-        left: Int,
-        top: Int,
-        contentOffsetX: Float,
-        contentOffsetY: Float
+        windowOriginX: Float,
+        windowOriginY: Float
     ): Boolean {
         var changed = false
         if (sourceBitmap !== bitmap) {
@@ -155,14 +139,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             this.reversePreRender = reversePreRender
             changed = true
         }
-        if (regionLeft != left || regionTop != top) {
-            regionLeft = left
-            regionTop = top
-            changed = true
-        }
-        if (this.contentOffsetX != contentOffsetX || this.contentOffsetY != contentOffsetY) {
-            this.contentOffsetX = contentOffsetX
-            this.contentOffsetY = contentOffsetY
+        if (this.windowOriginX != windowOriginX || this.windowOriginY != windowOriginY) {
+            this.windowOriginX = windowOriginX
+            this.windowOriginY = windowOriginY
             changed = true
         }
         return changed

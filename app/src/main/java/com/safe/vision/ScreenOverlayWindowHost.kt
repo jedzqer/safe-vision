@@ -3,8 +3,10 @@ package com.safe.vision
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import kotlin.math.abs
 import kotlin.math.max
@@ -34,6 +36,34 @@ internal class ScreenOverlayWindowHost(
     private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
     private var activeFrameBitmap: android.graphics.Bitmap? = null
 
+    fun resolveOverlayMetrics(): OverlayMetrics {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            val displayMetrics = context.resources.displayMetrics
+            return OverlayMetrics(
+                widthPixels = displayMetrics.widthPixels,
+                heightPixels = displayMetrics.heightPixels,
+                densityDpi = displayMetrics.densityDpi,
+                contentOffsetX = 0,
+                contentOffsetY = 0
+            )
+        }
+
+        val windowMetrics = windowManager.maximumWindowMetrics
+        val bounds = windowMetrics.bounds
+        val insets = windowMetrics.windowInsets.getInsetsIgnoringVisibility(
+            WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+        )
+        val availableWidth = (bounds.width() - insets.left - insets.right).coerceAtLeast(1)
+        val availableHeight = (bounds.height() - insets.top - insets.bottom).coerceAtLeast(1)
+        return OverlayMetrics(
+            widthPixels = availableWidth,
+            heightPixels = availableHeight,
+            densityDpi = context.resources.displayMetrics.densityDpi,
+            contentOffsetX = bounds.left + insets.left,
+            contentOffsetY = bounds.top + insets.top
+        )
+    }
+
     fun showFullscreenOverlay(
         frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics
@@ -47,10 +77,8 @@ internal class ScreenOverlayWindowHost(
         }
         maskOverlayView?.bindFrame(
             frame = frame,
-            left = 0,
-            top = 0,
-            contentOffsetX = metrics.contentOffsetX,
-            contentOffsetY = metrics.contentOffsetY
+            windowOriginX = metrics.contentOffsetX,
+            windowOriginY = metrics.contentOffsetY
         )
         maskOverlayView?.visibility = View.VISIBLE
     }
@@ -79,10 +107,8 @@ internal class ScreenOverlayWindowHost(
             slot.view.bindRegionTask(
                 bitmap = frame.sourceBitmap,
                 task = safeTask,
-                left = safeRect.left,
-                top = safeRect.top,
-                contentOffsetX = metrics.contentOffsetX,
-                contentOffsetY = metrics.contentOffsetY
+                windowOriginX = safeRect.left,
+                windowOriginY = safeRect.top
             )
             slot.view.alpha = 1f
             slot.view.visibility = View.VISIBLE

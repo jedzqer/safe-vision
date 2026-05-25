@@ -142,7 +142,7 @@ class ScreenDetectionService : Service() {
                     error(overlayUnavailableMessage(overlayMode))
                 }
 
-                val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext)
+                val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
                 overlayMetrics = metrics
                 imageReader = ImageReader.newInstance(
                     metrics.widthPixels,

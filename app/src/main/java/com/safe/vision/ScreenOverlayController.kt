@@ -2,6 +2,7 @@ package com.safe.vision
 
 import android.content.ComponentName
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.provider.Settings
 import android.util.DisplayMetrics
@@ -15,9 +16,13 @@ object ScreenOverlayController {
     private var systemAlertWindowHost: ScreenOverlayWindowHost? = null
 
     fun bindAccessibilityService(context: Context) {
-        val windowManager = context.getSystemService(WindowManager::class.java) ?: return
+        val overlayContext = createOverlayWindowContext(
+            context,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        )
+        val windowManager = overlayContext.getSystemService(WindowManager::class.java) ?: return
         accessibilityHost = ScreenOverlayWindowHost(
-            context = context,
+            context = overlayContext,
             windowManager = windowManager,
             windowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             touchThrough = true
@@ -105,8 +110,9 @@ object ScreenOverlayController {
         systemAlertWindowHost?.removeOverlayViews()
     }
 
-    fun resolveOverlayMetrics(context: Context): OverlayMetrics {
+    fun resolveOverlayMetrics(context: Context, mode: ScreenOverlayMode): OverlayMetrics {
         val displayMetrics = DisplayMetrics()
+        hostFor(context, mode)?.let { return it.resolveOverlayMetrics() }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val windowMetrics = context.getSystemService(WindowManager::class.java).maximumWindowMetrics
             val bounds = windowMetrics.bounds
@@ -148,17 +154,27 @@ object ScreenOverlayController {
         systemAlertWindowHost?.let { return it }
         if (!canDrawSystemAlertWindow(context)) return null
         val appContext = context.applicationContext
-        val windowManager = appContext.getSystemService(WindowManager::class.java) ?: return null
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val overlayContext = createOverlayWindowContext(appContext, overlayType)
+        val windowManager = overlayContext.getSystemService(WindowManager::class.java) ?: return null
         return ScreenOverlayWindowHost(
-            context = appContext,
+            context = overlayContext,
             windowManager = windowManager,
-            windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
+            windowType = overlayType,
             touchThrough = false
         ).also { systemAlertWindowHost = it }
+    }
+
+    private fun createOverlayWindowContext(baseContext: Context, windowType: Int): Context {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return baseContext
+        val displayManager = baseContext.getSystemService(DisplayManager::class.java) ?: return baseContext
+        val display = baseContext.display ?: displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            ?: return baseContext
+        return baseContext.createDisplayContext(display).createWindowContext(windowType, null)
     }
 }
