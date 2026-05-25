@@ -307,6 +307,8 @@ internal class ScreenOverlayWindowHost(
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
+            x = metrics.contentOffsetX
+            y = metrics.contentOffsetY
             alpha = 1f
         }
     }
