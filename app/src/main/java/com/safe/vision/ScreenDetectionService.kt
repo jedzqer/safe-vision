@@ -36,6 +36,11 @@ class ScreenDetectionService : Service() {
         private const val EXTRA_RESULT_DATA = "extra_result_data"
         private const val NOTIFICATION_CHANNEL_ID = "screen_detection_channel"
         private const val NOTIFICATION_ID = 3002
+        private const val FLICKER_WINDOW_SIZE = 4
+        private const val SHOW_THRESHOLD = 2
+        private const val HIDE_THRESHOLD = 1
+        private const val CLEAR_DELAY_MS = 800L
+
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
                 action = ACTION_START
@@ -62,6 +67,12 @@ class ScreenDetectionService : Service() {
     private var detectionIntervalMs: Long = 500L
     private var overlayMetrics: OverlayMetrics? = null
     private var overlayMode: ScreenOverlayMode = ScreenOverlayMode.ACCESSIBILITY
+
+    // 抗闪烁：滑动窗口 + 延迟清除
+    private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
+    private var overlayVisible = false
+    private var lastPositiveTimeMs: Long = 0L
+
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             DebugLogManager.addLog("屏幕检测", "MediaProjection 已停止")
@@ -219,10 +230,36 @@ class ScreenDetectionService : Service() {
 
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
         val metrics = overlayMetrics ?: return
-        if (frame == null) {
-            ScreenOverlayController.clearMaskOverlays(overlayMode)
+        val hasDetection = frame != null
+
+        // 滑动窗口采样
+        if (detectionWindow.size >= FLICKER_WINDOW_SIZE) detectionWindow.removeFirst()
+        detectionWindow.addLast(hasDetection)
+        if (hasDetection) lastPositiveTimeMs = System.currentTimeMillis()
+
+        val positiveCount = detectionWindow.count { it }
+        val withinClearDelay = System.currentTimeMillis() - lastPositiveTimeMs < CLEAR_DELAY_MS
+
+        // 迟滞判断：已显示时要求更低的正帧数才维持；未显示时要求更高才触发
+        val shouldShow = if (overlayVisible) {
+            positiveCount > HIDE_THRESHOLD || withinClearDelay
+        } else {
+            positiveCount >= SHOW_THRESHOLD
+        }
+
+        if (!shouldShow) {
+            if (overlayVisible) {
+                ScreenOverlayController.clearMaskOverlays(overlayMode)
+                overlayVisible = false
+            }
+            frame?.bitmap?.recycle()
             return
         }
+
+        // 窗口判断为应显示，但当前帧无内容（延迟清除保护期内），保持上一帧不动
+        if (frame == null) return
+
+        overlayVisible = true
 
         if (frame.requiresFullscreenOverlay || frame.regions.isEmpty()) {
             val shown = ScreenOverlayController.showFullscreenOverlay(
@@ -263,6 +300,9 @@ class ScreenDetectionService : Service() {
 
     private fun releaseResources() {
         ScreenOverlayController.removeOverlayViews()
+        detectionWindow.clear()
+        overlayVisible = false
+        lastPositiveTimeMs = 0L
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
