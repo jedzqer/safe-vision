@@ -7,6 +7,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import kotlin.math.abs
+import kotlin.math.max
 
 internal class ScreenOverlayWindowHost(
     private val context: Context,
@@ -14,6 +15,11 @@ internal class ScreenOverlayWindowHost(
     private val windowType: Int,
     private val touchThrough: Boolean
 ) {
+    companion object {
+        private const val MIN_SLOT_REUSE_DISTANCE_DP = 72f
+        private const val SLOT_REUSE_DISTANCE_MULTIPLIER = 1.5f
+    }
+
     private data class RegionOverlaySlot(
         val view: ScreenMaskOverlayView,
         var label: String,
@@ -61,6 +67,8 @@ internal class ScreenOverlayWindowHost(
         safeTasks.forEach { task ->
             val slot = takeBestSlot(task, reusableSlots, metrics)
             val view = slot.view
+            view.release()
+            view.alpha = 0f
             view.visibility = View.INVISIBLE
             windowManager.updateViewLayout(view, createRegionMaskLayoutParams(task.drawRect, metrics))
             view.setRegionBounds(task.drawRect.left, task.drawRect.top)
@@ -74,6 +82,7 @@ internal class ScreenOverlayWindowHost(
                     reversePreRender = false
                 )
             )
+            view.alpha = 1f
             view.visibility = View.VISIBLE
             slot.label = task.label
             slot.lastRegion = Rect(task.drawRect)
@@ -139,12 +148,16 @@ internal class ScreenOverlayWindowHost(
     ): RegionOverlaySlot {
         val sameLabelIndex = reusableSlots
             .withIndex()
-            .filter { it.value.label == task.label }
+            .filter {
+                it.value.label == task.label &&
+                    canReuseSlot(it.value.lastRegion, task.drawRect, metrics)
+            }
             .minByOrNull { movementDistanceSquared(it.value.lastRegion, task.drawRect) }
             ?.index
 
         val slotIndex = sameLabelIndex ?: reusableSlots
             .withIndex()
+            .filter { canReuseSlot(it.value.lastRegion, task.drawRect, metrics) }
             .minByOrNull { movementDistanceSquared(it.value.lastRegion, task.drawRect) }
             ?.index
 
@@ -157,6 +170,17 @@ internal class ScreenOverlayWindowHost(
         }
         windowManager.addView(view, createRegionMaskLayoutParams(Rect(0, 0, 1, 1), metrics))
         return RegionOverlaySlot(view, task.label, Rect(task.drawRect))
+    }
+
+    private fun canReuseSlot(previous: Rect, current: Rect, metrics: OverlayMetrics): Boolean {
+        val minReuseDistancePx = MIN_SLOT_REUSE_DISTANCE_DP * metrics.densityDpi / 160f
+        val sizeBasedReuseDistancePx = max(
+            max(previous.width(), previous.height()),
+            max(current.width(), current.height())
+        ) * SLOT_REUSE_DISTANCE_MULTIPLIER
+        val maxReuseDistancePx = max(minReuseDistancePx, sizeBasedReuseDistancePx)
+        return movementDistanceSquared(previous, current) <=
+            maxReuseDistancePx.toLong() * maxReuseDistancePx.toLong()
     }
 
     private fun movementDistanceSquared(previous: Rect, current: Rect): Long {
