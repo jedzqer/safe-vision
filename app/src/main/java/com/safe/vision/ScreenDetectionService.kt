@@ -8,7 +8,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
@@ -70,6 +72,10 @@ class ScreenDetectionService : Service() {
     private var detectionIntervalMs: Long = 500L
     private var overlayMetrics: OverlayMetrics? = null
     private var overlayMode: ScreenOverlayMode = ScreenOverlayMode.ACCESSIBILITY
+    private var analysisBitmap: Bitmap? = null
+    private var analysisCanvas: Canvas? = null
+    private var stagingBitmap: Bitmap? = null
+    private val analysisDstRect = Rect()
 
     // 抗闪烁：滑动窗口 + 延迟清除
     private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
@@ -197,7 +203,11 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
-            val bitmap = imageReader?.acquireLatestImage()?.use { it.toBitmap() }
+            val bitmap = withContext(Dispatchers.Default) {
+                imageReader?.acquireLatestImage()?.use { image ->
+                    image.copyToReusableBitmap()
+                }
+            }
 
             if (bitmap == null) {
                 delay(200)
@@ -215,13 +225,19 @@ class ScreenDetectionService : Service() {
                 } else {
                     DetectionConfig.LabelProfile.STANDARD
                 }
-                val overlayFrame = overlayRenderer?.render(bitmap, detections, profile)
+                val overlayFrame = if (detections.isNotEmpty()) {
+                    val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                    overlayRenderer?.render(overlayBitmap, detections, profile).also { frame ->
+                        if (frame == null && !overlayBitmap.isRecycled) {
+                            overlayBitmap.recycle()
+                        }
+                    }
+                } else {
+                    null
+                }
                 RenderResult(detections.size, overlayFrame)
             }
 
-            if (renderResult.overlayFrame == null && !bitmap.isRecycled) {
-                bitmap.recycle()
-            }
             applyOverlayFrame(renderResult.overlayFrame)
 
             val status = if (renderResult.detectionCount == 0) {
@@ -327,6 +343,7 @@ class ScreenDetectionService : Service() {
         runCatching { imageReader?.close() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "关闭 ImageReader 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         imageReader = null
+        releaseFrameBitmaps()
         mediaProjection?.unregisterCallback(projectionCallback)
         runCatching { mediaProjection?.stop() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "停止 MediaProjection 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
@@ -433,22 +450,75 @@ class ScreenDetectionService : Service() {
         }
     }
 
-    private fun Image.toBitmap(): Bitmap {
+    private fun Image.copyToReusableBitmap(): Bitmap {
         val plane = planes.first()
         val buffer = plane.buffer
         buffer.rewind()
+        val crop = cropRect
+        val targetWidth = crop.width()
+        val targetHeight = crop.height()
         val pixelStride = plane.pixelStride
         val rowStride = plane.rowStride
-        val rowPadding = rowStride - pixelStride * width
-        val bitmap = Bitmap.createBitmap(
-            width + rowPadding / pixelStride,
-            height,
-            Bitmap.Config.ARGB_8888
-        )
-        bitmap.copyPixelsFromBuffer(buffer)
-        val cropped = Bitmap.createBitmap(bitmap, 0, 0, width, height)
-        bitmap.recycle()
-        return cropped
+        val sourceWidth = width
+        val sourceHeight = height
+        val paddedWidth = rowStride / pixelStride
+
+        val targetBitmap = ensureAnalysisBitmap(targetWidth, targetHeight)
+        val requiresStaging = paddedWidth != sourceWidth ||
+            crop.left != 0 ||
+            crop.top != 0 ||
+            targetWidth != sourceWidth ||
+            targetHeight != sourceHeight
+
+        if (!requiresStaging) {
+            targetBitmap.copyPixelsFromBuffer(buffer)
+            return targetBitmap
+        }
+
+        val paddedBitmap = ensureStagingBitmap(paddedWidth, sourceHeight)
+        paddedBitmap.copyPixelsFromBuffer(buffer)
+        analysisDstRect.set(0, 0, targetWidth, targetHeight)
+        analysisCanvas?.drawBitmap(paddedBitmap, crop, analysisDstRect, null)
+        return targetBitmap
+    }
+
+    private fun ensureAnalysisBitmap(width: Int, height: Int): Bitmap {
+        val currentBitmap = analysisBitmap
+        if (currentBitmap != null &&
+            currentBitmap.width == width &&
+            currentBitmap.height == height &&
+            !currentBitmap.isRecycled
+        ) {
+            return currentBitmap
+        }
+        currentBitmap?.takeIf { !it.isRecycled }?.recycle()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        analysisBitmap = bitmap
+        analysisCanvas = Canvas(bitmap)
+        return bitmap
+    }
+
+    private fun ensureStagingBitmap(width: Int, height: Int): Bitmap {
+        val currentBitmap = stagingBitmap
+        if (currentBitmap != null &&
+            currentBitmap.width == width &&
+            currentBitmap.height == height &&
+            !currentBitmap.isRecycled
+        ) {
+            return currentBitmap
+        }
+        currentBitmap?.takeIf { !it.isRecycled }?.recycle()
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            stagingBitmap = bitmap
+        }
+    }
+
+    private fun releaseFrameBitmaps() {
+        analysisCanvas = null
+        analysisBitmap?.takeIf { !it.isRecycled }?.recycle()
+        analysisBitmap = null
+        stagingBitmap?.takeIf { !it.isRecycled }?.recycle()
+        stagingBitmap = null
     }
 
     private data class RenderResult(
