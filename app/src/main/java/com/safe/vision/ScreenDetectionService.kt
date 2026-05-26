@@ -207,7 +207,8 @@ class ScreenDetectionService : Service() {
             val renderResult = withContext(Dispatchers.Default) {
                 val detections = yoloRunner?.run(
                     bitmap,
-                    enrichFaceLandmarks = variant == DetectionModelVariant.STANDARD
+                    // Skip face-landmark enrichment during realtime screen detection to reduce latency.
+                    enrichFaceLandmarks = false
                 ).orEmpty()
                 val profile = if (variant == DetectionModelVariant.ANIME) {
                     DetectionConfig.LabelProfile.ANIME
