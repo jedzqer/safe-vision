@@ -45,12 +45,10 @@ class YoloOnnxRunner(
     private val optimizedModelPath: String =
         File(context.cacheDir, modelConfig.optimizedFileName).absolutePath
     private val cpuThreads = DetectionConfig.defaultCpuThreadCount()
-    private var paddedBitmap: Bitmap? = null
-    private var paddedCanvas: Canvas? = null
     private var resizedBitmap: Bitmap? = null
     private var resizedCanvas: Canvas? = null
-    private val resizeSrcRect = Rect()
     private val resizeDstRect = Rect(0, 0, modelInputSize, modelInputSize)
+    private val resizeLetterboxDstRect = RectF()
     @Volatile
     private var faceLandmarkRunner: FaceLandmarkOnnxRunner? = null
     @Volatile
@@ -84,17 +82,7 @@ class YoloOnnxRunner(
                         if (rawData.isNotEmpty() && rawData[0] is Array<*>) {
                             val batchData = rawData[0] as Array<*>
                             if (batchData.isNotEmpty() && batchData[0] is FloatArray) {
-                                val cols = batchData.size
-                                val rows = (batchData[0] as FloatArray).size
-                                val transposed = Array(rows) { FloatArray(cols) }
-                                
-                                for (i in 0 until cols) {
-                                    val col = batchData[i] as FloatArray
-                                    for (j in 0 until rows) {
-                                        transposed[j][i] = col[j]
-                                    }
-                                }
-                                transposed
+                                batchData as Array<FloatArray>
                             } else {
                                 DebugLogManager.addLog("模型检测", "错误: 数据格式不匹配")
                                 emptyArray()
@@ -134,21 +122,20 @@ class YoloOnnxRunner(
         val width = sourceBitmap.width
         val height = sourceBitmap.height
         val squareSize = max(width, height)
-        
-        // 复用 padded/resized 位图，减少内存分配
-        if (paddedBitmap == null || paddedBitmap?.width != squareSize || paddedBitmap?.height != squareSize) {
-            paddedBitmap = Bitmap.createBitmap(squareSize, squareSize, Bitmap.Config.ARGB_8888)
-            paddedCanvas = Canvas(paddedBitmap!!)
-        }
-        paddedBitmap?.eraseColor(Color.BLACK)
-        paddedCanvas?.drawBitmap(sourceBitmap, 0f, 0f, null)
 
         if (resizedBitmap == null) {
             resizedBitmap = Bitmap.createBitmap(modelInputSize, modelInputSize, Bitmap.Config.ARGB_8888)
             resizedCanvas = Canvas(resizedBitmap!!)
         }
-        resizeSrcRect.set(0, 0, squareSize, squareSize)
-        resizedCanvas?.drawBitmap(paddedBitmap!!, resizeSrcRect, resizeDstRect, null)
+        resizedBitmap?.eraseColor(Color.BLACK)
+        val scale = modelInputSize.toFloat() / squareSize.toFloat()
+        resizeLetterboxDstRect.set(
+            0f,
+            0f,
+            width * scale,
+            height * scale
+        )
+        resizedCanvas?.drawBitmap(sourceBitmap, null, resizeLetterboxDstRect, null)
 
         resizedBitmap?.getPixels(pixels, 0, modelInputSize, 0, 0, modelInputSize, modelInputSize)
 
@@ -180,26 +167,27 @@ class YoloOnnxRunner(
 
     private fun postProcess(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
         val detections = mutableListOf<DetectionCandidate>()
-        val rows = raw.size
+        if (raw.isEmpty()) return emptyList()
+        val attrs = raw.size
+        val rows = raw[0].size
 
         for (i in 0 until rows) {
-            val row = raw[i]
-            if (row.size < 5) continue
-            val scores = row.copyOfRange(4, row.size)
+            if (attrs < 5) continue
             var maxScore = Float.NEGATIVE_INFINITY
             var classId = -1
-            scores.forEachIndexed { index, score ->
+            for (j in 4 until attrs) {
+                val score = raw[j][i]
                 if (!score.isNaN() && score >= 0f && score > maxScore) {
                     maxScore = score
-                    classId = index
+                    classId = j - 4
                 }
             }
             if (classId == -1) continue
             if (maxScore < DetectionConfig.SCORE_THRESHOLD) continue
-            var x = row[0]
-            var y = row[1]
-            var w = row[2]
-            var h = row[3]
+            var x = raw[0][i]
+            var y = raw[1][i]
+            var w = raw[2][i]
+            var h = raw[3][i]
 
             x = x - w / 2f
             y = y - h / 2f
