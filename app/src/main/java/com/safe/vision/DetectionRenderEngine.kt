@@ -39,7 +39,13 @@ class DetectionRenderEngine(
         val onNormalStickerFallback: () -> Unit = {}
     )
 
-    private data class ReverseRect(val rect: Rect, val circular: Boolean, val label: String)
+    private data class ReverseRect(
+        val rect: Rect,
+        val circular: Boolean,
+        val label: String,
+        val clipPath: Path? = null,
+        val rotationDegrees: Float = 0f
+    )
 
     private data class NormalRenderTask(
         val className: String,
@@ -139,7 +145,15 @@ class DetectionRenderEngine(
             )
 
             if (settings.reverseLabels.contains(detection.className)) {
-                reverseRects.add(ReverseRect(scaledTargetRect, allowCircular, detection.className))
+                reverseRects.add(
+                    ReverseRect(
+                        rect = scaledTargetRect,
+                        circular = allowCircular,
+                        label = detection.className,
+                        clipPath = clipPath,
+                        rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else detection.boxRotationDegrees ?: 0f
+                    )
+                )
                 if (reverseBlurMode == null) {
                     reverseBlurMode = renderMode
                 } else if (reverseBlurMode != renderMode) {
@@ -303,12 +317,21 @@ class DetectionRenderEngine(
                 BlurEffects.drawWithCircularClip(outputCanvas, item.rect) {
                     outputCanvas.drawBitmap(base, circleBounds, circleBounds, null)
                 }
+            } else if (item.clipPath != null) {
+                val save = outputCanvas.save()
+                outputCanvas.clipPath(item.clipPath)
+                outputCanvas.drawBitmap(base, 0f, 0f, null)
+                outputCanvas.restoreToCount(save)
             } else {
                 outputCanvas.drawBitmap(base, item.rect, item.rect, null)
             }
             if (shouldOutline(item.label) && mode != PrivacySettingsManager.BLUR_MODE_STICKER) {
                 if (item.circular) BlurEffects.drawCircularOutline(outputCanvas, item.rect)
-                else BlurEffects.drawRectOutline(outputCanvas, item.rect)
+                else if (item.clipPath != null) {
+                    BlurEffects.drawPathOutline(outputCanvas, item.clipPath, item.rect)
+                } else {
+                    BlurEffects.drawRectOutline(outputCanvas, item.rect, rotationDegrees = item.rotationDegrees)
+                }
             }
         }
         return output

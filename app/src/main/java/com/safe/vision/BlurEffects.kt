@@ -248,6 +248,13 @@ object BlurEffects {
         canvas.drawCircle(rect.exactCenterX(), rect.exactCenterY(), radius, outlinePaint)
     }
 
+    fun drawPathOutline(canvas: Canvas, path: Path, boundsRect: Rect, color: Int = Color.RED) {
+        if (boundsRect.width() <= 0 || boundsRect.height() <= 0) return
+        outlinePaint.color = color
+        outlinePaint.strokeWidth = outlineStrokeWidth(boundsRect)
+        canvas.drawPath(path, outlinePaint)
+    }
+
     fun drawBlack(canvas: Canvas, rect: Rect, color: Int = Color.BLACK) {
         if (rect.width() <= 0 || rect.height() <= 0) return
         val paint = Paint().apply { this.color = color }
