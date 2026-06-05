@@ -59,7 +59,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         const val GAUSSIAN_RADIUS_MIN = 6
         const val GAUSSIAN_RADIUS_MAX = 50
         const val GAUSSIAN_RADIUS_DEFAULT = 12
-        const val MASK_SCALE_MIN = 1f
+        const val MASK_SCALE_MIN = 0.5f
         const val MASK_SCALE_MAX = 3f
         const val MASK_SCALE_DEFAULT = 1f
         

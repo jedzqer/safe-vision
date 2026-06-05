@@ -161,7 +161,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 sourceBitmap.width,
                 sourceBitmap.height
             )
-            val scaledEyePath = if (usesEyeStrip && eyeTarget?.path != null && maskScale > 1f) {
+            val scaledEyePath = if (usesEyeStrip && eyeTarget?.path != null && kotlin.math.abs(maskScale - 1f) > 0.0001f) {
                 Path(eyeTarget.path).apply {
                     transform(
                         Matrix().apply {
