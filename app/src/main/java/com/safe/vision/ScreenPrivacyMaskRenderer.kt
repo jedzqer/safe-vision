@@ -44,6 +44,10 @@ class ScreenPrivacyMaskRenderer(context: Context) {
 
     private val privacySettings = PrivacySettingsManager.getInstance(context.applicationContext)
 
+    fun isReverseModeActive(labelProfile: DetectionConfig.LabelProfile): Boolean {
+        return privacySettings.getReverseLabels(labelProfile).isNotEmpty()
+    }
+
     fun render(
         sourceBitmap: Bitmap,
         detections: List<YoloOnnxRunner.Detection>,
@@ -55,6 +59,20 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val useCircularMask = privacySettings.isCircularMaskEnabled()
         val maskOutlineEnabled = privacySettings.isMaskOutlineEnabled()
         val maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet()
+
+        if (detections.isEmpty()) {
+            return if (reverseLabels.isNotEmpty()) {
+                OverlayFrame(
+                    sourceBitmap = sourceBitmap,
+                    drawTasks = emptyList(),
+                    reverseMode = defaultBlurMode,
+                    reverseRegions = emptyList(),
+                    reversePreRender = privacySettings.isReversePreRenderEnabled()
+                )
+            } else {
+                null
+            }
+        }
 
         fun shouldOutline(label: String): Boolean {
             if (!maskOutlineEnabled) return false
