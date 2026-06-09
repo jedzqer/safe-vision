@@ -28,6 +28,7 @@ class DetectionRenderEngine(
         val labelEffectOverrides: Map<String, Int>,
         val reverseLabels: Set<String>,
         val useCircularMask: Boolean,
+        val fullScreenMaskWhenReverseLabelsMissing: Boolean,
         val reversePreRenderEnabled: Boolean,
         val maskOutlineEnabled: Boolean,
         val maskOutlineLabels: Set<String>
@@ -77,6 +78,18 @@ class DetectionRenderEngine(
         normalEffectSourceProvider: (Bitmap) -> Bitmap = { it },
         callbacks: RenderCallbacks = RenderCallbacks()
     ): Bitmap {
+        val shouldFullscreenFallback =
+            settings.fullScreenMaskWhenReverseLabelsMissing &&
+                settings.reverseLabels.isNotEmpty() &&
+                detections.none { settings.reverseLabels.contains(it.className) }
+        if (shouldFullscreenFallback) {
+            return applyFullscreenMask(
+                base = sourceBitmap,
+                mode = settings.defaultBlurMode,
+                stickerProvider = stickerProvider,
+                callbacks = callbacks
+            )
+        }
         if (detections.isEmpty()) return sourceBitmap
 
         val reverseRects = mutableListOf<ReverseRect>()
@@ -333,6 +346,39 @@ class DetectionRenderEngine(
                     BlurEffects.drawRectOutline(outputCanvas, item.rect, rotationDegrees = item.rotationDegrees)
                 }
             }
+        }
+        return output
+    }
+
+    private fun applyFullscreenMask(
+        base: Bitmap,
+        mode: Int,
+        stickerProvider: (String?) -> Bitmap?,
+        callbacks: RenderCallbacks
+    ): Bitmap {
+        val output = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+        val outputCanvas = Canvas(output)
+        val fullRect = Rect(0, 0, base.width, base.height)
+        when (mode) {
+            PrivacySettingsManager.BLUR_MODE_MOSAIC -> {
+                BlurEffects.drawMosaic(outputCanvas, base, fullRect, privacySettings.getMosaicBlockSize())
+            }
+            PrivacySettingsManager.BLUR_MODE_BLACK -> outputCanvas.drawColor(android.graphics.Color.BLACK)
+            PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
+                BlurEffects.drawGaussian(outputCanvas, base, fullRect, privacySettings.getGaussianRadius())
+            }
+            PrivacySettingsManager.BLUR_MODE_SOBEL -> BlurEffects.drawSobelEdge(outputCanvas, base, fullRect)
+            PrivacySettingsManager.BLUR_MODE_STICKER -> {
+                val stickerBitmap = stickerProvider(null)
+                if (stickerBitmap != null) {
+                    outputCanvas.drawBitmap(base, 0f, 0f, null)
+                    BlurEffects.drawSticker(outputCanvas, stickerBitmap, fullRect, base.width, base.height)
+                } else {
+                    callbacks.onReverseStickerFallback()
+                    BlurEffects.drawMosaic(outputCanvas, base, fullRect, privacySettings.getMosaicBlockSize())
+                }
+            }
+            else -> BlurEffects.drawMosaic(outputCanvas, base, fullRect, privacySettings.getMosaicBlockSize())
         }
         return output
     }

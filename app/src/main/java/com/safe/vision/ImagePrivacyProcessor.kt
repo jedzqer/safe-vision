@@ -156,6 +156,8 @@ class ImagePrivacyProcessor {
                     labelEffectOverrides = privacySettings.getLabelEffectOverrides(labelProfile),
                     reverseLabels = privacySettings.getReverseLabels(labelProfile).toSet(),
                     useCircularMask = privacySettings.isCircularMaskEnabled(),
+                    fullScreenMaskWhenReverseLabelsMissing =
+                        privacySettings.isReverseLabelMissFullscreenEnabled(),
                     reversePreRenderEnabled = privacySettings.isReversePreRenderEnabled(),
                     maskOutlineEnabled = privacySettings.isMaskOutlineEnabled(),
                     maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet()

@@ -230,6 +230,13 @@
     <string name="settings_reverse_pre_render_summary">활성화하면 역방향 마스킹을 먼저 렌더링하고, 그 다음 스티커와 기타 효과를 적용합니다</string>
     <string name="settings_reverse_pre_render_enabled">역방향 우선 렌더링을 활성화했습니다</string>
     <string name="settings_reverse_pre_render_disabled">역방향 우선 렌더링을 비활성화했습니다</string>
+    <string name="settings_reverse_fullscreen_fallback_summary">역방향 마스킹이 감지되지 않았을 때 전체 화면 마스크로 대체할지 제어합니다. 아래 두 옵션은 동시에 켤 수 있습니다.</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">접근성 화면 감지에서 아무것도 감지되지 않으면 전체 화면 마스크</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss">감지 결과에서 어떤 역방향 라벨도 맞지 않으면 전체 화면 마스크 (일반 오버레이 화면 감지 제외)</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty_enabled">빈 접근성 감지용 전체 화면 대체를 활성화했습니다</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty_disabled">빈 접근성 감지용 전체 화면 대체를 비활성화했습니다</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss_enabled">역방향 라벨 미감지 시 전체 화면 대체를 활성화했습니다</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss_disabled">역방향 라벨 미감지 시 전체 화면 대체를 비활성화했습니다</string>
     <string name="settings_mosaic_intensity_title">모자이크 강도</string>
     <string name="settings_mosaic_intensity_summary">현재 블록 크기: %1$d</string>
     <string name="settings_gaussian_intensity_title">가우시안 강도</string>

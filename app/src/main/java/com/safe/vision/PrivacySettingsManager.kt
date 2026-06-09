@@ -41,6 +41,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         private const val KEY_MASK_OUTLINE_LABELS = "mask_outline_labels"
         private const val KEY_ANIME_MASK_OUTLINE_LABELS = "anime_mask_outline_labels"
         private const val KEY_REVERSE_PRE_RENDER_ENABLED = "reverse_pre_render_enabled"
+        private const val KEY_ACCESSIBILITY_EMPTY_REVERSE_FULLSCREEN_ENABLED =
+            "accessibility_empty_reverse_fullscreen_enabled"
+        private const val KEY_REVERSE_LABEL_MISS_FULLSCREEN_ENABLED =
+            "reverse_label_miss_fullscreen_enabled"
         private const val KEY_PRIVACY_PRESETS = "privacy_presets"
         private const val KEY_ACTIVE_PRESET_NAME = "active_preset_name"
         // 遮挡模式
@@ -285,6 +289,22 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         sharedPrefs.edit().putBoolean(KEY_REVERSE_PRE_RENDER_ENABLED, enabled).apply()
     }
 
+    fun isAccessibilityEmptyReverseFullscreenEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_ACCESSIBILITY_EMPTY_REVERSE_FULLSCREEN_ENABLED, false)
+    }
+
+    fun setAccessibilityEmptyReverseFullscreenEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_ACCESSIBILITY_EMPTY_REVERSE_FULLSCREEN_ENABLED, enabled).apply()
+    }
+
+    fun isReverseLabelMissFullscreenEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_REVERSE_LABEL_MISS_FULLSCREEN_ENABLED, false)
+    }
+
+    fun setReverseLabelMissFullscreenEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_REVERSE_LABEL_MISS_FULLSCREEN_ENABLED, enabled).apply()
+    }
+
     data class PrivacyPreset(
         val name: String,
         val blurMode: Int,
@@ -303,7 +323,9 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val labelEffectOverrides: Map<String, Int>,
         val reverseLabels: List<String>,
         val maskOutlineLabels: List<String>,
-        val reversePreRenderEnabled: Boolean
+        val reversePreRenderEnabled: Boolean,
+        val accessibilityEmptyReverseFullscreenEnabled: Boolean,
+        val reverseLabelMissFullscreenEnabled: Boolean
     )
 
     data class ImportResult(
@@ -670,7 +692,9 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 getMaskOutlineLabels(DetectionConfig.LabelProfile.STANDARD),
                 getMaskOutlineLabels(DetectionConfig.LabelProfile.ANIME)
             ),
-            reversePreRenderEnabled = isReversePreRenderEnabled()
+            reversePreRenderEnabled = isReversePreRenderEnabled(),
+            accessibilityEmptyReverseFullscreenEnabled = isAccessibilityEmptyReverseFullscreenEnabled(),
+            reverseLabelMissFullscreenEnabled = isReverseLabelMissFullscreenEnabled()
         )
     }
 
@@ -727,6 +751,8 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.ANIME)
         )
         setReversePreRenderEnabled(preset.reversePreRenderEnabled)
+        setAccessibilityEmptyReverseFullscreenEnabled(preset.accessibilityEmptyReverseFullscreenEnabled)
+        setReverseLabelMissFullscreenEnabled(preset.reverseLabelMissFullscreenEnabled)
     }
 
     private fun readPresets(): LinkedHashMap<String, PrivacyPreset> {
@@ -787,7 +813,15 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             labelEffectOverrides = parseOverrides(obj.optJSONObject("labelEffectOverrides")),
             reverseLabels = parseLabelList(obj.optJSONArray("reverseLabels"), includeLocked = false, default = emptyList()),
             maskOutlineLabels = parseLabelList(obj.optJSONArray("maskOutlineLabels"), includeLocked = true, default = DetectionConfig.LABELS),
-            reversePreRenderEnabled = obj.optBoolean("reversePreRenderEnabled", true)
+            reversePreRenderEnabled = obj.optBoolean("reversePreRenderEnabled", true),
+            accessibilityEmptyReverseFullscreenEnabled = obj.optBoolean(
+                "accessibilityEmptyReverseFullscreenEnabled",
+                false
+            ),
+            reverseLabelMissFullscreenEnabled = obj.optBoolean(
+                "reverseLabelMissFullscreenEnabled",
+                false
+            )
         )
     }
 
@@ -909,6 +943,14 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             .put("reverseLabels", reverse)
             .put("maskOutlineLabels", outline)
             .put("reversePreRenderEnabled", preset.reversePreRenderEnabled)
+            .put(
+                "accessibilityEmptyReverseFullscreenEnabled",
+                preset.accessibilityEmptyReverseFullscreenEnabled
+            )
+            .put(
+                "reverseLabelMissFullscreenEnabled",
+                preset.reverseLabelMissFullscreenEnabled
+            )
     }
 
     private fun <T> mergeLabelMaps(vararg maps: Map<String, T>): Map<String, T> {

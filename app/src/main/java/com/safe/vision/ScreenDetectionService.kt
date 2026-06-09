@@ -225,14 +225,11 @@ class ScreenDetectionService : Service() {
                 } else {
                     DetectionConfig.LabelProfile.STANDARD
                 }
-                val shouldRenderOverlay = detections.isNotEmpty() ||
-                    (
-                        overlayMode == ScreenOverlayMode.ACCESSIBILITY &&
-                            overlayRenderer?.isReverseModeActive(profile) == true
-                        )
+                val shouldRenderOverlay =
+                    overlayRenderer?.shouldRenderOverlay(detections, profile, overlayMode) == true
                 val overlayFrame = if (shouldRenderOverlay) {
                     val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    overlayRenderer?.render(overlayBitmap, detections, profile).also { frame ->
+                    overlayRenderer?.render(overlayBitmap, detections, profile, overlayMode).also { frame ->
                         if (frame == null && !overlayBitmap.isRecycled) {
                             overlayBitmap.recycle()
                         }

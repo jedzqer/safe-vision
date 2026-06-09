@@ -75,6 +75,8 @@ class SettingsFragment : Fragment() {
     private lateinit var circularMaskSwitch: android.widget.Switch
     private lateinit var maskOutlineSwitch: android.widget.Switch
     private lateinit var reversePreRenderSwitch: android.widget.Switch
+    private lateinit var accessibilityEmptyReverseFullscreenCheckbox: CheckBox
+    private lateinit var reverseLabelMissFullscreenCheckbox: CheckBox
     private lateinit var maskOutlineSummary: TextView
     private lateinit var maskOutlineAdjustButton: Button
     private lateinit var mosaicIntensitySummary: TextView
@@ -861,6 +863,9 @@ class SettingsFragment : Fragment() {
         maskOutlineSummary = view.findViewById(R.id.maskOutlineSummary)
         maskOutlineSwitch = view.findViewById(R.id.maskOutlineSwitch)
         reversePreRenderSwitch = view.findViewById(R.id.reversePreRenderSwitch)
+        accessibilityEmptyReverseFullscreenCheckbox =
+            view.findViewById(R.id.accessibilityEmptyReverseFullscreenCheckbox)
+        reverseLabelMissFullscreenCheckbox = view.findViewById(R.id.reverseLabelMissFullscreenCheckbox)
         maskOutlineAdjustButton = view.findViewById(R.id.maskOutlineAdjustButton)
         mosaicIntensitySummary = view.findViewById(R.id.mosaicIntensitySummary)
         mosaicIntensitySeekBar = view.findViewById(R.id.mosaicIntensitySeekBar)
@@ -1192,6 +1197,36 @@ class SettingsFragment : Fragment() {
             }
             Toast.makeText(requireContext(), toastText, Toast.LENGTH_SHORT).show()
             DebugLogManager.addLog("设置", "反向优先渲染开关: ${if (isChecked) "开启" else "关闭"}")
+        }
+        accessibilityEmptyReverseFullscreenCheckbox.isChecked =
+            privacySettings.isAccessibilityEmptyReverseFullscreenEnabled()
+        accessibilityEmptyReverseFullscreenCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            privacySettings.setAccessibilityEmptyReverseFullscreenEnabled(isChecked)
+            val toastText = if (isChecked) {
+                R.string.settings_reverse_fullscreen_fallback_accessibility_empty_enabled
+            } else {
+                R.string.settings_reverse_fullscreen_fallback_accessibility_empty_disabled
+            }
+            Toast.makeText(requireContext(), toastText, Toast.LENGTH_SHORT).show()
+            DebugLogManager.addLog(
+                "设置",
+                "无障碍无识别全屏遮挡开关: ${if (isChecked) "开启" else "关闭"}"
+            )
+        }
+        reverseLabelMissFullscreenCheckbox.isChecked =
+            privacySettings.isReverseLabelMissFullscreenEnabled()
+        reverseLabelMissFullscreenCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            privacySettings.setReverseLabelMissFullscreenEnabled(isChecked)
+            val toastText = if (isChecked) {
+                R.string.settings_reverse_fullscreen_fallback_reverse_miss_enabled
+            } else {
+                R.string.settings_reverse_fullscreen_fallback_reverse_miss_disabled
+            }
+            Toast.makeText(requireContext(), toastText, Toast.LENGTH_SHORT).show()
+            DebugLogManager.addLog(
+                "设置",
+                "反向标签未命中全屏遮挡开关: ${if (isChecked) "开启" else "关闭"}"
+            )
         }
         updateMaskOutlineSummary()
 
@@ -1561,6 +1596,10 @@ class SettingsFragment : Fragment() {
         circularMaskSwitch.isChecked = privacySettings.isCircularMaskEnabled()
         maskOutlineSwitch.isChecked = privacySettings.isMaskOutlineEnabled()
         reversePreRenderSwitch.isChecked = privacySettings.isReversePreRenderEnabled()
+        accessibilityEmptyReverseFullscreenCheckbox.isChecked =
+            privacySettings.isAccessibilityEmptyReverseFullscreenEnabled()
+        reverseLabelMissFullscreenCheckbox.isChecked =
+            privacySettings.isReverseLabelMissFullscreenEnabled()
 
         val mosaicMin = PrivacySettingsManager.MOSAIC_BLOCK_MIN
         val mosaicProgress = (privacySettings.getMosaicBlockSize() - mosaicMin).coerceIn(0, mosaicIntensitySeekBar.max)

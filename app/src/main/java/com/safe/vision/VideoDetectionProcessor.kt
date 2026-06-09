@@ -108,6 +108,8 @@ class VideoDetectionProcessor(
                 labelEffectOverrides = labelEffectOverrides,
                 reverseLabels = reverseLabels,
                 useCircularMask = privacySettings.isCircularMaskEnabled(),
+                fullScreenMaskWhenReverseLabelsMissing =
+                    privacySettings.isReverseLabelMissFullscreenEnabled(),
                 reversePreRenderEnabled = privacySettings.isReversePreRenderEnabled(),
                 maskOutlineEnabled = privacySettings.isMaskOutlineEnabled(),
                 maskOutlineLabels = privacySettings.getMaskOutlineLabels().toSet()

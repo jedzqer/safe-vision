@@ -230,6 +230,13 @@
     <string name="settings_reverse_pre_render_summary">啟用後，命中反向遮罩時先渲染反向遮罩，再渲染貼紙和其它效果</string>
     <string name="settings_reverse_pre_render_enabled">已開啟反向優先渲染</string>
     <string name="settings_reverse_pre_render_disabled">已關閉反向優先渲染</string>
+    <string name="settings_reverse_fullscreen_fallback_summary">控制反向遮罩在未命中時是否退回為全螢幕遮罩，可同時開啟以下兩項</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">無障礙螢幕識別無任何內容時，全螢幕遮罩</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss">識別結果未命中任何反向標籤時，全螢幕遮罩（普通懸浮窗螢幕識別除外）</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty_enabled">已開啟無障礙空識別全螢幕遮罩</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty_disabled">已關閉無障礙空識別全螢幕遮罩</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss_enabled">已開啟反向標籤未命中全螢幕遮罩</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss_disabled">已關閉反向標籤未命中全螢幕遮罩</string>
     <string name="settings_mosaic_intensity_title">馬賽克強度</string>
     <string name="settings_mosaic_intensity_summary">目前區塊大小：%1$d</string>
     <string name="settings_gaussian_intensity_title">高斯強度</string>

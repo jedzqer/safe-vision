@@ -373,6 +373,47 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <TextView
+        android:id="@+id/reverseFullscreenFallbackSummary"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_reverse_fullscreen_fallback_summary"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:textColor="?attr/svColorTextSecondary"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintTop_toBottomOf="@id/reversePreRenderSwitch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/reverseFullscreenFallbackRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintTop_toBottomOf="@id/reverseFullscreenFallbackSummary"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <CheckBox
+            android:id="@+id/accessibilityEmptyReverseFullscreenCheckbox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_reverse_fullscreen_fallback_accessibility_empty"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+        <CheckBox
+            android:id="@+id/reverseLabelMissFullscreenCheckbox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/settings_reverse_fullscreen_fallback_reverse_miss"
+            android:textColor="?attr/svColorTextPrimary"
+            android:buttonTint="?attr/svColorPrimary" />
+
+    </LinearLayout>
+
+    <TextView
         android:id="@+id/mosaicIntensityLabel"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -380,7 +421,7 @@
         android:textAppearance="?attr/textAppearanceBody1"
         android:textColor="?attr/svColorTextPrimary"
         android:layout_marginBottom="6dp"
-        app:layout_constraintTop_toBottomOf="@id/reversePreRenderSwitch"
+        app:layout_constraintTop_toBottomOf="@id/reverseFullscreenFallbackRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

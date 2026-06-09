@@ -44,14 +44,24 @@ class ScreenPrivacyMaskRenderer(context: Context) {
 
     private val privacySettings = PrivacySettingsManager.getInstance(context.applicationContext)
 
-    fun isReverseModeActive(labelProfile: DetectionConfig.LabelProfile): Boolean {
-        return privacySettings.getReverseLabels(labelProfile).isNotEmpty()
+    fun shouldRenderOverlay(
+        detections: List<YoloOnnxRunner.Detection>,
+        labelProfile: DetectionConfig.LabelProfile,
+        overlayMode: ScreenOverlayMode
+    ): Boolean {
+        if (detections.isNotEmpty()) return true
+        return shouldFullscreenFallback(
+            detections = detections,
+            labelProfile = labelProfile,
+            overlayMode = overlayMode
+        )
     }
 
     fun render(
         sourceBitmap: Bitmap,
         detections: List<YoloOnnxRunner.Detection>,
-        labelProfile: DetectionConfig.LabelProfile
+        labelProfile: DetectionConfig.LabelProfile,
+        overlayMode: ScreenOverlayMode
     ): OverlayFrame? {
         val defaultBlurMode = privacySettings.getBlurMode(labelProfile)
         val labelOverrides = privacySettings.getLabelEffectOverrides(labelProfile)
@@ -59,20 +69,23 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val useCircularMask = privacySettings.isCircularMaskEnabled()
         val maskOutlineEnabled = privacySettings.isMaskOutlineEnabled()
         val maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet()
+        val shouldFullscreenFallback = shouldFullscreenFallback(
+            detections = detections,
+            labelProfile = labelProfile,
+            overlayMode = overlayMode
+        )
 
-        if (detections.isEmpty()) {
-            return if (reverseLabels.isNotEmpty()) {
-                OverlayFrame(
-                    sourceBitmap = sourceBitmap,
-                    drawTasks = emptyList(),
-                    reverseMode = defaultBlurMode,
-                    reverseRegions = emptyList(),
-                    reversePreRender = privacySettings.isReversePreRenderEnabled()
-                )
-            } else {
-                null
-            }
+        if (shouldFullscreenFallback) {
+            return OverlayFrame(
+                sourceBitmap = sourceBitmap,
+                drawTasks = emptyList(),
+                reverseMode = defaultBlurMode,
+                reverseRegions = emptyList(),
+                reversePreRender = privacySettings.isReversePreRenderEnabled()
+            )
         }
+
+        if (detections.isEmpty()) return null
 
         fun shouldOutline(label: String): Boolean {
             if (!maskOutlineEnabled) return false
@@ -268,5 +281,28 @@ class ScreenPrivacyMaskRenderer(context: Context) {
             },
             reversePreRender = privacySettings.isReversePreRenderEnabled()
         )
+    }
+
+    private fun shouldFullscreenFallback(
+        detections: List<YoloOnnxRunner.Detection>,
+        labelProfile: DetectionConfig.LabelProfile,
+        overlayMode: ScreenOverlayMode
+    ): Boolean {
+        val reverseLabels = privacySettings.getReverseLabels(labelProfile).toSet()
+        if (reverseLabels.isEmpty()) return false
+        val hasReverseHit = detections.any { detection ->
+            reverseLabels.contains(detection.className) &&
+                privacySettings.isLabelBlocked(detection.className, labelProfile)
+        }
+        if (
+            overlayMode == ScreenOverlayMode.ACCESSIBILITY &&
+            privacySettings.isAccessibilityEmptyReverseFullscreenEnabled() &&
+            detections.isEmpty()
+        ) {
+            return true
+        }
+        return overlayMode != ScreenOverlayMode.SYSTEM_ALERT_WINDOW &&
+            privacySettings.isReverseLabelMissFullscreenEnabled() &&
+            !hasReverseHit
     }
 }
