@@ -32,7 +32,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val drawTasks: List<DrawTask>,
         val reverseMode: Int?,
         val reverseRegions: List<ClearRegion>,
-        val reversePreRender: Boolean
+        val reversePreRender: Boolean,
+        val reverseStickerLabel: String? = null
     ) {
         val requiresFullscreenOverlay: Boolean
             get() = reverseMode != null
@@ -76,12 +77,21 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         )
 
         if (shouldFullscreenFallback) {
+            val firstReverseLabel = privacySettings.getReverseLabels(labelProfile).firstOrNull()
+            val rawMode = firstReverseLabel?.let { labelOverrides[it] } ?: defaultBlurMode
+            // 全屏无法绘制眼睛条，EYES 退回马赛克
+            val fullscreenMode = if (rawMode == PrivacySettingsManager.BLUR_MODE_EYES) {
+                PrivacySettingsManager.BLUR_MODE_MOSAIC
+            } else {
+                rawMode
+            }
             return OverlayFrame(
                 sourceBitmap = sourceBitmap,
                 drawTasks = emptyList(),
-                reverseMode = defaultBlurMode,
+                reverseMode = fullscreenMode,
                 reverseRegions = emptyList(),
-                reversePreRender = privacySettings.isReversePreRenderEnabled()
+                reversePreRender = privacySettings.isReversePreRenderEnabled(),
+                reverseStickerLabel = firstReverseLabel
             )
         }
 

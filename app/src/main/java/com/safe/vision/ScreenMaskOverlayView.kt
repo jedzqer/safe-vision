@@ -28,6 +28,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     private var reverseMode: Int? = null
     private var reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion> = emptyList()
     private var reversePreRender: Boolean = false
+    private var reverseStickerLabel: String? = null
     private var windowOriginX: Float = 0f
     private var windowOriginY: Float = 0f
     // 采集面降分辨率后,draw 坐标处于采集像素空间,绘制时按该比例放大到屏幕像素。
@@ -72,6 +73,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = frame?.reverseMode,
             reverseRegions = frame?.reverseRegions.orEmpty(),
             reversePreRender = frame?.reversePreRender == true,
+            reverseStickerLabel = frame?.reverseStickerLabel,
             windowOriginX = windowOriginX.toFloat(),
             windowOriginY = windowOriginY.toFloat(),
             scaleX = scaleX,
@@ -95,6 +97,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = null,
             reverseRegions = emptyList(),
             reversePreRender = false,
+            reverseStickerLabel = null,
             windowOriginX = windowOriginX.toFloat(),
             windowOriginY = windowOriginY.toFloat(),
             scaleX = scaleX,
@@ -111,6 +114,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseMode = null,
             reverseRegions = emptyList(),
             reversePreRender = false,
+            reverseStickerLabel = null,
             windowOriginX = 0f,
             windowOriginY = 0f,
             scaleX = 1f,
@@ -126,6 +130,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         reverseMode: Int?,
         reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion>,
         reversePreRender: Boolean,
+        reverseStickerLabel: String?,
         windowOriginX: Float,
         windowOriginY: Float,
         scaleX: Float,
@@ -154,6 +159,10 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         }
         if (this.reversePreRender != reversePreRender) {
             this.reversePreRender = reversePreRender
+            changed = true
+        }
+        if (this.reverseStickerLabel != reverseStickerLabel) {
+            this.reverseStickerLabel = reverseStickerLabel
             changed = true
         }
         if (this.windowOriginX != windowOriginX || this.windowOriginY != windowOriginY) {
@@ -249,7 +258,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
                 BlurEffects.drawGaussian(canvas, bitmap, fullRect, privacySettings.getGaussianRadius())
             }
             PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                val sticker = StickerLoader.loadSticker(appContext, privacySettings)
+                val sticker = StickerLoader.loadSticker(appContext, privacySettings, reverseStickerLabel)
                 if (sticker != null) {
                     BlurEffects.drawSticker(canvas, sticker, fullRect, bitmap.width, bitmap.height)
                 } else {
