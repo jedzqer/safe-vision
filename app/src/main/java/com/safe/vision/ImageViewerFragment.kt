@@ -223,11 +223,16 @@ class ImageViewerFragment : Fragment() {
                     videoTouchStartX = event.x
                     videoTouchStartY = event.y
                     videoSwipeHandled = false
+                    longPressTriggered = false
+                    scheduleLongPress(fullSizeVideo)
                     false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.x - videoTouchStartX
                     val dy = event.y - videoTouchStartY
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                        cancelLongPress(fullSizeVideo)
+                    }
                     val swipeThreshold = touchSlop * 3
                     val verticalScroll = appSettings.isViewerVerticalScrollEnabled()
                     val isNavSwipe = if (verticalScroll) {
@@ -245,7 +250,8 @@ class ImageViewerFragment : Fragment() {
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val consumed = videoSwipeHandled
+                    cancelLongPress(fullSizeVideo)
+                    val consumed = videoSwipeHandled || longPressTriggered
                     videoSwipeHandled = false
                     consumed
                 }

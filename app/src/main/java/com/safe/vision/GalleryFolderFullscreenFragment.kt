@@ -255,7 +255,7 @@ class GalleryFolderFullscreenFragment : Fragment() {
         selectionCountText.text = getString(R.string.gallery_selection_count, selectedPaths.size)
         selectAllButton.isEnabled = mediaFiles.isNotEmpty()
         deleteSelectedButton.isEnabled = selectedPaths.isNotEmpty()
-        saveSelectedButton.isEnabled = selectedPaths.isNotEmpty() && !isVideoFolder()
+        saveSelectedButton.isEnabled = selectedPaths.isNotEmpty()
         moveSelectedButton.isEnabled = selectedPaths.isNotEmpty() && !isVideoFolder()
         moveSelectedButton.alpha = if (moveSelectedButton.isEnabled) 1f else 0.45f
         mediaAdapter?.updateSelection(selectionMode, selectedPaths)
@@ -429,10 +429,11 @@ class GalleryFolderFullscreenFragment : Fragment() {
     }
 
     private fun saveSelected() {
-        if (isVideoFolder()) return
         val targets = getSelectedFiles()
+        val saveVideo = isVideoFolder()
         if (targets.isEmpty()) {
-            Toast.makeText(requireContext(), getString(R.string.gallery_save_empty), Toast.LENGTH_SHORT).show()
+            val emptyMsg = if (saveVideo) R.string.gallery_save_video_empty else R.string.gallery_save_empty
+            Toast.makeText(requireContext(), getString(emptyMsg), Toast.LENGTH_SHORT).show()
             return
         }
         saveSelectedButton.isEnabled = false
@@ -440,7 +441,10 @@ class GalleryFolderFullscreenFragment : Fragment() {
         val appContext = requireContext().applicationContext
         lifecycleScope.launch {
             val results = withContext(Dispatchers.IO) {
-                targets.map { file -> saveImageToGallery(appContext, file) }
+                targets.map { file ->
+                    if (saveVideo) saveVideoToGallery(appContext, file)
+                    else saveImageToGallery(appContext, file)
+                }
             }
             val successCount = results.count { it }
             val total = results.size
@@ -448,7 +452,10 @@ class GalleryFolderFullscreenFragment : Fragment() {
             when {
                 successCount == total -> Toast.makeText(
                     requireContext(),
-                    getString(R.string.gallery_save_success, successCount),
+                    getString(
+                        if (saveVideo) R.string.gallery_save_video_success else R.string.gallery_save_success,
+                        successCount
+                    ),
                     Toast.LENGTH_SHORT
                 ).show()
                 successCount > 0 -> Toast.makeText(
@@ -632,6 +639,42 @@ class GalleryFolderFullscreenFragment : Fragment() {
                 if (!processed.compress(format, 95, output)) {
                     throw IllegalStateException("压缩失败")
                 }
+            } ?: throw IllegalStateException("无法写入输出流")
+            true
+        } catch (e: Exception) {
+            insertedUri?.let { appContext.contentResolver.delete(it, null, null) }
+            false
+        }
+    }
+
+    private suspend fun saveVideoToGallery(appContext: Context, videoFile: File): Boolean {
+        var insertedUri: android.net.Uri? = null
+        return try {
+            val extension = videoFile.extension.lowercase(Locale.getDefault()).ifBlank { "mp4" }
+            val mimeType = when (extension) {
+                "mov" -> "video/quicktime"
+                "mkv" -> "video/x-matroska"
+                else -> "video/mp4"
+            }
+            val displayName = "${videoFile.nameWithoutExtension}_${saveDateFormat.format(Date())}.$extension"
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SafeVision")
+                } else {
+                    val targetDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "SafeVision").apply {
+                        if (!exists()) mkdirs()
+                    }
+                    put(MediaStore.MediaColumns.DATA, File(targetDir, displayName).absolutePath)
+                }
+            }
+            val resolver = appContext.contentResolver
+            val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                ?: return false
+            insertedUri = uri
+            resolver.openOutputStream(uri)?.use { output ->
+                videoFile.inputStream().use { input -> input.copyTo(output) }
             } ?: throw IllegalStateException("无法写入输出流")
             true
         } catch (e: Exception) {

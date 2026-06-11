@@ -150,6 +150,8 @@
     <string name="gallery_save_partial">保存完成：成功 %1$d / %2$d</string>
     <string name="gallery_save_failed">保存失败：%1$s</string>
     <string name="gallery_save_empty">请选择至少一张图片</string>
+    <string name="gallery_save_video_success">已保存 %1$d 个视频到相册</string>
+    <string name="gallery_save_video_empty">请选择至少一个视频</string>
     
     <!-- 媒体浏览 -->
     <string name="viewer_no_images">没有可浏览的媒体</string>

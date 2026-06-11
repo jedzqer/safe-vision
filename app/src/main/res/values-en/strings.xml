@@ -150,6 +150,8 @@
     <string name="gallery_save_partial">Save finished: %1$d / %2$d succeeded</string>
     <string name="gallery_save_failed">Save failed: %1$s</string>
     <string name="gallery_save_empty">Please select at least one image</string>
+    <string name="gallery_save_video_success">Saved %1$d videos to the system gallery</string>
+    <string name="gallery_save_video_empty">Please select at least one video</string>
 
     <!-- Media viewer -->
     <string name="viewer_no_images">No media available</string>
