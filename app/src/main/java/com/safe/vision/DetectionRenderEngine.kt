@@ -83,9 +83,17 @@ class DetectionRenderEngine(
                 settings.reverseLabels.isNotEmpty() &&
                 detections.none { settings.reverseLabels.contains(it.className) }
         if (shouldFullscreenFallback) {
+            val firstReverseLabel = settings.reverseLabels.firstOrNull()
+            val rawMode = firstReverseLabel?.let { settings.labelEffectOverrides[it] } ?: settings.defaultBlurMode
+            val fullscreenMode = if (rawMode == PrivacySettingsManager.BLUR_MODE_EYES) {
+                PrivacySettingsManager.BLUR_MODE_MOSAIC
+            } else {
+                rawMode
+            }
             return applyFullscreenMask(
                 base = sourceBitmap,
-                mode = settings.defaultBlurMode,
+                mode = fullscreenMode,
+                stickerLabel = firstReverseLabel,
                 stickerProvider = stickerProvider,
                 callbacks = callbacks
             )
@@ -353,6 +361,7 @@ class DetectionRenderEngine(
     private fun applyFullscreenMask(
         base: Bitmap,
         mode: Int,
+        stickerLabel: String?,
         stickerProvider: (String?) -> Bitmap?,
         callbacks: RenderCallbacks
     ): Bitmap {
@@ -369,7 +378,7 @@ class DetectionRenderEngine(
             }
             PrivacySettingsManager.BLUR_MODE_SOBEL -> BlurEffects.drawSobelEdge(outputCanvas, base, fullRect)
             PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                val stickerBitmap = stickerProvider(null)
+                val stickerBitmap = stickerProvider(stickerLabel)
                 if (stickerBitmap != null) {
                     outputCanvas.drawBitmap(base, 0f, 0f, null)
                     BlurEffects.drawSticker(outputCanvas, stickerBitmap, fullRect, base.width, base.height)
