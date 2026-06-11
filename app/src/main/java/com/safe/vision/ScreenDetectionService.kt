@@ -48,6 +48,9 @@ class ScreenDetectionService : Service() {
         // 静帧跳过：把整帧缩到极小灰度图做差分，变化低于阈值则跳过整条 YOLO 链路
         private const val STATIC_FRAME_SIGNATURE_SIZE = 32
         private const val STATIC_FRAME_DIFF_THRESHOLD = 2.0
+        // 采集端降分辨率：把镜像捕获面的短边压到该目标值，遮挡坐标在叠加边界按比例还原。
+        // 模型输入只有 320，全屏挡/黑块/马赛克对像素精度不敏感，缩小可显著降低每帧 RGBA 搬运与缩放开销。
+        private const val CAPTURE_TARGET_SHORT_EDGE = 480
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -91,6 +94,9 @@ class ScreenDetectionService : Service() {
     private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
     private var overlayVisible = false
     private var lastPositiveTimeMs: Long = 0L
+
+    // 去抖：仅在状态文案变化时刷新通知/状态/日志，避免每帧抢主线程做 notify()
+    private var lastPublishedStatus: String? = null
 
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -160,16 +166,20 @@ class ScreenDetectionService : Service() {
 
                 val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
                 overlayMetrics = metrics
-                imageReader = ImageReader.newInstance(
+                val (captureWidth, captureHeight) = resolveCaptureSize(
                     metrics.widthPixels,
-                    metrics.heightPixels,
+                    metrics.heightPixels
+                )
+                imageReader = ImageReader.newInstance(
+                    captureWidth,
+                    captureHeight,
                     PixelFormat.RGBA_8888,
                     2
                 )
                 virtualDisplay = projection.createVirtualDisplay(
                     "safe-vision-screen-detection",
-                    metrics.widthPixels,
-                    metrics.heightPixels,
+                    captureWidth,
+                    captureHeight,
                     metrics.densityDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     imageReader?.surface,
@@ -192,7 +202,7 @@ class ScreenDetectionService : Service() {
 
                 DebugLogManager.addLog(
                     "屏幕检测",
-                    "屏幕检测已启动: ${metrics.widthPixels}x${metrics.heightPixels}, 偏移=${metrics.contentOffsetX},${metrics.contentOffsetY}, 模型=${variant.runtimeLabel}"
+                    "屏幕检测已启动: 屏幕=${metrics.widthPixels}x${metrics.heightPixels}, 采集=${captureWidth}x${captureHeight}, 偏移=${metrics.contentOffsetX},${metrics.contentOffsetY}, 模型=${variant.runtimeLabel}"
                 )
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_running))
                 updateNotification(getString(R.string.screen_detection_notification_running))
@@ -213,6 +223,7 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
+            val cycleStart = android.os.SystemClock.elapsedRealtime()
             val bitmap = withContext(Dispatchers.Default) {
                 imageReader?.acquireLatestImage()?.use { image ->
                     image.copyToReusableBitmap()
@@ -220,7 +231,7 @@ class ScreenDetectionService : Service() {
             }
 
             if (bitmap == null) {
-                delay(200)
+                delay(50)
                 continue
             }
 
@@ -229,7 +240,7 @@ class ScreenDetectionService : Service() {
             }
             if (isStaticFrame) {
                 // 画面静止：跳过整条 YOLO 链路，遮挡与状态保持上一帧不动
-                delay(detectionIntervalMs)
+                delayRemainingInterval(cycleStart)
                 continue
             }
 
@@ -266,12 +277,23 @@ class ScreenDetectionService : Service() {
             } else {
                 getString(R.string.screen_detection_status_detected, renderResult.detectionCount)
             }
-            ScreenDetectionStateHolder.setRunning(status, renderResult.detectionCount)
-            updateNotification(status)
-            DebugLogManager.addLog("屏幕检测", "最新一帧检测结果: ${renderResult.detectionCount} 个目标")
+            // 仅在状态变化时刷新,避免每帧 notify() 持续抢占主线程
+            if (status != lastPublishedStatus) {
+                lastPublishedStatus = status
+                ScreenDetectionStateHolder.setRunning(status, renderResult.detectionCount)
+                updateNotification(status)
+                DebugLogManager.addLog("屏幕检测", "检测状态更新: ${renderResult.detectionCount} 个目标")
+            }
 
-            delay(detectionIntervalMs)
+            delayRemainingInterval(cycleStart)
         }
+    }
+
+    // 把处理耗时计入周期：实际周期 = max(间隔, 处理耗时),而非「间隔 + 处理耗时」,降低端到端延迟。
+    private suspend fun delayRemainingInterval(cycleStart: Long) {
+        val elapsed = android.os.SystemClock.elapsedRealtime() - cycleStart
+        val remaining = detectionIntervalMs - elapsed
+        if (remaining > 0) delay(remaining)
     }
 
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
@@ -358,6 +380,7 @@ class ScreenDetectionService : Service() {
         detectionWindow.clear()
         overlayVisible = false
         lastPositiveTimeMs = 0L
+        lastPublishedStatus = null
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
@@ -469,6 +492,17 @@ class ScreenDetectionService : Service() {
         } else {
             getParcelableExtra(key)
         }
+    }
+
+    // 按短边目标值等比缩小采集面，保持宽高比、对齐偶数、且绝不放大（屏幕本就小于目标时原样采集）。
+    private fun resolveCaptureSize(screenWidth: Int, screenHeight: Int): Pair<Int, Int> {
+        if (screenWidth <= 0 || screenHeight <= 0) return screenWidth to screenHeight
+        val shortEdge = minOf(screenWidth, screenHeight)
+        if (shortEdge <= CAPTURE_TARGET_SHORT_EDGE) return screenWidth to screenHeight
+        val scale = CAPTURE_TARGET_SHORT_EDGE.toFloat() / shortEdge.toFloat()
+        val width = (screenWidth * scale).toInt().coerceAtLeast(1) and 1.inv()
+        val height = (screenHeight * scale).toInt().coerceAtLeast(1) and 1.inv()
+        return width.coerceAtLeast(2) to height.coerceAtLeast(2)
     }
 
     private fun isFrameStatic(bitmap: Bitmap): Boolean {

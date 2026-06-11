@@ -30,6 +30,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     private var reversePreRender: Boolean = false
     private var windowOriginX: Float = 0f
     private var windowOriginY: Float = 0f
+    // 采集面降分辨率后,draw 坐标处于采集像素空间,绘制时按该比例放大到屏幕像素。
+    private var scaleX: Float = 1f
+    private var scaleY: Float = 1f
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -37,7 +40,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         val localReverseMode = reverseMode
 
         canvas.save()
+        // 屏幕像素 = 缩放(采集坐标) - 窗口屏幕原点。先平移再缩放,使内层绘制坐标保持采集像素空间。
         canvas.translate(-windowOriginX, -windowOriginY)
+        canvas.scale(scaleX, scaleY)
         if (localReverseMode != null && reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
@@ -56,7 +61,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     fun bindFrame(
         frame: ScreenPrivacyMaskRenderer.OverlayFrame?,
         windowOriginX: Int,
-        windowOriginY: Int
+        windowOriginY: Int,
+        scaleX: Float = 1f,
+        scaleY: Float = 1f
     ) {
         val changed = updateState(
             bitmap = frame?.sourceBitmap,
@@ -66,7 +73,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseRegions = frame?.reverseRegions.orEmpty(),
             reversePreRender = frame?.reversePreRender == true,
             windowOriginX = windowOriginX.toFloat(),
-            windowOriginY = windowOriginY.toFloat()
+            windowOriginY = windowOriginY.toFloat(),
+            scaleX = scaleX,
+            scaleY = scaleY
         )
         if (changed) invalidate()
     }
@@ -75,7 +84,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         bitmap: Bitmap?,
         task: ScreenPrivacyMaskRenderer.DrawTask?,
         windowOriginX: Int,
-        windowOriginY: Int
+        windowOriginY: Int,
+        scaleX: Float = 1f,
+        scaleY: Float = 1f
     ) {
         val changed = updateState(
             bitmap = bitmap,
@@ -85,7 +96,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseRegions = emptyList(),
             reversePreRender = false,
             windowOriginX = windowOriginX.toFloat(),
-            windowOriginY = windowOriginY.toFloat()
+            windowOriginY = windowOriginY.toFloat(),
+            scaleX = scaleX,
+            scaleY = scaleY
         )
         if (changed) invalidate()
     }
@@ -99,7 +112,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             reverseRegions = emptyList(),
             reversePreRender = false,
             windowOriginX = 0f,
-            windowOriginY = 0f
+            windowOriginY = 0f,
+            scaleX = 1f,
+            scaleY = 1f
         )
         if (changed && shouldInvalidate) invalidate()
     }
@@ -112,7 +127,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion>,
         reversePreRender: Boolean,
         windowOriginX: Float,
-        windowOriginY: Float
+        windowOriginY: Float,
+        scaleX: Float,
+        scaleY: Float
     ): Boolean {
         var changed = false
         if (sourceBitmap !== bitmap) {
@@ -142,6 +159,11 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         if (this.windowOriginX != windowOriginX || this.windowOriginY != windowOriginY) {
             this.windowOriginX = windowOriginX
             this.windowOriginY = windowOriginY
+            changed = true
+        }
+        if (this.scaleX != scaleX || this.scaleY != scaleY) {
+            this.scaleX = scaleX
+            this.scaleY = scaleY
             changed = true
         }
         return changed

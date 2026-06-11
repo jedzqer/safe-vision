@@ -10,6 +10,7 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 internal class ScreenOverlayWindowHost(
     private val context: Context,
@@ -36,6 +37,15 @@ internal class ScreenOverlayWindowHost(
     private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
     private var activeFrameBitmap: android.graphics.Bitmap? = null
     private var renderGeneration: Long = 0L
+
+    // 采集面被降分辨率后，遮挡坐标处于采集像素空间，叠加到屏幕时按此比例放大还原。
+    private var captureScaleX: Float = 1f
+    private var captureScaleY: Float = 1f
+
+    private fun updateCaptureScale(metrics: OverlayMetrics, bitmap: android.graphics.Bitmap) {
+        captureScaleX = if (bitmap.width > 0) metrics.widthPixels.toFloat() / bitmap.width else 1f
+        captureScaleY = if (bitmap.height > 0) metrics.heightPixels.toFloat() / bitmap.height else 1f
+    }
 
     fun resolveOverlayMetrics(): OverlayMetrics {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -81,6 +91,7 @@ internal class ScreenOverlayWindowHost(
     ) {
         val generation = ++renderGeneration
         swapActiveFrameBitmap(frame.sourceBitmap)
+        updateCaptureScale(metrics, frame.sourceBitmap)
         if (maskOverlayView == null) {
             maskOverlayView = createOverlayView()
             windowManager.addView(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
@@ -99,6 +110,7 @@ internal class ScreenOverlayWindowHost(
     ) {
         val generation = ++renderGeneration
         swapActiveFrameBitmap(frame.sourceBitmap)
+        updateCaptureScale(metrics, frame.sourceBitmap)
         markAllRegionSlotsUnused()
 
         frame.drawTasks.forEach { task ->
@@ -280,10 +292,11 @@ internal class ScreenOverlayWindowHost(
         region: Rect,
         metrics: OverlayMetrics
     ) {
-        layoutParams.width = region.width()
-        layoutParams.height = region.height()
-        layoutParams.x = region.left - metrics.contentOffsetX
-        layoutParams.y = region.top - metrics.contentOffsetY
+        // region 处于采集像素空间，乘以采集->屏幕比例还原为屏幕像素，再减去内容偏移。
+        layoutParams.width = (region.width() * captureScaleX).roundToInt().coerceAtLeast(1)
+        layoutParams.height = (region.height() * captureScaleY).roundToInt().coerceAtLeast(1)
+        layoutParams.x = (region.left * captureScaleX).roundToInt() - metrics.contentOffsetX
+        layoutParams.y = (region.top * captureScaleY).roundToInt() - metrics.contentOffsetY
     }
 
     private fun bindFullscreenFrame(
@@ -296,7 +309,9 @@ internal class ScreenOverlayWindowHost(
         view.bindFrame(
             frame = frame,
             windowOriginX = originX,
-            windowOriginY = originY
+            windowOriginY = originY,
+            scaleX = captureScaleX,
+            scaleY = captureScaleY
         )
         view.post {
             if (maskOverlayView !== view || renderGeneration != generation || !view.isAttachedToWindow) {
@@ -306,7 +321,9 @@ internal class ScreenOverlayWindowHost(
             view.bindFrame(
                 frame = frame,
                 windowOriginX = resolvedX,
-                windowOriginY = resolvedY
+                windowOriginY = resolvedY,
+                scaleX = captureScaleX,
+                scaleY = captureScaleY
             )
         }
     }
@@ -319,23 +336,30 @@ internal class ScreenOverlayWindowHost(
         metrics: OverlayMetrics,
         generation: Long
     ) {
-        val (originX, originY) = resolveViewOrigin(view, region.left, region.top)
+        // 窗口已放置在屏幕像素坐标，getLocationOnScreen 取不到时回退用缩放后的屏幕坐标。
+        val fallbackX = (region.left * captureScaleX).roundToInt()
+        val fallbackY = (region.top * captureScaleY).roundToInt()
+        val (originX, originY) = resolveViewOrigin(view, fallbackX, fallbackY)
         view.bindRegionTask(
             bitmap = bitmap,
             task = task,
             windowOriginX = originX,
-            windowOriginY = originY
+            windowOriginY = originY,
+            scaleX = captureScaleX,
+            scaleY = captureScaleY
         )
         view.post {
             if (renderGeneration != generation || !view.isAttachedToWindow) {
                 return@post
             }
-            val (resolvedX, resolvedY) = resolveViewOrigin(view, region.left, region.top)
+            val (resolvedX, resolvedY) = resolveViewOrigin(view, fallbackX, fallbackY)
             view.bindRegionTask(
                 bitmap = bitmap,
                 task = task,
                 windowOriginX = resolvedX,
-                windowOriginY = resolvedY
+                windowOriginY = resolvedY,
+                scaleX = captureScaleX,
+                scaleY = captureScaleY
             )
         }
     }
