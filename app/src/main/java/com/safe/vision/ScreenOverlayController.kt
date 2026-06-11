@@ -169,8 +169,9 @@ object ScreenOverlayController {
     private fun createOverlayWindowContext(baseContext: Context, windowType: Int): Context {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return baseContext
         val displayManager = baseContext.getSystemService(DisplayManager::class.java) ?: return baseContext
-        val display = baseContext.display ?: displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-            ?: return baseContext
+        // Service/application contexts are not display-bound on newer Android versions.
+        // Resolve the default display explicitly instead of touching Context.display.
+        val display = displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY) ?: return baseContext
         return baseContext.createDisplayContext(display).createWindowContext(windowType, null)
     }
 }

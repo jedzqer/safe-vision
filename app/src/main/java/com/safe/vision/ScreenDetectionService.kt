@@ -45,6 +45,9 @@ class ScreenDetectionService : Service() {
         private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 300L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_TIMEOUT_MS = 2_000L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_POLL_MS = 100L
+        // 静帧跳过：把整帧缩到极小灰度图做差分，变化低于阈值则跳过整条 YOLO 链路
+        private const val STATIC_FRAME_SIGNATURE_SIZE = 32
+        private const val STATIC_FRAME_DIFF_THRESHOLD = 2.0
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -76,6 +79,13 @@ class ScreenDetectionService : Service() {
     private var analysisCanvas: Canvas? = null
     private var stagingBitmap: Bitmap? = null
     private val analysisDstRect = Rect()
+
+    // 静帧跳过：上一帧的小图灰度指纹与采样缓存
+    private var signatureBitmap: Bitmap? = null
+    private var signatureCanvas: Canvas? = null
+    private val signaturePixels = IntArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
+    private var lastSignature: FloatArray? = null
+    private val signatureDstRect = Rect(0, 0, STATIC_FRAME_SIGNATURE_SIZE, STATIC_FRAME_SIGNATURE_SIZE)
 
     // 抗闪烁：滑动窗口 + 延迟清除
     private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
@@ -211,6 +221,15 @@ class ScreenDetectionService : Service() {
 
             if (bitmap == null) {
                 delay(200)
+                continue
+            }
+
+            val isStaticFrame = withContext(Dispatchers.Default) {
+                isFrameStatic(bitmap)
+            }
+            if (isStaticFrame) {
+                // 画面静止：跳过整条 YOLO 链路，遮挡与状态保持上一帧不动
+                delay(detectionIntervalMs)
                 continue
             }
 
@@ -452,6 +471,37 @@ class ScreenDetectionService : Service() {
         }
     }
 
+    private fun isFrameStatic(bitmap: Bitmap): Boolean {
+        val size = STATIC_FRAME_SIGNATURE_SIZE
+        val small = signatureBitmap ?: Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
+            signatureBitmap = it
+            signatureCanvas = Canvas(it)
+        }
+        signatureCanvas?.drawBitmap(bitmap, null, signatureDstRect, null)
+        small.getPixels(signaturePixels, 0, size, 0, 0, size, size)
+
+        val current = FloatArray(signaturePixels.size)
+        for (i in signaturePixels.indices) {
+            val pixel = signaturePixels[i]
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            // 加权灰度，整数即可，存为 Float 便于差分
+            current[i] = (r * 0.299f + g * 0.587f + b * 0.114f)
+        }
+
+        val previous = lastSignature
+        lastSignature = current
+        if (previous == null) return false
+
+        var sum = 0.0
+        for (i in current.indices) {
+            sum += kotlin.math.abs(current[i] - previous[i])
+        }
+        val meanDiff = sum / current.size
+        return meanDiff < STATIC_FRAME_DIFF_THRESHOLD
+    }
+
     private fun Image.copyToReusableBitmap(): Bitmap {
         val plane = planes.first()
         val buffer = plane.buffer
@@ -521,6 +571,10 @@ class ScreenDetectionService : Service() {
         analysisBitmap = null
         stagingBitmap?.takeIf { !it.isRecycled }?.recycle()
         stagingBitmap = null
+        signatureCanvas = null
+        signatureBitmap?.takeIf { !it.isRecycled }?.recycle()
+        signatureBitmap = null
+        lastSignature = null
     }
 
     private data class RenderResult(
