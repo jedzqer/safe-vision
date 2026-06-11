@@ -307,7 +307,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         if (
             overlayMode == ScreenOverlayMode.ACCESSIBILITY &&
             privacySettings.isAccessibilityEmptyReverseFullscreenEnabled() &&
-            detections.isEmpty()
+            detections.none { privacySettings.isLabelBlocked(it.className, labelProfile) }
         ) {
             return true
         }
