@@ -26,6 +26,35 @@ object BlurEffects {
         val path: Path
     )
 
+    sealed class OutlineShape {
+        data class RectShape(val rect: Rect) : OutlineShape()
+        data class CircleShape(val rect: Rect) : OutlineShape()
+        data class PathShape(val path: Path, val boundsRect: Rect) : OutlineShape()
+
+        fun toPath(): Path {
+            return when (this) {
+                is RectShape -> {
+                    val p = Path()
+                    p.addRect(
+                        rect.left.toFloat(),
+                        rect.top.toFloat(),
+                        rect.right.toFloat(),
+                        rect.bottom.toFloat(),
+                        Path.Direction.CW
+                    )
+                    p
+                }
+                is CircleShape -> {
+                    val r = hypot(rect.width() / 2f, rect.height() / 2f)
+                    val p = Path()
+                    p.addCircle(rect.exactCenterX(), rect.exactCenterY(), r, Path.Direction.CW)
+                    p
+                }
+                is PathShape -> Path(path)
+            }
+        }
+    }
+
     private val outlinePaint: Paint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -255,6 +284,38 @@ object BlurEffects {
         outlinePaint.color = color
         outlinePaint.strokeWidth = outlineStrokeWidth(boundsRect)
         canvas.drawPath(path, outlinePaint)
+    }
+
+    fun drawUnionOutline(
+        canvas: Canvas,
+        shapes: List<OutlineShape>,
+        color: Int = Color.RED
+    ) {
+        if (shapes.isEmpty()) return
+        val validPaths = shapes.mapNotNull { shape ->
+            val p = shape.toPath()
+            if (p.isEmpty) null else p
+        }
+        if (validPaths.isEmpty()) return
+
+        val unionPath = Path(validPaths.first())
+        for (i in 1 until validPaths.size) {
+            unionPath.op(validPaths[i], Path.Op.UNION)
+        }
+        if (unionPath.isEmpty) return
+
+        val minStroke = shapes.minOf { shape ->
+            val rect = when (shape) {
+                is OutlineShape.RectShape -> shape.rect
+                is OutlineShape.CircleShape -> shape.rect
+                is OutlineShape.PathShape -> shape.boundsRect
+            }
+            outlineStrokeWidth(rect)
+        }
+
+        outlinePaint.color = color
+        outlinePaint.strokeWidth = minStroke
+        canvas.drawPath(unionPath, outlinePaint)
     }
 
     fun drawBlack(canvas: Canvas, rect: Rect, color: Int = Color.BLACK) {

@@ -214,6 +214,7 @@ class DetectionRenderEngine(
         if (normalTasks.isNotEmpty()) {
             val outputCanvas = Canvas(outputBitmap)
             val normalEffectSource = normalEffectSourceProvider(outputBitmap)
+            val outlineShapes = mutableListOf<BlurEffects.OutlineShape>()
             normalTasks.forEach { task ->
                 renderNormalTask(
                     canvas = outputCanvas,
@@ -222,7 +223,10 @@ class DetectionRenderEngine(
                     stickerProvider = stickerProvider,
                     shouldOutline = ::shouldOutline,
                     callbacks = callbacks
-                )
+                )?.let { outlineShapes.add(it) }
+            }
+            if (outlineShapes.isNotEmpty()) {
+                BlurEffects.drawUnionOutline(outputCanvas, outlineShapes)
             }
         }
 
@@ -232,7 +236,11 @@ class DetectionRenderEngine(
             outputBitmap
         }
         if (reverseRects.isNotEmpty()) {
-            drawReverseOutlines(Canvas(finalBitmap), reverseRects, modeToUse, ::shouldOutline)
+            val reverseOutlineShapes = collectReverseOutlineShapes(reverseRects, ::shouldOutline)
+            if (reverseOutlineShapes.isNotEmpty()) {
+                val finalCanvas = Canvas(finalBitmap)
+                BlurEffects.drawUnionOutline(finalCanvas, reverseOutlineShapes)
+            }
         }
         return finalBitmap
     }
@@ -244,7 +252,7 @@ class DetectionRenderEngine(
         stickerProvider: (String?) -> Bitmap?,
         shouldOutline: (String) -> Boolean,
         callbacks: RenderCallbacks
-    ) {
+    ): BlurEffects.OutlineShape? {
         val applyEffect: (Rect) -> Unit = { drawRect ->
             when (task.renderMode) {
                 PrivacySettingsManager.BLUR_MODE_BLACK -> BlurEffects.drawBlack(canvas, drawRect)
@@ -272,11 +280,12 @@ class DetectionRenderEngine(
                 else -> BlurEffects.drawMosaic(canvas, source, drawRect, privacySettings.getMosaicBlockSize())
             }
         }
+        var outlineShape: BlurEffects.OutlineShape? = null
         if (task.allowCircular) {
             val circleBounds = BlurEffects.circumscribedCircleBounds(task.drawRect, source.width, source.height)
             BlurEffects.drawWithCircularClip(canvas, task.drawRect) { applyEffect(circleBounds) }
             if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                BlurEffects.drawCircularOutline(canvas, task.drawRect)
+                outlineShape = BlurEffects.OutlineShape.CircleShape(task.drawRect)
             }
         } else {
             if (task.clipPath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
@@ -288,13 +297,20 @@ class DetectionRenderEngine(
                 applyEffect(task.drawRect)
             }
             if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                if (task.clipPath != null) {
-                    BlurEffects.drawPathOutline(canvas, task.clipPath, task.drawRect)
+                outlineShape = if (task.clipPath != null) {
+                    BlurEffects.OutlineShape.PathShape(task.clipPath, task.drawRect)
+                } else if (kotlin.math.abs(task.boxRotationDegrees) > 0.01f) {
+                    val rotatedPath = BlurEffects.rotatedRectPath(
+                        android.graphics.RectF(task.drawRect),
+                        task.boxRotationDegrees
+                    )
+                    BlurEffects.OutlineShape.PathShape(rotatedPath, task.drawRect)
                 } else {
-                    BlurEffects.drawRectOutline(canvas, task.drawRect, rotationDegrees = task.boxRotationDegrees)
+                    BlurEffects.OutlineShape.RectShape(task.drawRect)
                 }
             }
         }
+        return outlineShape
     }
 
     private fun applyReverseMask(
@@ -360,20 +376,24 @@ class DetectionRenderEngine(
         return output
     }
 
-    private fun drawReverseOutlines(
-        canvas: Canvas,
+    private fun collectReverseOutlineShapes(
         rects: List<ReverseRect>,
-        mode: Int,
         shouldOutline: (String) -> Boolean
-    ) {
-        rects.forEach { item ->
-            if (!shouldOutline(item.label)) return@forEach
+    ): List<BlurEffects.OutlineShape> {
+        return rects.mapNotNull { item ->
+            if (!shouldOutline(item.label)) return@mapNotNull null
             if (item.circular) {
-                BlurEffects.drawCircularOutline(canvas, item.rect)
+                BlurEffects.OutlineShape.CircleShape(item.rect)
             } else if (item.clipPath != null) {
-                BlurEffects.drawPathOutline(canvas, item.clipPath, item.rect)
+                BlurEffects.OutlineShape.PathShape(item.clipPath, item.rect)
+            } else if (abs(item.rotationDegrees) > 0.01f) {
+                val rotatedPath = BlurEffects.rotatedRectPath(
+                    RectF(item.rect),
+                    item.rotationDegrees
+                )
+                BlurEffects.OutlineShape.PathShape(rotatedPath, item.rect)
             } else {
-                BlurEffects.drawRectOutline(canvas, item.rect, rotationDegrees = item.rotationDegrees)
+                BlurEffects.OutlineShape.RectShape(item.rect)
             }
         }
     }

@@ -42,23 +42,26 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         val localReverseMode = reverseMode
 
         canvas.save()
-        // 屏幕像素 = 缩放(采集坐标) - 窗口屏幕原点。先平移再缩放,使内层绘制坐标保持采集像素空间。
         canvas.translate(-windowOriginX, -windowOriginY)
         canvas.scale(scaleX, scaleY)
         if (localReverseMode != null && reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
+        val outlineShapes = mutableListOf<BlurEffects.OutlineShape>()
         val localSingleTask = singleDrawTask
         if (localSingleTask != null) {
-            drawTask(canvas, bitmap, localSingleTask)
+            drawTask(canvas, bitmap, localSingleTask)?.let { outlineShapes.add(it) }
         } else {
-            drawTasks.forEach { drawTask(canvas, bitmap, it) }
+            drawTasks.forEach { drawTask(canvas, bitmap, it)?.let { outlineShapes.add(it) } }
         }
         if (localReverseMode != null && !reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
         if (localReverseMode != null) {
-            drawReverseOutlines(canvas, localReverseMode)
+            outlineShapes.addAll(collectReverseOutlineShapes())
+        }
+        if (outlineShapes.isNotEmpty()) {
+            BlurEffects.drawUnionOutline(canvas, outlineShapes)
         }
         canvas.restore()
     }
@@ -186,7 +189,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         canvas: Canvas,
         bitmap: Bitmap,
         task: ScreenPrivacyMaskRenderer.DrawTask
-    ) {
+    ): BlurEffects.OutlineShape? {
+        var outlineShape: BlurEffects.OutlineShape? = null
         if (task.allowCircular) {
             val circleBounds = BlurEffects.circumscribedCircleBounds(
                 task.drawRect,
@@ -197,9 +201,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
                 applyEffect(canvas, bitmap, task.renderMode, circleBounds, task)
             }
             if (task.drawOutline) {
-                BlurEffects.drawCircularOutline(canvas, task.drawRect)
+                outlineShape = BlurEffects.OutlineShape.CircleShape(task.drawRect)
             }
-            return
+            return outlineShape
         }
 
         if (task.usesEyeStrip && task.eyePath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
@@ -211,12 +215,13 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             applyEffect(canvas, bitmap, task.renderMode, task.drawRect, task)
         }
         if (task.drawOutline) {
-            if (task.usesEyeStrip && task.eyePath != null) {
-                BlurEffects.drawPathOutline(canvas, task.eyePath, task.drawRect)
+            outlineShape = if (task.usesEyeStrip && task.eyePath != null) {
+                BlurEffects.OutlineShape.PathShape(task.eyePath, task.drawRect)
             } else {
-                BlurEffects.drawRectOutline(canvas, task.drawRect)
+                BlurEffects.OutlineShape.RectShape(task.drawRect)
             }
         }
+        return outlineShape
     }
 
     private fun applyEffect(
@@ -288,15 +293,15 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         }
     }
 
-    private fun drawReverseOutlines(canvas: Canvas, mode: Int) {
-        reverseRegions.forEach { clearRegion ->
-            if (!clearRegion.drawOutline) return@forEach
+    private fun collectReverseOutlineShapes(): List<BlurEffects.OutlineShape> {
+        return reverseRegions.mapNotNull { clearRegion ->
+            if (!clearRegion.drawOutline) return@mapNotNull null
             if (clearRegion.circular) {
-                BlurEffects.drawCircularOutline(canvas, clearRegion.rect)
+                BlurEffects.OutlineShape.CircleShape(clearRegion.rect)
             } else if (clearRegion.path != null) {
-                BlurEffects.drawPathOutline(canvas, clearRegion.path, clearRegion.rect)
+                BlurEffects.OutlineShape.PathShape(clearRegion.path, clearRegion.rect)
             } else {
-                BlurEffects.drawRectOutline(canvas, clearRegion.rect)
+                BlurEffects.OutlineShape.RectShape(clearRegion.rect)
             }
         }
     }
