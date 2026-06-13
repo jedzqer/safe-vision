@@ -289,7 +289,6 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     }
 
     private fun drawReverseOutlines(canvas: Canvas, mode: Int) {
-        if (mode == PrivacySettingsManager.BLUR_MODE_STICKER) return
         reverseRegions.forEach { clearRegion ->
             if (!clearRegion.drawOutline) return@forEach
             if (clearRegion.circular) {

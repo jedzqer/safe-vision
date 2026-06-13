@@ -366,7 +366,6 @@ class DetectionRenderEngine(
         mode: Int,
         shouldOutline: (String) -> Boolean
     ) {
-        if (mode == PrivacySettingsManager.BLUR_MODE_STICKER) return
         rects.forEach { item ->
             if (!shouldOutline(item.label)) return@forEach
             if (item.circular) {
