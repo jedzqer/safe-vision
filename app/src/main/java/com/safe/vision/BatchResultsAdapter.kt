@@ -9,6 +9,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -35,7 +37,12 @@ class BatchResultsAdapter : RecyclerView.Adapter<BatchResultsAdapter.ViewHolder>
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(results[position])
     }
-    
+
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        holder.loadJob?.cancel()
+    }
+
     override fun getItemCount(): Int = results.size
 
     private fun decodeSampledBitmap(filePath: String, reqWidth: Int, reqHeight: Int) =
@@ -71,8 +78,10 @@ class BatchResultsAdapter : RecyclerView.Adapter<BatchResultsAdapter.ViewHolder>
         private val fileNameText: TextView = itemView.findViewById(R.id.fileNameText)
         private val statusText: TextView = itemView.findViewById(R.id.statusText)
         private val detectionsText: TextView = itemView.findViewById(R.id.detectionsText)
-        
+        var loadJob: Job? = null
+
         fun bind(result: BatchProcessingManager.BatchProcessingResult) {
+            loadJob?.cancel()
             fileNameText.text = result.task.fileName
             val context = itemView.context
             
@@ -94,7 +103,7 @@ class BatchResultsAdapter : RecyclerView.Adapter<BatchResultsAdapter.ViewHolder>
                 // 显示图片缩略图
                 result.imageFile?.let { file ->
                     imageView.tag = file.absolutePath
-                    CoroutineScope(Dispatchers.IO).launch {
+                    loadJob = CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val targetWidth = imageView.width.takeIf { it > 0 }
                                 ?: (imageView.resources.displayMetrics.density * 60).toInt()

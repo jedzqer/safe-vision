@@ -27,6 +27,9 @@ class BatchProcessingService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var batchManager: BatchProcessingManager
     private lateinit var notificationManager: NotificationManager
+    private var isProcessing = false
+    private var collectorJob: kotlinx.coroutines.Job? = null
+    private var progressCollectorJob: kotlinx.coroutines.Job? = null
     
     companion object {
         const val CHANNEL_ID = "batch_processing_channel"
@@ -117,6 +120,11 @@ class BatchProcessingService : Service() {
     }
     
     private fun startBatchProcessing(uris: List<android.net.Uri>, preferredDetectedFolder: String) {
+        if (isProcessing) {
+            DebugLogManager.addLog("批量处理服务", "已有批量处理任务运行中，忽略重复启动请求")
+            return
+        }
+        isProcessing = true
         DebugLogManager.addLog("批量处理服务", "开始批量处理，共 ${uris.size} 张图片")
         batchManager.setPreferredDetectedFolder(preferredDetectedFolder)
         
@@ -124,14 +132,14 @@ class BatchProcessingService : Service() {
         startForeground(NOTIFICATION_ID, createInitialNotification())
         
         // 监听处理状态
-        serviceScope.launch {
+        collectorJob = serviceScope.launch {
             batchManager.processingState.collect { state ->
                 updateNotification(state)
             }
         }
         
         // 监听进度
-        serviceScope.launch {
+        progressCollectorJob = serviceScope.launch {
             batchManager.progress.collect { progress ->
                 updateProgressNotification(progress)
             }

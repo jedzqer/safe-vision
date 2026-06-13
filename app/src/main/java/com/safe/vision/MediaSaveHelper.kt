@@ -17,6 +17,7 @@ object MediaSaveHelper {
         val hasDetections: Boolean
     )
 
+    @Synchronized
     fun saveImage(
         context: Context,
         bytes: ByteArray,
