@@ -123,54 +123,60 @@ class YoloOnnxRunner(
         val sourceBitmap = if (bitmap.config == Bitmap.Config.ARGB_8888) bitmap else {
             bitmap.copy(Bitmap.Config.ARGB_8888, false)
         }
-        val width = sourceBitmap.width
-        val height = sourceBitmap.height
-        val squareSize = max(width, height)
+        try {
+            val width = sourceBitmap.width
+            val height = sourceBitmap.height
+            val squareSize = max(width, height)
 
-        val pixels = IntArray(inputArea)
-        val floatValues = FloatArray(3 * inputArea)
-        val floatBuffer = FloatBuffer.wrap(floatValues)
+            val pixels = IntArray(inputArea)
+            val floatValues = FloatArray(3 * inputArea)
+            val floatBuffer = FloatBuffer.wrap(floatValues)
 
-        if (resizedBitmap == null) {
-            resizedBitmap = Bitmap.createBitmap(modelInputSize, modelInputSize, Bitmap.Config.ARGB_8888)
-            resizedCanvas = Canvas(resizedBitmap!!)
+            if (resizedBitmap == null) {
+                resizedBitmap = Bitmap.createBitmap(modelInputSize, modelInputSize, Bitmap.Config.ARGB_8888)
+                resizedCanvas = Canvas(resizedBitmap!!)
+            }
+            resizedBitmap?.eraseColor(Color.BLACK)
+            val scale = modelInputSize.toFloat() / squareSize.toFloat()
+            resizeLetterboxDstRect.set(
+                0f,
+                0f,
+                width * scale,
+                height * scale
+            )
+            resizedCanvas?.drawBitmap(sourceBitmap, null, resizeLetterboxDstRect, null)
+
+            resizedBitmap?.getPixels(pixels, 0, modelInputSize, 0, 0, modelInputSize, modelInputSize)
+
+            for (i in 0 until inputArea) {
+                val pixel = pixels[i]
+                val r = ((pixel shr 16) and 0xFF) / 255f
+                val g = ((pixel shr 8) and 0xFF) / 255f
+                val b = (pixel and 0xFF) / 255f
+                floatValues[i] = r
+                floatValues[i + inputArea] = g
+                floatValues[i + inputArea * 2] = b
+            }
+
+            floatBuffer.position(0)
+            floatBuffer.limit(floatValues.size)
+            val tensor = OnnxTensor.createTensor(
+                environment,
+                floatBuffer,
+                longArrayOf(1, 3, modelInputSize.toLong(), modelInputSize.toLong())
+            )
+
+            val meta = PreprocessMeta(
+                originalWidth = width,
+                originalHeight = height,
+                squareSize = squareSize
+            )
+            return tensor to meta
+        } finally {
+            if (sourceBitmap !== bitmap && !sourceBitmap.isRecycled) {
+                sourceBitmap.recycle()
+            }
         }
-        resizedBitmap?.eraseColor(Color.BLACK)
-        val scale = modelInputSize.toFloat() / squareSize.toFloat()
-        resizeLetterboxDstRect.set(
-            0f,
-            0f,
-            width * scale,
-            height * scale
-        )
-        resizedCanvas?.drawBitmap(sourceBitmap, null, resizeLetterboxDstRect, null)
-
-        resizedBitmap?.getPixels(pixels, 0, modelInputSize, 0, 0, modelInputSize, modelInputSize)
-
-        for (i in 0 until inputArea) {
-            val pixel = pixels[i]
-            val r = ((pixel shr 16) and 0xFF) / 255f
-            val g = ((pixel shr 8) and 0xFF) / 255f
-            val b = (pixel and 0xFF) / 255f
-            floatValues[i] = r
-            floatValues[i + inputArea] = g
-            floatValues[i + inputArea * 2] = b
-        }
-
-        floatBuffer.position(0)
-        floatBuffer.limit(floatValues.size)
-        val tensor = OnnxTensor.createTensor(
-            environment,
-            floatBuffer,
-            longArrayOf(1, 3, modelInputSize.toLong(), modelInputSize.toLong())
-        )
-
-        val meta = PreprocessMeta(
-            originalWidth = width,
-            originalHeight = height,
-            squareSize = squareSize
-        )
-        return tensor to meta
     }
 
     private fun postProcess(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
