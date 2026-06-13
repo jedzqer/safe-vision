@@ -28,6 +28,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -162,7 +163,8 @@ class GalleryFolderFullscreenFragment : Fragment() {
                 } else {
                     toggleSelection(file)
                 }
-            }
+            },
+            coroutineScope = viewLifecycleOwner.lifecycleScope
         )
         recyclerView.adapter = mediaAdapter
 
@@ -716,7 +718,8 @@ class GalleryFolderFullscreenFragment : Fragment() {
 private class FolderMediaAdapter(
     private val thumbnailCacheManager: ThumbnailCacheManager,
     private val onClick: (File) -> Unit,
-    private val onLongPress: (File) -> Unit
+    private val onLongPress: (File) -> Unit,
+    private val coroutineScope: CoroutineScope
 ) : RecyclerView.Adapter<FolderMediaAdapter.FolderMediaViewHolder>() {
     private var files: List<File> = emptyList()
     private var selectionMode = false
@@ -724,6 +727,7 @@ private class FolderMediaAdapter(
     private var mediaKind = ThumbnailCacheManager.MediaKind.IMAGE
     private var highlightMetadataInNoDetection = false
     private var metadataImagePaths: Set<String> = emptySet()
+    private val durationCache = mutableMapOf<String, String>()
 
     fun updateData(
         files: List<File>,
@@ -733,12 +737,14 @@ private class FolderMediaAdapter(
         this.files = files
         this.mediaKind = mediaKind
         this.highlightMetadataInNoDetection = highlightMetadataInNoDetection && mediaKind == ThumbnailCacheManager.MediaKind.IMAGE
-        metadataImagePaths = if (this.highlightMetadataInNoDetection) {
-            buildMetadataImagePathSet(files)
-        } else {
-            emptySet()
-        }
+        metadataImagePaths = emptySet()
         notifyDataSetChanged()
+        if (this.highlightMetadataInNoDetection) {
+            coroutineScope.launch {
+                metadataImagePaths = withContext(Dispatchers.IO) { buildMetadataImagePathSet(files) }
+                notifyDataSetChanged()
+            }
+        }
     }
 
     fun updateSelection(selectionMode: Boolean, selectedPaths: Set<String>) {
@@ -754,12 +760,14 @@ private class FolderMediaAdapter(
 
     override fun onBindViewHolder(holder: FolderMediaViewHolder, position: Int) {
         val file = files[position]
+        val duration = if (mediaKind == ThumbnailCacheManager.MediaKind.VIDEO) readDuration(file) else null
         holder.bind(
             file = file,
             mediaKind = mediaKind,
             selectionMode = selectionMode,
             selected = selectedPaths.contains(file.absolutePath),
-            highlightMetadata = highlightMetadataInNoDetection && metadataImagePaths.contains(file.absolutePath)
+            highlightMetadata = highlightMetadataInNoDetection && metadataImagePaths.contains(file.absolutePath),
+            duration = duration
         )
         holder.itemView.setOnClickListener { onClick(file) }
         holder.itemView.setOnLongClickListener {
@@ -792,7 +800,8 @@ private class FolderMediaAdapter(
             mediaKind: ThumbnailCacheManager.MediaKind,
             selectionMode: Boolean,
             selected: Boolean,
-            highlightMetadata: Boolean
+            highlightMetadata: Boolean,
+            duration: String? = null
         ) {
             bindToken++
             val token = bindToken
@@ -811,7 +820,7 @@ private class FolderMediaAdapter(
 
             if (mediaKind == ThumbnailCacheManager.MediaKind.VIDEO) {
                 mediaBadge.visibility = View.VISIBLE
-                mediaBadge.text = readDuration(file)
+                mediaBadge.text = duration ?: "--:--"
             } else {
                 mediaBadge.visibility = View.GONE
             }
@@ -829,25 +838,29 @@ private class FolderMediaAdapter(
             bindPath = null
             bindToken++
         }
+    }
 
-        private fun readDuration(videoFile: File): String {
-            val retriever = MediaMetadataRetriever()
-            return try {
-                retriever.setDataSource(videoFile.absolutePath)
-                val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                if (durationMs == null) {
-                    "--:--"
-                } else {
-                    val seconds = durationMs / 1000
-                    val minutes = seconds / 60
-                    val remain = seconds % 60
-                    String.format(Locale.getDefault(), "%d:%02d", minutes, remain)
-                }
-            } catch (_: Exception) {
+    private fun readDuration(videoFile: File): String {
+        val path = videoFile.absolutePath
+        durationCache[path]?.let { return it }
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(path)
+            val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            val result = if (durationMs == null) {
                 "--:--"
-            } finally {
-                retriever.release()
+            } else {
+                val seconds = durationMs / 1000
+                val minutes = seconds / 60
+                val remain = seconds % 60
+                String.format(Locale.getDefault(), "%d:%02d", minutes, remain)
             }
+            durationCache[path] = result
+            result
+        } catch (_: Exception) {
+            "--:--"
+        } finally {
+            retriever.release()
         }
     }
 

@@ -42,19 +42,29 @@ class OutputFolderAdapter(
         holder.bind(items[position])
     }
 
+    override fun onViewRecycled(holder: OutputFolderViewHolder) {
+        super.onViewRecycled(holder)
+        holder.unbind()
+    }
+
     inner class OutputFolderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val indicatorDot: View = view.findViewById(R.id.indicatorDot)
         private val folderName: TextView = view.findViewById(R.id.outputFolderName)
         private val folderCount: TextView = view.findViewById(R.id.outputFolderCount)
         private val preview1: ImageView = view.findViewById(R.id.outputPreview1)
         private val preview2: ImageView = view.findViewById(R.id.outputPreview2)
+        private var bindToken = 0L
+        private var bindPath: String? = null
 
         fun bind(item: OutputFolderItem) {
+            bindToken++
+            val token = bindToken
+            bindPath = item.name
             folderName.text = item.name
             folderCount.text = itemView.context.getString(R.string.gallery_image_count, item.count)
             indicatorDot.visibility = if (item.isSelected) View.VISIBLE else View.GONE
-            bindPreview(preview1, item.previewFiles.getOrNull(0))
-            bindPreview(preview2, item.previewFiles.getOrNull(1))
+            bindPreview(preview1, item.previewFiles.getOrNull(0), token)
+            bindPreview(preview2, item.previewFiles.getOrNull(1), token)
 
             itemView.setOnClickListener { onClick(item) }
             itemView.setOnLongClickListener {
@@ -67,11 +77,17 @@ class OutputFolderAdapter(
             }
         }
 
-        private fun bindPreview(imageView: ImageView, file: java.io.File?) {
+        fun unbind() {
+            bindPath = null
+            bindToken++
+        }
+
+        private fun bindPreview(imageView: ImageView, file: java.io.File?, bindToken: Long) {
             val placeholder = android.R.drawable.ic_menu_gallery
             imageView.setImageResource(placeholder)
             if (file == null) return
             thumbnailCacheManager.load(file, ThumbnailCacheManager.MediaKind.IMAGE, 160) { bitmap ->
+                if (this.bindToken != bindToken || bindPath == null) return@load
                 if (bitmap != null) imageView.setImageBitmap(bitmap) else imageView.setImageResource(placeholder)
             }
         }

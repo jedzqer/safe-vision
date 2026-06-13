@@ -10,8 +10,12 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class ImageGalleryFragment : Fragment() {
@@ -97,32 +101,40 @@ class ImageGalleryFragment : Fragment() {
     }
 
     private fun loadFolderCards() {
-        val rootDir = getRootDir()
-        val customFolders = appSettingsManager.getCustomImageFolders()
-        val selectableFolders = listOf(FolderModels.SAFE_NET_DIR) + customFolders
+        val safenetTitle = getString(R.string.gallery_safenet)
+        val noDetectionTitle = getString(R.string.gallery_no_detection)
+        val videoTitle = getString(R.string.gallery_video_title)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val rootDir = getRootDir()
+            val customFolders = appSettingsManager.getCustomImageFolders()
+            val selectableFolders = listOf(FolderModels.SAFE_NET_DIR) + customFolders
 
-        var selected = appSettingsManager.getSelectedOutputFolder()
-        val selectedValid = selectableFolders.any { it.equals(selected, ignoreCase = true) } &&
-            File(rootDir, selected).exists()
-        if (!selectedValid) {
-            selected = FolderModels.SAFE_NET_DIR
-            appSettingsManager.setSelectedOutputFolder(selected)
+            var selected = appSettingsManager.getSelectedOutputFolder()
+            val selectedValid = selectableFolders.any { it.equals(selected, ignoreCase = true) } &&
+                File(rootDir, selected).exists()
+            if (!selectedValid) {
+                selected = FolderModels.SAFE_NET_DIR
+                appSettingsManager.setSelectedOutputFolder(selected)
+            }
+
+            val built = withContext(Dispatchers.IO) {
+                mutableListOf<GalleryFolderCard>().apply {
+                    add(buildCard(FolderModels.SAFE_NET_DIR, safenetTitle, true, false, true, selected))
+                    customFolders.forEach { name ->
+                        add(buildCard(name, name, false, false, true, selected))
+                    }
+                    add(buildCard(FolderModels.NO_DETECTION_DIR, noDetectionTitle, true, false, false, selected))
+                    add(buildCard(FolderModels.SAFE_VIDEO_DIR, videoTitle, true, true, false, selected))
+                }
+            }
+
+            cards = built
+            cardAdapter.submitList(built)
+
+            val allEmpty = built.all { it.count == 0 }
+            emptyText.visibility = if (allEmpty) View.VISIBLE else View.GONE
+            folderSummaryContainer.visibility = if (allEmpty) View.GONE else View.VISIBLE
         }
-
-        val built = mutableListOf<GalleryFolderCard>()
-        built.add(buildCard(FolderModels.SAFE_NET_DIR, getString(R.string.gallery_safenet), true, false, true, selected))
-        customFolders.forEach { name ->
-            built.add(buildCard(name, name, false, false, true, selected))
-        }
-        built.add(buildCard(FolderModels.NO_DETECTION_DIR, getString(R.string.gallery_no_detection), true, false, false, selected))
-        built.add(buildCard(FolderModels.SAFE_VIDEO_DIR, getString(R.string.gallery_video_title), true, true, false, selected))
-
-        cards = built
-        cardAdapter.submitList(built)
-
-        val allEmpty = built.all { it.count == 0 }
-        emptyText.visibility = if (allEmpty) View.VISIBLE else View.GONE
-        folderSummaryContainer.visibility = if (allEmpty) View.GONE else View.VISIBLE
     }
 
     private fun buildCard(
