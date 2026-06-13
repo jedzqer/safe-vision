@@ -127,14 +127,16 @@ safe-app/
 
 ### 屏幕实时检测
 
-- `ScreenDetectionService.kt`：屏幕检测前台服务
+- `ScreenDetectionService.kt`：屏幕检测前台服务，包含检测循环、MediaProjection 管理、应用切换自动暂停/恢复机制
 - `ScreenDetectionState.kt`：屏幕检测状态
-- `ScreenAccessibilityOverlayService.kt`：无障碍遮挡服务
+- `ScreenAccessibilityOverlayService.kt`：无障碍遮挡服务，同时负责监听应用切换事件并通过 StateFlow 发布前台应用包名
 - `ScreenOverlayController.kt`：无障碍遮挡 / 普通悬浮窗遮挡调度
 - `ScreenOverlayWindowHost.kt`：`WindowManager` 悬浮窗宿主
 - `ScreenMaskOverlayView.kt`：屏幕遮挡绘制 View
 - `ScreenPrivacyMaskRenderer.kt`：屏幕遮挡渲染逻辑
 - `ScreenOverlayMode.kt`：屏幕遮挡模式定义
+
+**应用切换自动暂停/恢复**：当用户从 Safe Vision 切换到其他应用时，`ScreenAccessibilityOverlayService` 捕获 `TYPE_WINDOW_STATE_CHANGED` 事件并通过 `foregroundAppPackage` StateFlow 发布。`ScreenDetectionService.startAppSwitchMonitoring()` 监听该流，非本应用时调用 `pauseDetection()`（清除遮挡层、暂停帧采集和 YOLO 推理），切回时调用 `resumeDetection()` 恢复检测。相关配置项在 `AppSettingsManager` 中（`isScreenLossAutoPauseEnabled`、`pausePollIntervalMs`）。
 
 ### 媒体库与浏览
 

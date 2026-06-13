@@ -661,7 +661,7 @@ class ScreenDetectionService : Service() {
             ScreenAccessibilityOverlayService.foregroundAppPackage.collect { packageName ->
                 if (packageName == null) return@collect
 
-                val isOurApp = packageName == "com.safe.vision"
+                val isOurApp = packageName == BuildConfig.APPLICATION_ID
                 if (isOurApp) {
                     if (_isPaused.value) {
                         DebugLogManager.addLog("屏幕检测", "检测到本应用，恢复检测")
