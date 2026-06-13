@@ -81,6 +81,7 @@ class DetectionRenderEngine(
         val shouldFullscreenFallback =
             settings.fullScreenMaskWhenReverseLabelsMissing &&
                 settings.reverseLabels.isNotEmpty() &&
+                detections.isNotEmpty() &&
                 detections.none { settings.reverseLabels.contains(it.className) }
         if (shouldFullscreenFallback) {
             val firstReverseLabel = settings.reverseLabels.firstOrNull()

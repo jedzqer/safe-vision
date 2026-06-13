@@ -305,7 +305,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 privacySettings.isLabelBlocked(detection.className, labelProfile)
         }
         if (
-            overlayMode == ScreenOverlayMode.ACCESSIBILITY &&
+            overlayMode != ScreenOverlayMode.SYSTEM_ALERT_WINDOW &&
             privacySettings.isAccessibilityEmptyReverseFullscreenEnabled() &&
             detections.none { privacySettings.isLabelBlocked(it.className, labelProfile) }
         ) {
@@ -313,6 +313,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
         return overlayMode != ScreenOverlayMode.SYSTEM_ALERT_WINDOW &&
             privacySettings.isReverseLabelMissFullscreenEnabled() &&
+            detections.isNotEmpty() &&
             !hasReverseHit
     }
 }

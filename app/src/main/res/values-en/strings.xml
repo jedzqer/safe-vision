@@ -265,9 +265,9 @@
     <string name="settings_reverse_pre_render_summary">When enabled, reverse masking is rendered first, followed by stickers and other effects</string>
     <string name="settings_reverse_pre_render_enabled">Reverse first rendering enabled</string>
     <string name="settings_reverse_pre_render_disabled">Reverse first rendering disabled</string>
-    <string name="settings_reverse_fullscreen_fallback_summary">Control whether reverse masking falls back to a fullscreen mask when nothing relevant is hit. Both options can be enabled together.</string>
-    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">Fullscreen mask when accessibility screen detection finds nothing</string>
-    <string name="settings_reverse_fullscreen_fallback_reverse_miss">Fullscreen mask when no reverse label is hit in detection results (excluding normal overlay screen detection)</string>
+    <string name="settings_reverse_fullscreen_fallback_summary">Control whether reverse masking falls back to a fullscreen mask when nothing relevant is hit. Both options can be enabled together (not effective for normal overlay screen detection).</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">Fullscreen mask when screen detection finds nothing</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss">Fullscreen mask when content is detected but no reverse label is hit</string>
     <string name="settings_reverse_fullscreen_fallback_accessibility_empty_enabled">Fullscreen fallback for empty accessibility detection enabled</string>
     <string name="settings_reverse_fullscreen_fallback_accessibility_empty_disabled">Fullscreen fallback for empty accessibility detection disabled</string>
     <string name="settings_reverse_fullscreen_fallback_reverse_miss_enabled">Fullscreen fallback for missed reverse labels enabled</string>

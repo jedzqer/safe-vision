@@ -265,9 +265,9 @@
     <string name="settings_reverse_pre_render_summary">启用后，命中反向遮挡时先渲染反向遮挡，再渲染贴纸和其它效果</string>
     <string name="settings_reverse_pre_render_enabled">已开启反向优先渲染</string>
     <string name="settings_reverse_pre_render_disabled">已关闭反向优先渲染</string>
-    <string name="settings_reverse_fullscreen_fallback_summary">控制反向遮挡在未命中时是否退回为全屏遮挡，可同时开启以下两项</string>
-    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">无障碍屏幕识别无任何内容时，全屏遮挡</string>
-    <string name="settings_reverse_fullscreen_fallback_reverse_miss">识别结果未命中任何反向标签时，全屏遮挡（普通悬浮窗屏幕识别除外）</string>
+    <string name="settings_reverse_fullscreen_fallback_summary">控制反向遮挡在未命中时是否退回为全屏遮挡，可同时开启以下两项（普通悬浮窗屏幕识别无效）</string>
+    <string name="settings_reverse_fullscreen_fallback_accessibility_empty">屏幕识别无任何内容时，全屏遮挡</string>
+    <string name="settings_reverse_fullscreen_fallback_reverse_miss">识别到内容但未命中任何反向标签时，全屏遮挡</string>
     <string name="settings_reverse_fullscreen_fallback_accessibility_empty_enabled">已开启无障碍空识别全屏遮挡</string>
     <string name="settings_reverse_fullscreen_fallback_accessibility_empty_disabled">已关闭无障碍空识别全屏遮挡</string>
     <string name="settings_reverse_fullscreen_fallback_reverse_miss_enabled">已开启反向标签未命中全屏遮挡</string>
