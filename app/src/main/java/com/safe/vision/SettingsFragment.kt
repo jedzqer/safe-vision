@@ -173,6 +173,8 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    private var pendingSharedPresetImport = false
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -911,9 +913,25 @@ class SettingsFragment : Fragment() {
         setupAboutSection()
         setupSupportSection()
         setupInlineLabelCardDismiss()
+        registerSharedPresetImportListener()
         
         // 初始化调试日志
         DebugLogManager.addLog("设置", "设置页面已初始化")
+    }
+
+    private fun registerSharedPresetImportListener() {
+        parentFragmentManager.setFragmentResultListener(
+            MainActivity.IMPORT_PRESET_REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val sharedUris = bundle.parcelableArrayListCompat<Uri>(MainActivity.IMPORT_PRESET_BUNDLE_KEY)
+                .orEmpty()
+            if (sharedUris.isEmpty()) return@setFragmentResultListener
+            if (pendingSharedPresetImport) return@setFragmentResultListener
+            pendingSharedPresetImport = true
+            importSharedPresetPackages(sharedUris)
+            pendingSharedPresetImport = false
+        }
     }
 
     private fun setupInlineLabelCardDismiss() {
@@ -1378,7 +1396,7 @@ class SettingsFragment : Fragment() {
             return
         }
         try {
-            val safeName = name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            val safeName = name.replace(Regex("[^\\p{L}\\p{N}._-]"), "_")
             val file = File(context.cacheDir, "preset_${safeName.ifBlank { "export" }}.svpreset.zip")
             val zipped = buildPresetZip(file, rawJson)
             if (!zipped) {
@@ -1403,20 +1421,9 @@ class SettingsFragment : Fragment() {
 
     private fun importPresetPackage(uri: Uri) {
         val context = requireContext()
-        val content = try {
-            extractPresetManifestFromZip(uri)
-        } catch (e: Exception) {
-            DebugLogManager.addLog("设置", "读取预设包失败: ${e.message}")
-            null
-        }
-        if (content.isNullOrBlank()) {
+        val result = importPresetPackageInternal(uri)
+        if (result == null) {
             Toast.makeText(context, R.string.settings_privacy_preset_import_failed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val result = privacySettings.importPresetPackageJson(content)
-        if (result.importedCount <= 0) {
-            Toast.makeText(context, R.string.settings_privacy_preset_import_failed, Toast.LENGTH_SHORT).show()
-            DebugLogManager.addLog("设置", "导入预设包失败: 未导入任何预设")
             return
         }
         updatePrivacyPresetSummary()
@@ -1427,6 +1434,61 @@ class SettingsFragment : Fragment() {
             Toast.LENGTH_SHORT
         ).show()
         DebugLogManager.addLog("设置", "导入预设包成功: ${result.importedNames.joinToString(",")}")
+    }
+
+    private fun importSharedPresetPackages(uris: List<Uri>) {
+        val successfulNames = mutableListOf<String>()
+        var importedPresetCount = 0
+
+        uris.forEach { uri ->
+            val result = importPresetPackageInternal(uri) ?: return@forEach
+            importedPresetCount += result.importedCount
+            successfulNames += result.importedNames
+        }
+
+        val context = requireContext()
+        if (importedPresetCount <= 0) {
+            Toast.makeText(context, R.string.settings_privacy_preset_import_failed, Toast.LENGTH_SHORT).show()
+            DebugLogManager.addLog("设置", "分享导入预设包失败: 未导入任何预设")
+            return
+        }
+
+        updatePrivacyPresetSummary()
+        refreshPrivacyUiFromSettings()
+        Toast.makeText(
+            context,
+            getString(R.string.settings_privacy_preset_import_success, importedPresetCount),
+            Toast.LENGTH_SHORT
+        ).show()
+        DebugLogManager.addLog("设置", "分享导入预设包成功: ${successfulNames.joinToString(",")}")
+    }
+
+    private fun importPresetPackageInternal(uri: Uri): PrivacySettingsManager.ImportResult? {
+        val context = requireContext()
+        val content = try {
+            extractPresetManifestFromZip(uri)
+        } catch (e: Exception) {
+            DebugLogManager.addLog("设置", "读取预设包失败: ${e.message}")
+            null
+        }
+        if (content.isNullOrBlank()) {
+            return null
+        }
+        val result = privacySettings.importPresetPackageJson(content)
+        if (result.importedCount <= 0) {
+            DebugLogManager.addLog("设置", "导入预设包失败: 未导入任何预设")
+            return null
+        }
+        return result
+    }
+
+    private inline fun <reified T : android.os.Parcelable> Bundle.parcelableArrayListCompat(key: String): ArrayList<T>? {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            getParcelableArrayList(key, T::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableArrayList(key)
+        }
     }
 
     private fun buildPresetZip(targetFile: File, rawJson: String): Boolean {

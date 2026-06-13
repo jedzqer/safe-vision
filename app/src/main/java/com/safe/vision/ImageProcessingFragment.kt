@@ -74,6 +74,7 @@ class ImageProcessingFragment : Fragment() {
     private var completedBatchVideos: Int = 0
     private var pendingScreenCaptureAfterOverlayPermission = false
     private var pendingScreenDetectionAfterNotificationPermission = false
+    private var pendingAutoProcessAfterShare = false
     
     private lateinit var batchManager: BatchProcessingManager
     private lateinit var batchResultsAdapter: BatchResultsAdapter
@@ -306,6 +307,16 @@ class ImageProcessingFragment : Fragment() {
             ScreenDetectionStateHolder.state.collect { state ->
                 updateScreenDetectionUi(state)
             }
+        }
+
+        parentFragmentManager.setFragmentResultListener(
+            MainActivity.SHARE_IMAGES_REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val sharedUris = bundle.parcelableArrayListCompat<Uri>(MainActivity.SHARE_IMAGES_BUNDLE_KEY)
+                .orEmpty()
+            if (sharedUris.isEmpty()) return@setFragmentResultListener
+            handleSharedImages(sharedUris)
         }
 
         updateScreenDetectionUi(ScreenDetectionStateHolder.state.value)
@@ -758,7 +769,12 @@ class ImageProcessingFragment : Fragment() {
             progressBar.max = 100
             progressBar.progress = 0
             runButton.isEnabled = true
+            if (pendingAutoProcessAfterShare) {
+                pendingAutoProcessAfterShare = false
+                processSelection()
+            }
         } catch (e: IOException) {
+            pendingAutoProcessAfterShare = false
             e.printStackTrace()
             DebugLogManager.addLog("错误", "加载图片失败: ${e.message}")
             Toast.makeText(
@@ -914,6 +930,7 @@ class ImageProcessingFragment : Fragment() {
     
     private fun handleBatchImagesSelected(uris: List<Uri>) {
         DebugLogManager.addLog("批量选择", "选择了 ${uris.size} 张图片")
+        pendingAutoProcessAfterShare = false
 
         selectedBitmap = null
         selectedBytes = null
@@ -942,6 +959,51 @@ class ImageProcessingFragment : Fragment() {
             getString(R.string.batch_processing_started, uris.size),
             Toast.LENGTH_SHORT
         ).show()
+    }
+
+    private fun handleSharedImages(uris: List<Uri>) {
+        val filteredUris = mediaSelectionHelper.filterSupportedImageUris(uris)
+        val skippedCount = uris.size - filteredUris.size
+        if (skippedCount > 0) {
+            Toast.makeText(
+                requireContext(),
+                getString(R.string.image_processing_filtered_unsupported_files, skippedCount),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        if (filteredUris.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.image_processing_no_usable_image, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        DebugLogManager.addLog("图片分享", "接收到来自其他应用的 ${filteredUris.size} 张图片")
+        resolveNameConflictsBeforeProcessing(filteredUris) { resolvedUris ->
+            if (resolvedUris.isEmpty()) {
+                Toast.makeText(
+                    requireContext(),
+                    R.string.image_processing_duplicate_images_skipped,
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@resolveNameConflictsBeforeProcessing
+            }
+
+            if (resolvedUris.size == 1) {
+                pendingAutoProcessAfterShare = true
+                handleSingleImageSelected(resolvedUris.first())
+            } else {
+                pendingAutoProcessAfterShare = false
+                handleBatchImagesSelected(resolvedUris)
+            }
+        }
+    }
+
+    private inline fun <reified T : android.os.Parcelable> Bundle.parcelableArrayListCompat(key: String): ArrayList<T>? {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            getParcelableArrayList(key, T::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableArrayList(key)
+        }
     }
     
     private fun updateBatchUI(state: BatchProcessingManager.BatchProcessingState) {
