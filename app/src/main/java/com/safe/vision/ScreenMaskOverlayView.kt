@@ -57,6 +57,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         if (localReverseMode != null && !reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
+        if (localReverseMode != null) {
+            drawReverseOutlines(canvas, localReverseMode)
+        }
         canvas.restore()
     }
 
@@ -208,7 +211,11 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             applyEffect(canvas, bitmap, task.renderMode, task.drawRect, task)
         }
         if (task.drawOutline) {
-            BlurEffects.drawRectOutline(canvas, task.drawRect)
+            if (task.usesEyeStrip && task.eyePath != null) {
+                BlurEffects.drawPathOutline(canvas, task.eyePath, task.drawRect)
+            } else {
+                BlurEffects.drawRectOutline(canvas, task.drawRect)
+            }
         }
     }
 
@@ -278,15 +285,19 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             } else {
                 clearRegion(canvas, clearRegion.rect)
             }
+        }
+    }
 
-            if (clearRegion.drawOutline) {
-                if (clearRegion.circular) {
-                    BlurEffects.drawCircularOutline(canvas, clearRegion.rect)
-                } else if (clearRegion.path != null) {
-                    BlurEffects.drawPathOutline(canvas, clearRegion.path, clearRegion.rect)
-                } else {
-                    BlurEffects.drawRectOutline(canvas, clearRegion.rect)
-                }
+    private fun drawReverseOutlines(canvas: Canvas, mode: Int) {
+        if (mode == PrivacySettingsManager.BLUR_MODE_STICKER) return
+        reverseRegions.forEach { clearRegion ->
+            if (!clearRegion.drawOutline) return@forEach
+            if (clearRegion.circular) {
+                BlurEffects.drawCircularOutline(canvas, clearRegion.rect)
+            } else if (clearRegion.path != null) {
+                BlurEffects.drawPathOutline(canvas, clearRegion.path, clearRegion.rect)
+            } else {
+                BlurEffects.drawRectOutline(canvas, clearRegion.rect)
             }
         }
     }

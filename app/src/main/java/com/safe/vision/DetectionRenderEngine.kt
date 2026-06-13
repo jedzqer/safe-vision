@@ -226,10 +226,15 @@ class DetectionRenderEngine(
             }
         }
 
-        if (reverseRects.isNotEmpty() && !preRenderReverse) {
-            return applyReverseMask(outputBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks)
+        val finalBitmap = if (reverseRects.isNotEmpty() && !preRenderReverse) {
+            applyReverseMask(outputBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks)
+        } else {
+            outputBitmap
         }
-        return outputBitmap
+        if (reverseRects.isNotEmpty()) {
+            drawReverseOutlines(Canvas(finalBitmap), reverseRects, modeToUse, ::shouldOutline)
+        }
+        return finalBitmap
     }
 
     private fun renderNormalTask(
@@ -283,7 +288,11 @@ class DetectionRenderEngine(
                 applyEffect(task.drawRect)
             }
             if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                BlurEffects.drawRectOutline(canvas, task.drawRect, rotationDegrees = task.boxRotationDegrees)
+                if (task.clipPath != null) {
+                    BlurEffects.drawPathOutline(canvas, task.clipPath, task.drawRect)
+                } else {
+                    BlurEffects.drawRectOutline(canvas, task.drawRect, rotationDegrees = task.boxRotationDegrees)
+                }
             }
         }
     }
@@ -347,16 +356,27 @@ class DetectionRenderEngine(
             } else {
                 outputCanvas.drawBitmap(base, item.rect, item.rect, null)
             }
-            if (shouldOutline(item.label) && mode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-                if (item.circular) BlurEffects.drawCircularOutline(outputCanvas, item.rect)
-                else if (item.clipPath != null) {
-                    BlurEffects.drawPathOutline(outputCanvas, item.clipPath, item.rect)
-                } else {
-                    BlurEffects.drawRectOutline(outputCanvas, item.rect, rotationDegrees = item.rotationDegrees)
-                }
-            }
         }
         return output
+    }
+
+    private fun drawReverseOutlines(
+        canvas: Canvas,
+        rects: List<ReverseRect>,
+        mode: Int,
+        shouldOutline: (String) -> Boolean
+    ) {
+        if (mode == PrivacySettingsManager.BLUR_MODE_STICKER) return
+        rects.forEach { item ->
+            if (!shouldOutline(item.label)) return@forEach
+            if (item.circular) {
+                BlurEffects.drawCircularOutline(canvas, item.rect)
+            } else if (item.clipPath != null) {
+                BlurEffects.drawPathOutline(canvas, item.clipPath, item.rect)
+            } else {
+                BlurEffects.drawRectOutline(canvas, item.rect, rotationDegrees = item.rotationDegrees)
+            }
+        }
     }
 
     private fun applyFullscreenMask(
