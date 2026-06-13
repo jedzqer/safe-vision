@@ -39,12 +39,10 @@ class YoloOnnxRunner(
     private val inputName: String
     private val executionProvider: String
     private val inputArea = modelInputSize * modelInputSize
-    private val floatValues = FloatArray(3 * inputArea)
-    private val floatBuffer = FloatBuffer.wrap(floatValues)
-    private val pixels = IntArray(inputArea)
     private val optimizedModelPath: String =
         File(context.cacheDir, modelConfig.optimizedFileName).absolutePath
     private val cpuThreads = DetectionConfig.defaultCpuThreadCount()
+    private val runLock = Any()
     private var resizedBitmap: Bitmap? = null
     private var resizedCanvas: Canvas? = null
     private val resizeDstRect = Rect(0, 0, modelInputSize, modelInputSize)
@@ -64,6 +62,12 @@ class YoloOnnxRunner(
     }
 
     fun run(bitmap: Bitmap, enrichFaceLandmarks: Boolean = true): List<Detection> {
+        return synchronized(runLock) {
+            runInternal(bitmap, enrichFaceLandmarks)
+        }
+    }
+
+    private fun runInternal(bitmap: Bitmap, enrichFaceLandmarks: Boolean): List<Detection> {
         val startTime = System.currentTimeMillis()
         val (inputTensor, meta) = preprocess(bitmap)
 
@@ -107,7 +111,7 @@ class YoloOnnxRunner(
                     "模型检测",
                     "检测完成: 输入=${bitmap.width}x${bitmap.height}, 推理=${inferenceTime}ms, 总耗时=${totalTime}ms, 结果=${detections.size}"
                 )
-                
+
                 return detections
             }
         }
@@ -122,6 +126,10 @@ class YoloOnnxRunner(
         val width = sourceBitmap.width
         val height = sourceBitmap.height
         val squareSize = max(width, height)
+
+        val pixels = IntArray(inputArea)
+        val floatValues = FloatArray(3 * inputArea)
+        val floatBuffer = FloatBuffer.wrap(floatValues)
 
         if (resizedBitmap == null) {
             resizedBitmap = Bitmap.createBitmap(modelInputSize, modelInputSize, Bitmap.Config.ARGB_8888)

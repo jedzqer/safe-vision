@@ -27,9 +27,7 @@ class FaceLandmarkOnnxRunner(
     private val session: OrtSession
     private val inputName: String
     private val inputArea = inputSize * inputSize
-    private val floatValues = FloatArray(3 * inputArea)
-    private val floatBuffer = FloatBuffer.wrap(floatValues)
-    private val pixels = IntArray(inputArea)
+    private val runLock = Any()
     private val priors: FloatArray = buildPriors(inputSize)
     private val confidenceThreshold = DetectionConfig.FaceLandmark.CONFIDENCE_THRESHOLD
     private val nmsThreshold = DetectionConfig.FaceLandmark.NMS_THRESHOLD
@@ -50,10 +48,19 @@ class FaceLandmarkOnnxRunner(
 
     fun run(bitmap: Bitmap): List<FaceDetection> {
         if (bitmap.width <= 1 || bitmap.height <= 1) return emptyList()
+        return synchronized(runLock) {
+            runInternal(bitmap)
+        }
+    }
+
+    private fun runInternal(bitmap: Bitmap): List<FaceDetection> {
         val source = if (bitmap.config == Bitmap.Config.ARGB_8888) bitmap else {
             bitmap.copy(Bitmap.Config.ARGB_8888, false)
         }
         val scaled = Bitmap.createScaledBitmap(source, inputSize, inputSize, true)
+        val floatValues = FloatArray(3 * inputArea)
+        val floatBuffer = FloatBuffer.wrap(floatValues)
+        val pixels = IntArray(inputArea)
         try {
             scaled.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
             for (i in 0 until inputArea) {

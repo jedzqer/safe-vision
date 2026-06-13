@@ -330,7 +330,12 @@ class DetectionRenderEngine(
         }
         if (safeRects.isEmpty()) return base
 
-        val output = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+        val outputConfig = if (mode == PrivacySettingsManager.BLUR_MODE_BLACK) {
+            Bitmap.Config.RGB_565
+        } else {
+            Bitmap.Config.ARGB_8888
+        }
+        val output = Bitmap.createBitmap(base.width, base.height, outputConfig)
         val outputCanvas = Canvas(output)
         val fullRect = Rect(0, 0, base.width, base.height)
         when (mode) {
@@ -408,7 +413,12 @@ class DetectionRenderEngine(
         stickerProvider: (String?) -> Bitmap?,
         callbacks: RenderCallbacks
     ): Bitmap {
-        val output = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+        val outputConfig = if (mode == PrivacySettingsManager.BLUR_MODE_BLACK) {
+            Bitmap.Config.RGB_565
+        } else {
+            Bitmap.Config.ARGB_8888
+        }
+        val output = Bitmap.createBitmap(base.width, base.height, outputConfig)
         val outputCanvas = Canvas(output)
         val fullRect = Rect(0, 0, base.width, base.height)
         when (mode) {

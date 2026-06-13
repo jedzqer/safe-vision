@@ -139,10 +139,10 @@ class ScreenDetectionService : Service() {
                 if (resultCode == 0 || resultData == null) {
                     DebugLogManager.addLog("屏幕检测", "缺少录屏授权结果，无法启动", DebugLogManager.LogLevel.ERROR)
                     stopDetection(getString(R.string.screen_detection_status_start_failed))
-                    return START_REDELIVER_INTENT
+                    return START_NOT_STICKY
                 }
                 startDetection(resultCode, resultData)
-                return START_REDELIVER_INTENT
+                return START_NOT_STICKY
             }
         }
         DebugLogManager.addLog("屏幕检测", "服务重启时未收到启动参数，停止保活", DebugLogManager.LogLevel.WARN)

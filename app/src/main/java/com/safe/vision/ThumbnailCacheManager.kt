@@ -43,6 +43,7 @@ class ThumbnailCacheManager private constructor(context: Context) {
     private val diskDir = File(context.cacheDir, DISK_CACHE_DIR).apply { if (!exists()) mkdirs() }
     private val executor = Executors.newFixedThreadPool(3)
     private val inFlight = Collections.synchronizedMap(mutableMapOf<String, MutableList<(Bitmap?) -> Unit>>())
+    private val pathToDiskFiles = Collections.synchronizedMap(mutableMapOf<String, MutableSet<String>>())
 
     fun load(file: File, kind: MediaKind, targetPx: Int, callback: (Bitmap?) -> Unit) {
         val key = buildKey(file, kind, targetPx)
@@ -73,11 +74,19 @@ class ThumbnailCacheManager private constructor(context: Context) {
 
     fun invalidate(file: File) {
         val path = file.absolutePath
-        val keys = memoryCache.snapshot().keys.filter { it.startsWith(path) }
+        val keyPrefix = "$path|"
+        val keys = memoryCache.snapshot().keys.filter { it.startsWith(keyPrefix) }
         keys.forEach { memoryCache.remove(it) }
-        diskDir.listFiles()?.forEach { cacheFile ->
-            if (cacheFile.name.startsWith(hash(path))) {
-                cacheFile.delete()
+        val diskNames = pathToDiskFiles.remove(path)
+        if (diskNames != null) {
+            diskNames.forEach { name ->
+                File(diskDir, name).delete()
+            }
+        } else {
+            diskDir.listFiles()?.forEach { cacheFile ->
+                if (cacheFile.name.startsWith(hash(path))) {
+                    cacheFile.delete()
+                }
             }
         }
     }
@@ -85,6 +94,7 @@ class ThumbnailCacheManager private constructor(context: Context) {
     fun clearAll() {
         memoryCache.evictAll()
         diskDir.listFiles()?.forEach { it.delete() }
+        pathToDiskFiles.clear()
     }
 
     private fun loadInternal(file: File, kind: MediaKind, targetPx: Int, key: String): Bitmap? {
@@ -94,6 +104,7 @@ class ThumbnailCacheManager private constructor(context: Context) {
             if (cached != null) {
                 memoryCache.put(key, cached)
                 diskFile.setLastModified(System.currentTimeMillis())
+                registerDiskFile(file.absolutePath, diskFile.name)
                 return cached
             }
         }
@@ -105,8 +116,16 @@ class ThumbnailCacheManager private constructor(context: Context) {
 
         memoryCache.put(key, decoded)
         saveToDisk(decoded, diskFile)
+        registerDiskFile(file.absolutePath, diskFile.name)
         trimDiskCache()
         return decoded
+    }
+
+    private fun registerDiskFile(path: String, diskName: String) {
+        synchronized(pathToDiskFiles) {
+            val set = pathToDiskFiles.getOrPut(path) { mutableSetOf() }
+            set.add(diskName)
+        }
     }
 
     private fun decodeImage(file: File, targetPx: Int): Bitmap? {
