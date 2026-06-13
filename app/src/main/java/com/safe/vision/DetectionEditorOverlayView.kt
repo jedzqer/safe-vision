@@ -27,6 +27,7 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
     private var items: MutableList<EditableDetection> = mutableListOf()
     private var imageMatrix: Matrix = Matrix()
     private var inverseMatrix: Matrix = Matrix()
+    private var inverseValid: Boolean = false
     private var imageBounds: RectF = RectF()
 
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -82,13 +83,13 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         items = list
         imageMatrix = Matrix(matrix)
         imageBounds = RectF(0f, 0f, bitmapWidth.toFloat(), bitmapHeight.toFloat())
-        imageMatrix.invert(inverseMatrix)
+        inverseValid = imageMatrix.invert(inverseMatrix)
         invalidate()
     }
 
     fun setImageMatrix(matrix: Matrix) {
         imageMatrix = Matrix(matrix)
-        imageMatrix.invert(inverseMatrix)
+        inverseValid = imageMatrix.invert(inverseMatrix)
         invalidate()
     }
 
@@ -216,6 +217,9 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
     }
 
     private fun mapPointToImage(x: Float, y: Float): android.graphics.PointF {
+        if (!inverseValid) {
+            return android.graphics.PointF(x, y)
+        }
         val pts = floatArrayOf(x, y)
         inverseMatrix.mapPoints(pts)
         return android.graphics.PointF(pts[0], pts[1])
@@ -224,9 +228,34 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
     private fun findHitItem(imageX: Float, imageY: Float): EditableDetection? {
         for (i in items.indices.reversed()) {
             val item = items[i]
-            if (item.rect.contains(imageX, imageY)) return item
+            val rotation = item.boxRotationDegrees ?: 0f
+            if (abs(rotation) > 0.01f) {
+                if (pointInRotatedRect(imageX, imageY, item.rect, rotation)) return item
+            } else {
+                if (item.rect.contains(imageX, imageY)) return item
+            }
         }
         return null
+    }
+
+    private fun pointInRotatedRect(
+        px: Float,
+        py: Float,
+        rect: RectF,
+        rotationDegrees: Float
+    ): Boolean {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val radians = Math.toRadians(-rotationDegrees.toDouble())
+        val cosA = kotlin.math.cos(radians).toFloat()
+        val sinA = kotlin.math.sin(radians).toFloat()
+        val dx = px - cx
+        val dy = py - cy
+        val localX = dx * cosA - dy * sinA
+        val localY = dx * sinA + dy * cosA
+        val halfW = rect.width() / 2f
+        val halfH = rect.height() / 2f
+        return localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH
     }
 
     private fun resolveHandle(item: EditableDetection, touchX: Float, touchY: Float): ResizeHandle {
@@ -267,15 +296,21 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
     }
 
     private fun clampRect(src: RectF): RectF {
-        val w = src.width().coerceAtLeast(minSizePx)
-        val h = src.height().coerceAtLeast(minSizePx)
+        val boundsW = imageBounds.width()
+        val boundsH = imageBounds.height()
+        val w = src.width().coerceAtLeast(minSizePx).coerceAtMost(boundsW)
+        val h = src.height().coerceAtLeast(minSizePx).coerceAtMost(boundsH)
         var left = src.left
         var top = src.top
         if (left < imageBounds.left) left = imageBounds.left
         if (top < imageBounds.top) top = imageBounds.top
         if (left + w > imageBounds.right) left = imageBounds.right - w
         if (top + h > imageBounds.bottom) top = imageBounds.bottom - h
-        return RectF(left, top, left + w, top + h)
+        var right = left + w
+        var bottom = top + h
+        if (right > imageBounds.right) right = imageBounds.right
+        if (bottom > imageBounds.bottom) bottom = imageBounds.bottom
+        return RectF(left, top, right, bottom)
     }
 
     private fun isEyeMode(item: EditableDetection): Boolean {

@@ -55,12 +55,16 @@ object BlurEffects {
         }
     }
 
-    private val outlinePaint: Paint by lazy {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val outlinePaint: ThreadLocal<Paint> = object : ThreadLocal<Paint>() {
+        override fun initialValue(): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeJoin = Paint.Join.ROUND
             strokeCap = Paint.Cap.ROUND
         }
+    }
+
+    private val blackPaint: ThreadLocal<Paint> = object : ThreadLocal<Paint>() {
+        override fun initialValue(): Paint = Paint().apply { style = Paint.Style.FILL }
     }
 
     fun clampRect(rect: Rect, width: Int, height: Int): Rect {
@@ -253,8 +257,9 @@ object BlurEffects {
     ) {
         if (rect.width() <= 0 || rect.height() <= 0) return
         val stroke = outlineStrokeWidth(rect)
-        outlinePaint.color = color
-        outlinePaint.strokeWidth = stroke
+        val paint = outlinePaint.get() ?: Paint().also { outlinePaint.set(it) }
+        paint.color = color
+        paint.strokeWidth = stroke
         val insetRect = RectF(
             rect.left + stroke / 2f,
             rect.top + stroke / 2f,
@@ -263,9 +268,9 @@ object BlurEffects {
         )
         if (insetRect.width() <= 0f || insetRect.height() <= 0f) return
         if (abs(rotationDegrees) > 0.01f) {
-            canvas.drawPath(rotatedRectPath(insetRect, rotationDegrees), outlinePaint)
+            canvas.drawPath(rotatedRectPath(insetRect, rotationDegrees), paint)
         } else {
-            canvas.drawRect(insetRect, outlinePaint)
+            canvas.drawRect(insetRect, paint)
         }
     }
 
@@ -274,16 +279,18 @@ object BlurEffects {
         val stroke = outlineStrokeWidth(rect)
         val radius = hypot(rect.width() / 2f, rect.height() / 2f) - stroke / 2f
         if (radius <= 0f) return
-        outlinePaint.color = color
-        outlinePaint.strokeWidth = stroke
-        canvas.drawCircle(rect.exactCenterX(), rect.exactCenterY(), radius, outlinePaint)
+        val paint = outlinePaint.get() ?: Paint().also { outlinePaint.set(it) }
+        paint.color = color
+        paint.strokeWidth = stroke
+        canvas.drawCircle(rect.exactCenterX(), rect.exactCenterY(), radius, paint)
     }
 
     fun drawPathOutline(canvas: Canvas, path: Path, boundsRect: Rect, color: Int = Color.RED) {
         if (boundsRect.width() <= 0 || boundsRect.height() <= 0) return
-        outlinePaint.color = color
-        outlinePaint.strokeWidth = outlineStrokeWidth(boundsRect)
-        canvas.drawPath(path, outlinePaint)
+        val paint = outlinePaint.get() ?: Paint().also { outlinePaint.set(it) }
+        paint.color = color
+        paint.strokeWidth = outlineStrokeWidth(boundsRect)
+        canvas.drawPath(path, paint)
     }
 
     fun drawUnionOutline(
@@ -313,14 +320,16 @@ object BlurEffects {
             outlineStrokeWidth(rect)
         }
 
-        outlinePaint.color = color
-        outlinePaint.strokeWidth = minStroke
-        canvas.drawPath(unionPath, outlinePaint)
+        val paint = outlinePaint.get() ?: Paint().also { outlinePaint.set(it) }
+        paint.color = color
+        paint.strokeWidth = minStroke
+        canvas.drawPath(unionPath, paint)
     }
 
     fun drawBlack(canvas: Canvas, rect: Rect, color: Int = Color.BLACK) {
         if (rect.width() <= 0 || rect.height() <= 0) return
-        val paint = Paint().apply { this.color = color }
+        val paint = blackPaint.get() ?: Paint().also { blackPaint.set(it) }
+        paint.color = color
         canvas.drawRect(rect, paint)
     }
 
@@ -337,24 +346,29 @@ object BlurEffects {
         )
 
         val mosaic = Bitmap.createBitmap(region.width, region.height, Bitmap.Config.ARGB_8888)
-        val mosaicCanvas = Canvas(mosaic)
-        val paint = Paint()
+        try {
+            val mosaicCanvas = Canvas(mosaic)
+            val paint = Paint()
 
-        for (x in 0 until region.width step blockSize) {
-            for (y in 0 until region.height step blockSize) {
-                val pixel = region.getPixel(x, y)
-                val block = Rect(
-                    x,
-                    y,
-                    (x + blockSize).coerceAtMost(region.width),
-                    (y + blockSize).coerceAtMost(region.height)
-                )
-                paint.color = pixel or (0xff shl 24)
-                mosaicCanvas.drawRect(block, paint)
+            for (x in 0 until region.width step blockSize) {
+                for (y in 0 until region.height step blockSize) {
+                    val pixel = region.getPixel(x, y)
+                    val block = Rect(
+                        x,
+                        y,
+                        (x + blockSize).coerceAtMost(region.width),
+                        (y + blockSize).coerceAtMost(region.height)
+                    )
+                    paint.color = pixel or (0xff shl 24)
+                    mosaicCanvas.drawRect(block, paint)
+                }
             }
-        }
 
-        canvas.drawBitmap(mosaic, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+            canvas.drawBitmap(mosaic, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+        } finally {
+            if (!region.isRecycled) region.recycle()
+            if (!mosaic.isRecycled) mosaic.recycle()
+        }
     }
 
     fun drawGaussian(canvas: Canvas, source: Bitmap, rect: Rect, radius: Int = 12) {
@@ -368,8 +382,16 @@ object BlurEffects {
             safeRect.width(),
             safeRect.height()
         )
-        val blurred = gaussianBlur(region, radius)
-        canvas.drawBitmap(blurred, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+        val blurred = try {
+            gaussianBlur(region, radius)
+        } finally {
+            if (!region.isRecycled) region.recycle()
+        }
+        try {
+            canvas.drawBitmap(blurred, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+        } finally {
+            if (!blurred.isRecycled) blurred.recycle()
+        }
     }
 
     fun drawSticker(
@@ -433,6 +455,7 @@ object BlurEffects {
         val height = region.height
         val pixels = IntArray(width * height)
         region.getPixels(pixels, 0, width, 0, 0, width, height)
+        if (!region.isRecycled) region.recycle()
 
         val gray = IntArray(width * height) { index ->
             val color = pixels[index]
@@ -474,8 +497,12 @@ object BlurEffects {
         }
 
         val sobelBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        sobelBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        canvas.drawBitmap(sobelBitmap, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+        try {
+            sobelBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+            canvas.drawBitmap(sobelBitmap, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+        } finally {
+            if (!sobelBitmap.isRecycled) sobelBitmap.recycle()
+        }
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
