@@ -127,16 +127,16 @@ safe-app/
 
 ### 屏幕实时检测
 
-- `ScreenDetectionService.kt`：屏幕检测前台服务，包含检测循环、MediaProjection 管理、应用切换自动暂停/恢复机制
+- `ScreenDetectionService.kt`：屏幕检测前台服务，包含检测循环、MediaProjection 管理。通过 `MediaProjection.Callback.onCapturedContentVisibilityChanged`（Android 14+）检测屏幕捕获内容可见性变化，内容不可见时自动抑制遮挡显示
 - `ScreenDetectionState.kt`：屏幕检测状态
-- `ScreenAccessibilityOverlayService.kt`：无障碍遮挡服务，同时负责监听应用切换事件并通过 StateFlow 发布前台应用包名
+- `ScreenAccessibilityOverlayService.kt`：无障碍遮挡服务
 - `ScreenOverlayController.kt`：无障碍遮挡 / 普通悬浮窗遮挡调度
 - `ScreenOverlayWindowHost.kt`：`WindowManager` 悬浮窗宿主
 - `ScreenMaskOverlayView.kt`：屏幕遮挡绘制 View
 - `ScreenPrivacyMaskRenderer.kt`：屏幕遮挡渲染逻辑
 - `ScreenOverlayMode.kt`：屏幕遮挡模式定义
 
-**应用切换自动暂停/恢复**：当用户从 Safe Vision 切换到其他应用时，`ScreenAccessibilityOverlayService` 捕获 `TYPE_WINDOW_STATE_CHANGED` 事件并通过 `foregroundAppPackage` StateFlow 发布。`ScreenDetectionService.startAppSwitchMonitoring()` 监听该流，非本应用时调用 `pauseDetection()`（清除遮挡层、暂停帧采集和 YOLO 推理），切回时调用 `resumeDetection()` 恢复检测。相关配置项在 `AppSettingsManager` 中（`isScreenLossAutoPauseEnabled`、`pausePollIntervalMs`）。
+**屏幕捕获内容可见性**：当用户切换应用时，系统通过 `MediaProjection.Callback.onCapturedContentVisibilityChanged` 通知捕获内容可见性变化。`ScreenDetectionService` 侦听该回调：内容不可见时暂停遮挡显示并清除遮挡层，内容重新可见时恢复遮挡（含 150ms 延迟防止闪烁）。该机制依赖 `isScreenLossAutoPauseEnabled` 配置项（`AppSettingsManager`），仅在 Android 14+ 生效。
 
 ### 媒体库与浏览
 

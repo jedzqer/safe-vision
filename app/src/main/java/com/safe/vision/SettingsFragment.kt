@@ -1482,14 +1482,6 @@ class SettingsFragment : Fragment() {
         return result
     }
 
-    private inline fun <reified T : android.os.Parcelable> Bundle.parcelableArrayListCompat(key: String): ArrayList<T>? {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            getParcelableArrayList(key, T::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            getParcelableArrayList(key)
-        }
-    }
 
     private fun buildPresetZip(targetFile: File, rawJson: String): Boolean {
         val context = requireContext()

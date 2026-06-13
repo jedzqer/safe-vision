@@ -238,6 +238,13 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
+            if (!isCapturedContentVisible && captureVisibilityMonitoringEnabled) {
+                withContext(Dispatchers.Default) {
+                    imageReader?.acquireLatestImage()?.close()
+                }
+                delay(200)
+                continue
+            }
             val cycleStart = android.os.SystemClock.elapsedRealtime()
             val bitmap = withContext(Dispatchers.Default) {
                 imageReader?.acquireLatestImage()?.use { image ->

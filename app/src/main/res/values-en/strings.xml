@@ -67,15 +67,13 @@
     <string name="screen_detection_status_error">Screen detection error: %1$s</string>
     <string name="screen_detection_status_accessibility_missing">Accessibility overlay service is not connected. Unable to display screen masking.</string>
     <string name="screen_detection_status_overlay_missing">Overlay permission is not ready. Unable to display screen masking.</string>
-    <string name="screen_detection_status_paused">Detection paused - %1$s</string>
-    <string name="screen_detection_status_resuming">Detection resuming</string>
     <string name="screen_detection_accessibility_service_label">Safe Vision Screen Mask</string>
     <string name="screen_detection_accessibility_service_desc">Provides a touch-through privacy mask for screen detection.</string>
     <string name="screen_detection_accessibility_service_summary">Enable to show a non-blocking privacy mask during screen detection.</string>
     <string name="screen_detection_notification_title">Realtime Screen Detection</string>
     <string name="screen_detection_notification_starting">Preparing screen detection</string>
     <string name="screen_detection_notification_running">Screen detection is running</string>
-    <string name="screen_detection_notification_paused">Detection paused</string>
+
     <string name="screen_detection_notification_channel_name">Screen Detection</string>
     <string name="screen_detection_notification_channel_desc">Shows the realtime screen detection status</string>
     <string name="screen_detection_action_stop">Stop</string>

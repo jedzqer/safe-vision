@@ -997,14 +997,6 @@ class ImageProcessingFragment : Fragment() {
         }
     }
 
-    private inline fun <reified T : android.os.Parcelable> Bundle.parcelableArrayListCompat(key: String): ArrayList<T>? {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            getParcelableArrayList(key, T::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            getParcelableArrayList(key)
-        }
-    }
     
     private fun updateBatchUI(state: BatchProcessingManager.BatchProcessingState) {
         if (progressMode != ProgressMode.BATCH_IMAGE) return
