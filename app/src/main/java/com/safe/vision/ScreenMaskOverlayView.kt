@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
@@ -271,14 +272,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
         reverseRegions.forEach { clearRegion ->
             if (clearRegion.circular) {
-                BlurEffects.drawWithCircularClip(canvas, clearRegion.rect) {
-                    clearRegion(canvas, clearRegion.rect)
-                }
+                clearCircularRegion(canvas, clearRegion.rect)
             } else if (clearRegion.path != null) {
-                val checkpoint = canvas.save()
-                canvas.clipPath(clearRegion.path)
-                clearRegion(canvas, clearRegion.rect)
-                canvas.restoreToCount(checkpoint)
+                clearPathRegion(canvas, clearRegion.path)
             } else {
                 clearRegion(canvas, clearRegion.rect)
             }
@@ -286,6 +282,8 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             if (clearRegion.drawOutline) {
                 if (clearRegion.circular) {
                     BlurEffects.drawCircularOutline(canvas, clearRegion.rect)
+                } else if (clearRegion.path != null) {
+                    BlurEffects.drawPathOutline(canvas, clearRegion.path, clearRegion.rect)
                 } else {
                     BlurEffects.drawRectOutline(canvas, clearRegion.rect)
                 }
@@ -296,5 +294,19 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     private fun clearRegion(canvas: Canvas, rect: Rect) {
         if (rect.width() <= 0 || rect.height() <= 0) return
         canvas.drawRect(rect, clearPaint)
+    }
+
+    private fun clearCircularRegion(canvas: Canvas, rect: Rect) {
+        if (rect.width() <= 0 || rect.height() <= 0) return
+        canvas.drawCircle(
+            rect.exactCenterX(),
+            rect.exactCenterY(),
+            kotlin.math.hypot(rect.width() / 2f, rect.height() / 2f),
+            clearPaint
+        )
+    }
+
+    private fun clearPathRegion(canvas: Canvas, path: Path) {
+        canvas.drawPath(path, clearPaint)
     }
 }
