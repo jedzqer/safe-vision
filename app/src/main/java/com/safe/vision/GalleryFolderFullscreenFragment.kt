@@ -602,7 +602,12 @@ class GalleryFolderFullscreenFragment : Fragment() {
         return try {
             val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return false
             val metadataFile = buildMetadataFile(imageFile)
-            val processed = privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+            val processed = withContext(Dispatchers.Default) {
+                privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+            }
+            if (processed !== bitmap && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
             val mimeType = when (imageFile.extension.lowercase(Locale.getDefault())) {
                 "png" -> "image/png"
                 "webp" -> "image/webp"
@@ -640,6 +645,9 @@ class GalleryFolderFullscreenFragment : Fragment() {
                     throw IllegalStateException("压缩失败")
                 }
             } ?: throw IllegalStateException("无法写入输出流")
+            if (!processed.isRecycled) {
+                processed.recycle()
+            }
             true
         } catch (e: Exception) {
             insertedUri?.let { appContext.contentResolver.delete(it, null, null) }

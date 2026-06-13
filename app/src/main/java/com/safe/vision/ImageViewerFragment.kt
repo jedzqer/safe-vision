@@ -81,6 +81,15 @@ class ImageViewerFragment : Fragment() {
     private lateinit var privacyProcessor: ImagePrivacyProcessor
     private var currentProcessedBitmap: Bitmap? = null
     private var currentMetadataFile: File? = null
+
+    private fun releaseCurrentProcessedBitmap() {
+        val previous = currentProcessedBitmap
+        if (previous != null && !previous.isRecycled) {
+            previous.recycle()
+        }
+        currentProcessedBitmap = null
+    }
+
     private var pendingTargetPath: String? = null
     private val browseHistory = ArrayDeque<Int>()
     private lateinit var appSettings: AppSettingsManager
@@ -504,7 +513,7 @@ class ImageViewerFragment : Fragment() {
             animeMetadataBadge.visibility = View.GONE
             btnEnterFullscreen.visibility = View.GONE
             hideVideoSeekControls()
-            currentProcessedBitmap = null
+            releaseCurrentProcessedBitmap()
             currentMetadataFile = null
             cancelRandomPlay()
             randomCountdownView.visibility = View.GONE
@@ -557,7 +566,7 @@ class ImageViewerFragment : Fragment() {
         }
 
         if (isVideo) {
-            currentProcessedBitmap = null
+            releaseCurrentProcessedBitmap()
             animeMetadataBadge.visibility = View.GONE
             btnEnterFullscreen.visibility = View.GONE
             fullSizeVideo.stopPlayback()
@@ -617,8 +626,17 @@ class ImageViewerFragment : Fragment() {
                     updateAnimeMetadataBadge(metadataFile)
 
                     // 应用隐私遮挡
-                    val processedBitmap = privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
-                    if (!isAdded) return@launch
+                    val processedBitmap = withContext(Dispatchers.Default) {
+                        privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+                    }
+                    if (!bitmap.isRecycled) {
+                        bitmap.recycle()
+                    }
+                    if (!isAdded) {
+                        if (!processedBitmap.isRecycled) processedBitmap.recycle()
+                        return@launch
+                    }
+                    releaseCurrentProcessedBitmap()
                     currentProcessedBitmap = processedBitmap
 
                     // 先重置矩阵再设置位图，避免新图先按旧缩放状态绘制一帧导致"闪一下"
@@ -914,7 +932,12 @@ class ImageViewerFragment : Fragment() {
         return try {
             val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return false
             val metadataFile = findMetadataFile(imageFile)
-            val processedBitmap = privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+            val processedBitmap = withContext(Dispatchers.Default) {
+                privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
+            }
+            if (processedBitmap !== bitmap && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
             val mimeType = when (imageFile.extension.lowercase(Locale.getDefault())) {
                 "png" -> "image/png"
                 "webp" -> "image/webp"
@@ -954,6 +977,9 @@ class ImageViewerFragment : Fragment() {
                     throw IllegalStateException("压缩失败")
                 }
             } ?: throw IllegalStateException("无法写入输出流")
+            if (!processedBitmap.isRecycled) {
+                processedBitmap.recycle()
+            }
             DebugLogManager.addLog("媒体浏览", "导出图片成功: ${imageFile.name}")
             true
         } catch (e: Exception) {
@@ -1035,7 +1061,10 @@ class ImageViewerFragment : Fragment() {
 
     private fun shareImage(mediaFile: File) {
         viewLifecycleOwner.lifecycleScope.launch {
-            val processedBitmap = currentProcessedBitmap ?: run {
+            val cached = currentProcessedBitmap
+            val processedBitmap = if (cached != null) {
+                cached
+            } else {
                 val bitmap = withContext(Dispatchers.IO) {
                     BitmapFactory.decodeFile(mediaFile.absolutePath)
                 }
@@ -1046,9 +1075,13 @@ class ImageViewerFragment : Fragment() {
                 }
                 val metadataFile = currentMetadataFile ?: findMetadataFile(mediaFile)
                 currentMetadataFile = metadataFile
-                privacyProcessor.applyPrivacyBlur(bitmap, metadataFile).also {
-                    currentProcessedBitmap = it
+                val processed = withContext(Dispatchers.Default) {
+                    privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
                 }
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+                processed
             }
 
             try {
@@ -1327,6 +1360,7 @@ class ImageViewerFragment : Fragment() {
         randomQueueBuildJob?.cancel()
         randomQueueBuildJob = null
         stopVideoProgressUpdates()
+        releaseCurrentProcessedBitmap()
         super.onDestroyView()
     }
 
