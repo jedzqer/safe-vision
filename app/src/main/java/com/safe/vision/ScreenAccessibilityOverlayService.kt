@@ -2,21 +2,8 @@ package com.safe.vision
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class ScreenAccessibilityOverlayService : AccessibilityService() {
-    companion object {
-        private val _foregroundAppPackage = MutableStateFlow<String?>(null)
-        val foregroundAppPackage: StateFlow<String?> = _foregroundAppPackage.asStateFlow()
-
-        private val _appSwitchEventCount = MutableStateFlow(0)
-        val appSwitchEventCount: StateFlow<Int> = _appSwitchEventCount.asStateFlow()
-    }
-
-    private var lastReportedPackage: String? = null
-
     override fun onServiceConnected() {
         super.onServiceConnected()
         ScreenOverlayController.bindAccessibilityService(this)
@@ -38,11 +25,7 @@ class ScreenAccessibilityOverlayService : AccessibilityService() {
 
     private fun handleWindowStateChanged(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString()
-        if (packageName != null && packageName != lastReportedPackage) {
-            lastReportedPackage = packageName
-            _foregroundAppPackage.value = packageName
-            _appSwitchEventCount.value = _appSwitchEventCount.value + 1
-
+        if (packageName != null) {
             DebugLogManager.addLog(
                 "屏幕检测",
                 "应用切换: $packageName (className: ${event.className})"

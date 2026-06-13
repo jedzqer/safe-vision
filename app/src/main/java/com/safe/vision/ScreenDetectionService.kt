@@ -16,6 +16,7 @@ import android.hardware.display.VirtualDisplay
 import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
+import android.media.projection.MediaProjection.Callback
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
@@ -27,9 +28,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,6 +46,7 @@ class ScreenDetectionService : Service() {
         private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 300L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_TIMEOUT_MS = 2_000L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_POLL_MS = 100L
+        private const val VISIBILITY_RESUME_GRACE_MS = 150L
         // 静帧跳过：把整帧缩到极小灰度图做差分，变化低于阈值则跳过整条 YOLO 链路
         private const val STATIC_FRAME_SIGNATURE_SIZE = 32
         private const val STATIC_FRAME_DIFF_THRESHOLD = 2.0
@@ -85,11 +84,9 @@ class ScreenDetectionService : Service() {
     private var analysisCanvas: Canvas? = null
     private var stagingBitmap: Bitmap? = null
     private val analysisDstRect = Rect()
-
-    // 暂停/恢复机制
-    private val _isPaused = MutableStateFlow(false)
-    val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
-    private var pausePollIntervalMs: Long = 100L
+    private var captureVisibilityMonitoringEnabled = false
+    private var isCapturedContentVisible = true
+    private var visibilityResumeAfterMs: Long = 0L
 
     // 静帧跳过：上一帧的小图灰度指纹与采样缓存
     private var signatureBitmap: Bitmap? = null
@@ -106,10 +103,16 @@ class ScreenDetectionService : Service() {
     // 去抖：仅在状态文案变化时刷新通知/状态/日志，避免每帧抢主线程做 notify()
     private var lastPublishedStatus: String? = null
 
-    private val projectionCallback = object : MediaProjection.Callback() {
+    private val projectionCallback = object : Callback() {
         override fun onStop() {
             DebugLogManager.addLog("屏幕检测", "MediaProjection 已停止")
             stopDetection(getString(R.string.screen_detection_status_stopped))
+        }
+
+        override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+            if (!captureVisibilityMonitoringEnabled || mediaProjection == null) return
+            handleCapturedContentVisibilityChanged(isVisible)
         }
     }
 
@@ -203,11 +206,14 @@ class ScreenDetectionService : Service() {
                 detectionIntervalMs = (appSettings.getScreenDetectionIntervalSeconds() * 1000f)
                     .toLong()
                     .coerceIn(10L, 1000L)
-                pausePollIntervalMs = appSettings.getScreenLossPausePollIntervalMs()
                 if (yoloRunner == null || currentVariant != variant) {
                     yoloRunner = YoloOnnxRunner(applicationContext, variant)
                     currentVariant = variant
                 }
+                captureVisibilityMonitoringEnabled = appSettings.isScreenLossAutoPauseEnabled() &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                isCapturedContentVisible = true
+                visibilityResumeAfterMs = 0L
 
                 DebugLogManager.addLog(
                     "屏幕检测",
@@ -215,11 +221,6 @@ class ScreenDetectionService : Service() {
                 )
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_running))
                 updateNotification(getString(R.string.screen_detection_notification_running))
-
-                // 启动应用切换监听（如果启用）
-                if (appSettings.isScreenLossAutoPauseEnabled()) {
-                    startAppSwitchMonitoring()
-                }
 
                 detectionLoop(variant)
             } catch (e: CancellationException) {
@@ -237,12 +238,6 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
-            // 检查暂停状态
-            if (_isPaused.value) {
-                delay(pausePollIntervalMs)
-                continue
-            }
-
             val cycleStart = android.os.SystemClock.elapsedRealtime()
             val bitmap = withContext(Dispatchers.Default) {
                 imageReader?.acquireLatestImage()?.use { image ->
@@ -317,6 +312,15 @@ class ScreenDetectionService : Service() {
     }
 
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
+        if (shouldSuppressOverlayForHiddenCapture()) {
+            ScreenOverlayController.clearMaskOverlays(overlayMode)
+            detectionWindow.clear()
+            overlayVisible = false
+            lastPositiveTimeMs = 0L
+            frame?.sourceBitmap?.recycle()
+            return
+        }
+
         val metrics = overlayMetrics ?: return
         val hasDetection = frame != null
         val hideTimeoutMs = when (overlayMode) {
@@ -401,7 +405,9 @@ class ScreenDetectionService : Service() {
         overlayVisible = false
         lastPositiveTimeMs = 0L
         lastPublishedStatus = null
-        _isPaused.value = false
+        captureVisibilityMonitoringEnabled = false
+        isCapturedContentVisible = true
+        visibilityResumeAfterMs = 0L
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
@@ -637,43 +643,27 @@ class ScreenDetectionService : Service() {
         val overlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame?
     )
 
-    private fun pauseDetection(reason: String) {
-        if (_isPaused.value) return
-        _isPaused.value = true
-        ScreenOverlayController.removeOverlayViews()
-        overlayVisible = false
-        ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_paused, reason))
-        updateNotification(getString(R.string.screen_detection_notification_paused))
-        DebugLogManager.addLog("屏幕检测", "检测已暂停: $reason")
+    private fun shouldSuppressOverlayForHiddenCapture(): Boolean {
+        if (!captureVisibilityMonitoringEnabled) return false
+        if (isCapturedContentVisible) return false
+        return android.os.SystemClock.elapsedRealtime() >= visibilityResumeAfterMs
     }
 
-    private fun resumeDetection() {
-        if (!_isPaused.value) return
-        _isPaused.value = false
-        lastSignature = null
-        ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_resuming))
-        updateNotification(getString(R.string.screen_detection_notification_running))
-        DebugLogManager.addLog("屏幕检测", "检测已恢复")
-    }
-
-    private fun startAppSwitchMonitoring() {
-        serviceScope.launch {
-            ScreenAccessibilityOverlayService.foregroundAppPackage.collect { packageName ->
-                if (packageName == null) return@collect
-
-                val isOurApp = packageName == BuildConfig.APPLICATION_ID
-                if (isOurApp) {
-                    if (_isPaused.value) {
-                        DebugLogManager.addLog("屏幕检测", "检测到本应用，恢复检测")
-                        resumeDetection()
-                    }
-                } else {
-                    if (!_isPaused.value) {
-                        DebugLogManager.addLog("屏幕检测", "检测到非本应用 ($packageName)，暂停检测")
-                        pauseDetection("应用切换")
-                    }
-                }
-            }
+    private fun handleCapturedContentVisibilityChanged(isVisible: Boolean) {
+        if (isCapturedContentVisible == isVisible) return
+        isCapturedContentVisible = isVisible
+        if (isVisible) {
+            visibilityResumeAfterMs =
+                android.os.SystemClock.elapsedRealtime() + VISIBILITY_RESUME_GRACE_MS
+            lastSignature = null
+            DebugLogManager.addLog("屏幕检测", "捕获内容重新可见，允许恢复遮挡")
+        } else {
+            visibilityResumeAfterMs = 0L
+            ScreenOverlayController.removeOverlayViews()
+            detectionWindow.clear()
+            overlayVisible = false
+            lastPositiveTimeMs = 0L
+            DebugLogManager.addLog("屏幕检测", "捕获内容不可见，暂停遮挡显示")
         }
     }
 
