@@ -148,22 +148,25 @@ object ScreenOverlayController {
 
     private fun getOrCreateSystemAlertWindowHost(context: Context): ScreenOverlayWindowHost? {
         systemAlertWindowHost?.let { return it }
-        if (!canDrawSystemAlertWindow(context)) return null
-        val appContext = context.applicationContext
-        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
+        synchronized(this) {
+            systemAlertWindowHost?.let { return it }
+            if (!canDrawSystemAlertWindow(context)) return null
+            val appContext = context.applicationContext
+            val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            val overlayContext = createOverlayWindowContext(appContext, overlayType)
+            val windowManager = overlayContext.getSystemService(WindowManager::class.java) ?: return null
+            return ScreenOverlayWindowHost(
+                context = overlayContext,
+                windowManager = windowManager,
+                windowType = overlayType,
+                touchThrough = false
+            ).also { systemAlertWindowHost = it }
         }
-        val overlayContext = createOverlayWindowContext(appContext, overlayType)
-        val windowManager = overlayContext.getSystemService(WindowManager::class.java) ?: return null
-        return ScreenOverlayWindowHost(
-            context = overlayContext,
-            windowManager = windowManager,
-            windowType = overlayType,
-            touchThrough = false
-        ).also { systemAlertWindowHost = it }
     }
 
     private fun createOverlayWindowContext(baseContext: Context, windowType: Int): Context {

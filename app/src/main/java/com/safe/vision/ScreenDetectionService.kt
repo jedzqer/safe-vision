@@ -86,6 +86,7 @@ class ScreenDetectionService : Service() {
     private val analysisDstRect = Rect()
     private var captureVisibilityMonitoringEnabled = false
     private var isCapturedContentVisible = true
+    private var pendingVisibilityResume = false
     private var visibilityResumeAfterMs: Long = 0L
 
     // 静帧跳过：上一帧的小图灰度指纹与采样缓存
@@ -213,6 +214,7 @@ class ScreenDetectionService : Service() {
                 captureVisibilityMonitoringEnabled = appSettings.isScreenLossAutoPauseEnabled() &&
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
                 isCapturedContentVisible = true
+                pendingVisibilityResume = false
                 visibilityResumeAfterMs = 0L
 
                 DebugLogManager.addLog(
@@ -238,7 +240,7 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
-            if (!isCapturedContentVisible && captureVisibilityMonitoringEnabled) {
+            if (captureVisibilityMonitoringEnabled && shouldSuppressOverlayForHiddenCapture()) {
                 withContext(Dispatchers.Default) {
                     imageReader?.acquireLatestImage()?.close()
                 }
@@ -414,6 +416,7 @@ class ScreenDetectionService : Service() {
         lastPublishedStatus = null
         captureVisibilityMonitoringEnabled = false
         isCapturedContentVisible = true
+        pendingVisibilityResume = false
         visibilityResumeAfterMs = 0L
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
@@ -652,19 +655,29 @@ class ScreenDetectionService : Service() {
 
     private fun shouldSuppressOverlayForHiddenCapture(): Boolean {
         if (!captureVisibilityMonitoringEnabled) return false
+        if (pendingVisibilityResume) {
+            if (android.os.SystemClock.elapsedRealtime() < visibilityResumeAfterMs) {
+                return true
+            }
+            pendingVisibilityResume = false
+            isCapturedContentVisible = true
+            return false
+        }
         if (isCapturedContentVisible) return false
-        return android.os.SystemClock.elapsedRealtime() >= visibilityResumeAfterMs
+        return true
     }
 
     private fun handleCapturedContentVisibilityChanged(isVisible: Boolean) {
-        if (isCapturedContentVisible == isVisible) return
-        isCapturedContentVisible = isVisible
         if (isVisible) {
+            if (isCapturedContentVisible && !pendingVisibilityResume) return
+            pendingVisibilityResume = true
             visibilityResumeAfterMs =
                 android.os.SystemClock.elapsedRealtime() + VISIBILITY_RESUME_GRACE_MS
             lastSignature = null
-            DebugLogManager.addLog("屏幕检测", "捕获内容重新可见，允许恢复遮挡")
+            DebugLogManager.addLog("屏幕检测", "捕获内容重新可见，延迟恢复遮挡")
         } else {
+            isCapturedContentVisible = false
+            pendingVisibilityResume = false
             visibilityResumeAfterMs = 0L
             ScreenOverlayController.removeOverlayViews()
             detectionWindow.clear()

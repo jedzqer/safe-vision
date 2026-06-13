@@ -94,9 +94,22 @@ internal class ScreenOverlayWindowHost(
         updateCaptureScale(metrics, frame.sourceBitmap)
         if (maskOverlayView == null) {
             maskOverlayView = createOverlayView()
-            windowManager.addView(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+            try {
+                windowManager.addView(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+            } catch (e: WindowManager.BadTokenException) {
+                DebugLogManager.addLog("屏幕遮挡", "addView 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
+                maskOverlayView = null
+                return
+            }
         } else {
-            windowManager.updateViewLayout(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+            try {
+                windowManager.updateViewLayout(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+            } catch (e: WindowManager.BadTokenException) {
+                DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
+                runCatching { windowManager.removeView(maskOverlayView) }
+                maskOverlayView = null
+                return
+            }
         }
         maskOverlayView?.let { view ->
             bindFullscreenFrame(view, frame, metrics, generation)
@@ -122,11 +135,22 @@ internal class ScreenOverlayWindowHost(
             val safeTask = if (safeRect == task.drawRect) task else task.copy(drawRect = safeRect)
             val slot = takeBestSlot(safeTask, safeRect, metrics) ?: obtainRegionSlot(metrics)
             attachRegionSlotIfNeeded(slot)
+            if (!slot.attached) {
+                return@forEach
+            }
             slot.inUse = true
             slot.view.alpha = 0f
             slot.view.visibility = View.INVISIBLE
             updateRegionLayout(slot.layoutParams, safeRect, metrics)
-            windowManager.updateViewLayout(slot.view, slot.layoutParams)
+            try {
+                windowManager.updateViewLayout(slot.view, slot.layoutParams)
+            } catch (e: WindowManager.BadTokenException) {
+                DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 区域遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
+                runCatching { windowManager.removeView(slot.view) }
+                slot.attached = false
+                slot.inUse = false
+                return@forEach
+            }
             bindRegionTask(slot.view, frame.sourceBitmap, safeTask, safeRect, metrics, generation)
             slot.view.alpha = 1f
             slot.view.visibility = View.VISIBLE
@@ -275,8 +299,13 @@ internal class ScreenOverlayWindowHost(
 
     private fun attachRegionSlotIfNeeded(slot: RegionOverlaySlot) {
         if (slot.attached) return
-        windowManager.addView(slot.view, slot.layoutParams)
-        slot.attached = true
+        try {
+            windowManager.addView(slot.view, slot.layoutParams)
+            slot.attached = true
+        } catch (e: WindowManager.BadTokenException) {
+            DebugLogManager.addLog("屏幕遮挡", "addView 区域遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
+            slot.attached = false
+        }
     }
 
     private fun clampTaskRect(region: Rect, width: Int, height: Int): Rect {
