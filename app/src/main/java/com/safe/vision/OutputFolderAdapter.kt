@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
@@ -14,20 +15,10 @@ class OutputFolderAdapter(
     private val onLongClick: (OutputFolderItem) -> Unit
 ) : RecyclerView.Adapter<OutputFolderAdapter.OutputFolderViewHolder>() {
 
-    private val items = mutableListOf<OutputFolderItem>()
+    private val differ = AsyncListDiffer(this, DiffCallback())
 
     fun submitList(newItems: List<OutputFolderItem>) {
-        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = items.size
-            override fun getNewListSize() = newItems.size
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                items[oldPos].name == newItems[newPos].name
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                items[oldPos] == newItems[newPos]
-        })
-        items.clear()
-        items.addAll(newItems)
-        diff.dispatchUpdatesTo(this)
+        differ.submitList(newItems.toList())
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): OutputFolderViewHolder {
@@ -36,10 +27,10 @@ class OutputFolderAdapter(
         return OutputFolderViewHolder(view)
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun getItemCount(): Int = differ.currentList.size
 
     override fun onBindViewHolder(holder: OutputFolderViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(differ.currentList[position])
     }
 
     override fun onViewRecycled(holder: OutputFolderViewHolder) {
@@ -91,5 +82,13 @@ class OutputFolderAdapter(
                 if (bitmap != null) imageView.setImageBitmap(bitmap) else imageView.setImageResource(placeholder)
             }
         }
+    }
+
+    private class DiffCallback : DiffUtil.ItemCallback<OutputFolderItem>() {
+        override fun areItemsTheSame(oldItem: OutputFolderItem, newItem: OutputFolderItem): Boolean =
+            oldItem.name == newItem.name
+
+        override fun areContentsTheSame(oldItem: OutputFolderItem, newItem: OutputFolderItem): Boolean =
+            oldItem == newItem
     }
 }

@@ -349,10 +349,13 @@ object BlurEffects {
         try {
             val mosaicCanvas = Canvas(mosaic)
             val paint = Paint()
+            val pixelCount = region.width * region.height
+            val pixels = IntArray(pixelCount)
+            region.getPixels(pixels, 0, region.width, 0, 0, region.width, region.height)
 
             for (x in 0 until region.width step blockSize) {
                 for (y in 0 until region.height step blockSize) {
-                    val pixel = region.getPixel(x, y)
+                    val pixel = pixels[y * region.width + x]
                     val block = Rect(
                         x,
                         y,

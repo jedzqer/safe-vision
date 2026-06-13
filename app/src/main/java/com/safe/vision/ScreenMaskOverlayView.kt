@@ -148,11 +148,11 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             sourceBitmap = bitmap
             changed = true
         }
-        if (drawTasks != tasks) {
+        if (drawTasks !== tasks) {
             drawTasks = tasks
             changed = true
         }
-        if (this.singleDrawTask != singleTask) {
+        if (this.singleDrawTask !== singleTask) {
             this.singleDrawTask = singleTask
             changed = true
         }
@@ -160,7 +160,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             this.reverseMode = reverseMode
             changed = true
         }
-        if (this.reverseRegions != reverseRegions) {
+        if (this.reverseRegions !== reverseRegions) {
             this.reverseRegions = reverseRegions
             changed = true
         }

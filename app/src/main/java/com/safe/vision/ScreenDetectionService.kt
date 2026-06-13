@@ -93,6 +93,9 @@ class ScreenDetectionService : Service() {
     private var signatureBitmap: Bitmap? = null
     private var signatureCanvas: Canvas? = null
     private val signaturePixels = IntArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
+    private val signatureBufferA = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
+    private val signatureBufferB = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
+    private var useBufferA = true
     private var lastSignature: FloatArray? = null
     private val signatureDstRect = Rect(0, 0, STATIC_FRAME_SIGNATURE_SIZE, STATIC_FRAME_SIGNATURE_SIZE)
 
@@ -551,13 +554,13 @@ class ScreenDetectionService : Service() {
         signatureCanvas?.drawBitmap(bitmap, null, signatureDstRect, null)
         small.getPixels(signaturePixels, 0, size, 0, 0, size, size)
 
-        val current = FloatArray(signaturePixels.size)
+        val current = if (useBufferA) signatureBufferA else signatureBufferB
+        useBufferA = !useBufferA
         for (i in signaturePixels.indices) {
             val pixel = signaturePixels[i]
             val r = (pixel shr 16) and 0xFF
             val g = (pixel shr 8) and 0xFF
             val b = pixel and 0xFF
-            // 加权灰度，整数即可，存为 Float 便于差分
             current[i] = (r * 0.299f + g * 0.587f + b * 0.114f)
         }
 
