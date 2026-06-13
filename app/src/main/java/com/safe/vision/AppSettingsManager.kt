@@ -34,9 +34,12 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_SCREEN_DETECTION_ANIME_MODEL = "screen_detection_anime_model"
         private const val KEY_SCREEN_DETECTION_INTERVAL_SECONDS = "screen_detection_interval_seconds"
         private const val KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW = "screen_detection_use_system_alert_window"
+        private const val KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED = "screen_loss_auto_pause_enabled"
+        private const val KEY_SCREEN_LOSS_PAUSE_POLL_INTERVAL_MS = "screen_loss_pause_poll_interval_ms"
         private const val DEFAULT_SCREEN_DETECTION_INTERVAL_SECONDS = 0.5f
         private const val MIN_SCREEN_DETECTION_INTERVAL_SECONDS = 0.01f
         private const val MAX_SCREEN_DETECTION_INTERVAL_SECONDS = 1.0f
+        private const val DEFAULT_SCREEN_LOSS_PAUSE_POLL_INTERVAL_MS = 100L
         private const val KEY_SELECTED_OUTPUT_FOLDER = "selected_output_folder"
         private const val KEY_CUSTOM_IMAGE_FOLDERS = "custom_image_folders"
         private const val KEY_VIEWER_VERTICAL_SCROLL = "viewer_vertical_scroll"
@@ -164,6 +167,29 @@ class AppSettingsManager private constructor(context: Context) {
         } else {
             ScreenOverlayMode.ACCESSIBILITY
         }
+    }
+
+    fun isScreenLossAutoPauseEnabled(): Boolean {
+        return sharedPreferences.getBoolean(KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED, true)
+    }
+
+    fun setScreenLossAutoPauseEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getScreenLossPausePollIntervalMs(): Long {
+        return sharedPreferences.getLong(
+            KEY_SCREEN_LOSS_PAUSE_POLL_INTERVAL_MS,
+            DEFAULT_SCREEN_LOSS_PAUSE_POLL_INTERVAL_MS
+        ).coerceIn(50L, 500L)
+    }
+
+    fun setScreenLossPausePollIntervalMs(intervalMs: Long) {
+        sharedPreferences.edit()
+            .putLong(KEY_SCREEN_LOSS_PAUSE_POLL_INTERVAL_MS, intervalMs.coerceIn(50L, 500L))
+            .apply()
     }
 
     fun isFileSystemPickerEnabled(): Boolean {

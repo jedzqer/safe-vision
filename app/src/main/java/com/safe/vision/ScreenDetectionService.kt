@@ -27,6 +27,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +85,11 @@ class ScreenDetectionService : Service() {
     private var analysisCanvas: Canvas? = null
     private var stagingBitmap: Bitmap? = null
     private val analysisDstRect = Rect()
+
+    // 暂停/恢复机制
+    private val _isPaused = MutableStateFlow(false)
+    val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
+    private var pausePollIntervalMs: Long = 100L
 
     // 静帧跳过：上一帧的小图灰度指纹与采样缓存
     private var signatureBitmap: Bitmap? = null
@@ -195,6 +203,7 @@ class ScreenDetectionService : Service() {
                 detectionIntervalMs = (appSettings.getScreenDetectionIntervalSeconds() * 1000f)
                     .toLong()
                     .coerceIn(10L, 1000L)
+                pausePollIntervalMs = appSettings.getScreenLossPausePollIntervalMs()
                 if (yoloRunner == null || currentVariant != variant) {
                     yoloRunner = YoloOnnxRunner(applicationContext, variant)
                     currentVariant = variant
@@ -206,6 +215,11 @@ class ScreenDetectionService : Service() {
                 )
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_running))
                 updateNotification(getString(R.string.screen_detection_notification_running))
+
+                // 启动应用切换监听（如果启用）
+                if (appSettings.isScreenLossAutoPauseEnabled()) {
+                    startAppSwitchMonitoring()
+                }
 
                 detectionLoop(variant)
             } catch (e: CancellationException) {
@@ -223,6 +237,12 @@ class ScreenDetectionService : Service() {
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
         while (serviceScope.isActive) {
+            // 检查暂停状态
+            if (_isPaused.value) {
+                delay(pausePollIntervalMs)
+                continue
+            }
+
             val cycleStart = android.os.SystemClock.elapsedRealtime()
             val bitmap = withContext(Dispatchers.Default) {
                 imageReader?.acquireLatestImage()?.use { image ->
@@ -381,6 +401,7 @@ class ScreenDetectionService : Service() {
         overlayVisible = false
         lastPositiveTimeMs = 0L
         lastPublishedStatus = null
+        _isPaused.value = false
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
@@ -615,5 +636,45 @@ class ScreenDetectionService : Service() {
         val detectionCount: Int,
         val overlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame?
     )
+
+    private fun pauseDetection(reason: String) {
+        if (_isPaused.value) return
+        _isPaused.value = true
+        ScreenOverlayController.removeOverlayViews()
+        overlayVisible = false
+        ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_paused, reason))
+        updateNotification(getString(R.string.screen_detection_notification_paused))
+        DebugLogManager.addLog("屏幕检测", "检测已暂停: $reason")
+    }
+
+    private fun resumeDetection() {
+        if (!_isPaused.value) return
+        _isPaused.value = false
+        lastSignature = null
+        ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_resuming))
+        updateNotification(getString(R.string.screen_detection_notification_running))
+        DebugLogManager.addLog("屏幕检测", "检测已恢复")
+    }
+
+    private fun startAppSwitchMonitoring() {
+        serviceScope.launch {
+            ScreenAccessibilityOverlayService.foregroundAppPackage.collect { packageName ->
+                if (packageName == null) return@collect
+
+                val isOurApp = packageName == "com.safe.vision"
+                if (isOurApp) {
+                    if (_isPaused.value) {
+                        DebugLogManager.addLog("屏幕检测", "检测到本应用，恢复检测")
+                        resumeDetection()
+                    }
+                } else {
+                    if (!_isPaused.value) {
+                        DebugLogManager.addLog("屏幕检测", "检测到非本应用 ($packageName)，暂停检测")
+                        pauseDetection("应用切换")
+                    }
+                }
+            }
+        }
+    }
 
 }
