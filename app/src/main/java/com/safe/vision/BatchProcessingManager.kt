@@ -33,6 +33,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
     private val _results = MutableStateFlow<List<BatchProcessingResult>>(emptyList())
     val results: StateFlow<List<BatchProcessingResult>> = _results.asStateFlow()
     
+    @Volatile
     private var processingQueue = Channel<BatchProcessingTask>(256)
     private val isProcessing = AtomicBoolean(false)
     private val processedCount = AtomicInteger(0)
@@ -42,6 +43,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
     
     @Volatile
     private var yoloRunner: YoloOnnxRunner? = null
+    @Volatile
     private var isModelLoaded = false
     private var loadedModelVariant: DetectionModelVariant? = null
     private var processingJob: Job? = null
@@ -116,10 +118,15 @@ class BatchProcessingManager private constructor(private val context: Context) {
      * 取消批量处理
      */
     fun cancelProcessing() {
-        processingJob?.cancel()
-        processingQueue.close()
+        val job = processingJob
+        val queue = processingQueue
+        job?.cancel()
+        queue.close()
+        clearQueue(queue)
         processingQueue = Channel(256)
-        clearQueue()
+        if (processingJob === job) {
+            processingJob = null
+        }
         isProcessing.set(false)
         _processingState.value = BatchProcessingState.Cancelled
         DebugLogManager.addLog("批量处理", "批量处理已取消")
@@ -183,6 +190,8 @@ class BatchProcessingManager private constructor(private val context: Context) {
                     
                     _processingState.value = BatchProcessingState.Completed
                     DebugLogManager.addLog("批量处理", "批量处理完成，共处理 ${processedCount.get()} 张图片")
+                } catch (_: CancellationException) {
+                    DebugLogManager.addLog("批量处理", "批量处理协程已取消")
                 } catch (e: Exception) {
                     DebugLogManager.addLog("批量处理", "批量处理失败: ${e.message}")
                     DebugLogManager.addLog("批量处理", "异常堆栈: ${e.stackTraceToString()}")
@@ -355,9 +364,9 @@ class BatchProcessingManager private constructor(private val context: Context) {
         }
     }
 
-    private fun clearQueue() {
+    private fun clearQueue(queue: Channel<BatchProcessingTask>) {
         while (true) {
-            val task = processingQueue.tryReceive().getOrNull() ?: break
+            val task = queue.tryReceive().getOrNull() ?: break
             safeDeleteTempFile(task.tempFile)
         }
     }

@@ -16,8 +16,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -46,8 +48,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
     val progress: StateFlow<VideoProgress> = _progress.asStateFlow()
 
     private val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile
     private var processingJob: Job? = null
     private var yoloRunner: YoloOnnxRunner? = null
+    @Volatile
     private var isModelLoaded = false
     private var loadedModelVariant: DetectionModelVariant? = null
     private var modelVariantLabel: String = "unknown"
@@ -109,13 +113,14 @@ class VideoProcessingManager private constructor(private val context: Context) {
         * 启动视频处理任务
         */
     fun startProcessing(uri: Uri, options: VideoProcessingOptions) {
-        cancel()
         detectionProcessor.resetSessionFlags()
 
-        processingJob = processingScope.launch {
+        val previousJob = processingJob
+        val job = processingScope.launch(start = CoroutineStart.LAZY) {
             val sessionId = LocalDateTime.now().format(sessionIdFormatter)
             val sessionTag = "[SESSION $sessionId]"
             try {
+                previousJob?.cancelAndJoin()
                 _state.value = VideoProcessingState.Initializing
                 _progress.value = VideoProgress(0, 0, 0)
 
@@ -178,19 +183,27 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 DebugLogManager.addLog("视频处理", "[SESSION $sessionId] 异常堆栈: ${e.stackTraceToString()}")
                 _state.value = VideoProcessingState.Error(userMessage)
             } finally {
-                processingJob = null
+                clearProcessingJobReference(currentCoroutineContext()[Job])
             }
         }
+        processingJob = job
+        job.start()
     }
 
     fun cancel() {
         val job = processingJob ?: return
         if (!job.isActive) {
-            processingJob = null
+            clearProcessingJobReference(job)
             return
         }
         job.cancel()
         DebugLogManager.addLog("视频处理", "视频处理已取消")
+    }
+
+    private fun clearProcessingJobReference(expectedJob: Job?) {
+        if (processingJob === expectedJob) {
+            processingJob = null
+        }
     }
 
     private suspend fun ensureModelLoaded() {
@@ -325,14 +338,14 @@ class VideoProcessingManager private constructor(private val context: Context) {
             )
 
             val muxer = android.media.MediaMuxer(tempOutputFile.absolutePath, android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            val audioTrackIndex = VideoCodecUtils.addAudioTrackIfPresent(context, muxer, uri)
+            val audioTrackCopier = VideoCodecUtils.AudioTrackCopier.create(context, muxer, uri)
+            val audioTrackIndex = audioTrackCopier?.trackIndex ?: -1
             var videoTrackIndex = -1
             var muxerStarted = false
             var muxerStopped = false
             var muxerReleased = false
             var encoderStopped = false
             var encoderReleased = false
-            var audioCopied = false
             var completedSuccessfully = false
             DebugLogManager.addLog(
                 "视频处理",
@@ -388,6 +401,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                         }
                         outputIndex >= 0 -> {
                             if (bufferInfo.size > 0 && muxerStarted && videoTrackIndex >= 0) {
+                                audioTrackCopier?.copySamplesUpTo(bufferInfo.presentationTimeUs)
                                 val encodedData = activeEncoder.getOutputBuffer(outputIndex)
                                     ?: throw IllegalStateException("编码缓冲区为空")
                                 encodedData.position(bufferInfo.offset)
@@ -563,10 +577,9 @@ class VideoProcessingManager private constructor(private val context: Context) {
                     joinAll(*allJobs.toTypedArray())
                 }
                 currentCoroutineContext().ensureActive()
-                if (audioTrackIndex != -1 && muxerStarted && !audioCopied) {
-                    DebugLogManager.addLog("视频处理", "$sessionTag [MUXER] 开始复制音轨")
-                    VideoCodecUtils.copyAudioToMuxer(context, muxer, audioTrackIndex, uri)
-                    audioCopied = true
+                if (audioTrackIndex != -1 && muxerStarted) {
+                    DebugLogManager.addLog("视频处理", "$sessionTag [MUXER] 补齐剩余音轨样本")
+                    audioTrackCopier?.finish()
                 }
                 _progress.value = _progress.value.copy(percentage = 99)
                 if (muxerStarted && !muxerStopped) {
@@ -626,6 +639,8 @@ class VideoProcessingManager private constructor(private val context: Context) {
                         .onFailure { e -> DebugLogManager.addLog("视频处理", "$sessionTag [CLEANUP] muxer release 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
                     muxerReleased = true
                 }
+                runCatching { audioTrackCopier?.close() }
+                    .onFailure { e -> DebugLogManager.addLog("视频处理", "$sessionTag [CLEANUP] audio extractor 关闭失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
                 if (!completedSuccessfully) {
                     runCatching {
                         if (tempOutputFile.exists()) {

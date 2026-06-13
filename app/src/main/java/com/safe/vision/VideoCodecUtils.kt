@@ -20,6 +20,83 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 object VideoCodecUtils {
+    class AudioTrackCopier private constructor(
+        private val extractor: MediaExtractor,
+        private val muxer: android.media.MediaMuxer,
+        val trackIndex: Int
+    ) : Closeable {
+        private val buffer = ByteBuffer.allocate(1024 * 1024)
+        private val info = MediaCodec.BufferInfo()
+        private var finished = false
+
+        fun copySamplesUpTo(maxPresentationTimeUs: Long) {
+            copyInternal { sampleTimeUs -> sampleTimeUs <= maxPresentationTimeUs }
+        }
+
+        fun finish() {
+            copyInternal { true }
+        }
+
+        override fun close() {
+            extractor.release()
+        }
+
+        private fun copyInternal(shouldCopy: (Long) -> Boolean) {
+            if (finished) return
+            while (true) {
+                val sampleTimeUs = extractor.sampleTime
+                if (sampleTimeUs < 0) {
+                    finished = true
+                    return
+                }
+                if (!shouldCopy(sampleTimeUs)) {
+                    return
+                }
+                buffer.clear()
+                val sampleSize = extractor.readSampleData(buffer, 0)
+                if (sampleSize < 0) {
+                    finished = true
+                    return
+                }
+                buffer.position(0)
+                buffer.limit(sampleSize)
+                info.offset = 0
+                info.size = sampleSize
+                info.presentationTimeUs = sampleTimeUs
+                info.flags = extractor.sampleFlags
+                muxer.writeSampleData(trackIndex, buffer, info)
+                extractor.advance()
+            }
+        }
+
+        companion object {
+            fun create(
+                context: Context,
+                muxer: android.media.MediaMuxer,
+                uri: Uri
+            ): AudioTrackCopier? {
+                val extractor = MediaExtractor()
+                try {
+                    extractor.setDataSource(context, uri, null)
+                    for (i in 0 until extractor.trackCount) {
+                        val format = extractor.getTrackFormat(i)
+                        val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                        if (mime.startsWith("audio/")) {
+                            extractor.selectTrack(i)
+                            val trackIndex = muxer.addTrack(format)
+                            return AudioTrackCopier(extractor, muxer, trackIndex)
+                        }
+                    }
+                    extractor.release()
+                    return null
+                } catch (t: Throwable) {
+                    runCatching { extractor.release() }
+                    throw t
+                }
+            }
+        }
+    }
+
     class SurfaceInputWriter(
         private val inputSurface: Surface
     ) : Closeable {
@@ -267,56 +344,61 @@ object VideoCodecUtils {
 
     fun addAudioTrackIfPresent(context: Context, muxer: android.media.MediaMuxer, uri: Uri): Int {
         val extractor = MediaExtractor()
-        extractor.setDataSource(context, uri, null)
-        var audioTrackIndex = -1
-        for (i in 0 until extractor.trackCount) {
-            val format = extractor.getTrackFormat(i)
-            val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-            if (mime.startsWith("audio/")) {
-                extractor.selectTrack(i)
-                audioTrackIndex = muxer.addTrack(format)
-                break
+        try {
+            extractor.setDataSource(context, uri, null)
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/")) {
+                    extractor.selectTrack(i)
+                    return muxer.addTrack(format)
+                }
             }
+            return -1
+        } finally {
+            extractor.release()
         }
-        extractor.release()
-        return audioTrackIndex
     }
 
     fun copyAudioToMuxer(context: Context, muxer: android.media.MediaMuxer, trackIndex: Int, uri: Uri) {
         if (trackIndex == -1) return
         val extractor = MediaExtractor()
-        extractor.setDataSource(context, uri, null)
-        var audioTrack = -1
-        for (i in 0 until extractor.trackCount) {
-            val format = extractor.getTrackFormat(i)
-            val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-            if (mime.startsWith("audio/")) {
-                extractor.selectTrack(i)
-                audioTrack = i
-                break
+        try {
+            extractor.setDataSource(context, uri, null)
+            var audioTrack = -1
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/")) {
+                    extractor.selectTrack(i)
+                    audioTrack = i
+                    break
+                }
             }
-        }
-        if (audioTrack == -1) {
-            extractor.release()
-            return
-        }
+            if (audioTrack == -1) {
+                return
+            }
 
-        val buffer = ByteBuffer.allocate(1024 * 1024)
-        val info = MediaCodec.BufferInfo()
-        while (true) {
-            buffer.clear()
-            val sampleSize = extractor.readSampleData(buffer, 0)
-            if (sampleSize < 0) {
-                break
+            val buffer = ByteBuffer.allocate(1024 * 1024)
+            val info = MediaCodec.BufferInfo()
+            while (true) {
+                buffer.clear()
+                val sampleSize = extractor.readSampleData(buffer, 0)
+                if (sampleSize < 0) {
+                    break
+                }
+                buffer.position(0)
+                buffer.limit(sampleSize)
+                info.offset = 0
+                info.size = sampleSize
+                info.presentationTimeUs = extractor.sampleTime
+                info.flags = extractor.sampleFlags
+                muxer.writeSampleData(trackIndex, buffer, info)
+                extractor.advance()
             }
-            info.offset = 0
-            info.size = sampleSize
-            info.presentationTimeUs = extractor.sampleTime
-            info.flags = extractor.sampleFlags
-            muxer.writeSampleData(trackIndex, buffer, info)
-            extractor.advance()
+        } finally {
+            extractor.release()
         }
-        extractor.release()
     }
 
 }

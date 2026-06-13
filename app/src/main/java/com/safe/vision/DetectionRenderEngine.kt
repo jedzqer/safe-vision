@@ -235,6 +235,9 @@ class DetectionRenderEngine(
         } else {
             outputBitmap
         }
+        if (finalBitmap !== outputBitmap && outputBitmap !== sourceBitmap && !outputBitmap.isRecycled) {
+            outputBitmap.recycle()
+        }
         if (reverseRects.isNotEmpty()) {
             val reverseOutlineShapes = collectReverseOutlineShapes(reverseRects, ::shouldOutline)
             if (reverseOutlineShapes.isNotEmpty()) {
