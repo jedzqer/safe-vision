@@ -136,7 +136,7 @@ safe-app/
 - `ScreenPrivacyMaskRenderer.kt`：屏幕遮挡渲染逻辑
 - `ScreenOverlayMode.kt`：屏幕遮挡模式定义
 
-**屏幕捕获内容可见性**：当用户切换应用时，系统通过 `MediaProjection.Callback.onCapturedContentVisibilityChanged` 通知捕获内容可见性变化。`ScreenDetectionService` 侦听该回调：内容不可见时暂停遮挡显示并清除遮挡层，内容重新可见时恢复遮挡（含 150ms 延迟防止闪烁）。该机制依赖 `isScreenLossAutoPauseEnabled` 配置项（`AppSettingsManager`），仅在 Android 14+ 生效。
+**屏幕捕获内容可见性**：当用户切换应用时，系统通过 `MediaProjection.Callback.onCapturedContentVisibilityChanged` 通知捕获内容可见性变化。`ScreenDetectionService` 侦听该回调：内容不可见时暂停遮挡显示并清除遮挡层，内容重新可见时恢复遮挡。该机制依赖 `isScreenLossAutoPauseEnabled` 配置项（`AppSettingsManager`），仅在 Android 14+ 生效。
 
 ### 媒体库与浏览
 
