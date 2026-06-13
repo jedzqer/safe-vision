@@ -31,10 +31,10 @@ class BatchProcessingService : Service() {
     companion object {
         const val CHANNEL_ID = "batch_processing_channel"
         const val NOTIFICATION_ID = 1001
-        const val ACTION_START_PROCESSING = "com.safe.vision.action.START_PROCESSING"
-        const val ACTION_CANCEL_PROCESSING = "com.safe.vision.action.CANCEL_PROCESSING"
-        const val EXTRA_URIS = "com.safe.vision.extra.URIS"
-        const val EXTRA_PREFERRED_DETECTED_FOLDER = "com.safe.vision.extra.PREFERRED_DETECTED_FOLDER"
+        const val ACTION_START_PROCESSING = "com.safe.vision2.action.START_PROCESSING"
+        const val ACTION_CANCEL_PROCESSING = "com.safe.vision2.action.CANCEL_PROCESSING"
+        const val EXTRA_URIS = "com.safe.vision2.extra.URIS"
+        const val EXTRA_PREFERRED_DETECTED_FOLDER = "com.safe.vision2.extra.PREFERRED_DETECTED_FOLDER"
         
         fun startProcessing(
             context: Context,

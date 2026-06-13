@@ -34,8 +34,8 @@ import kotlinx.coroutines.withContext
 
 class ScreenDetectionService : Service() {
     companion object {
-        private const val ACTION_START = "com.safe.vision.action.START_SCREEN_DETECTION"
-        private const val ACTION_STOP = "com.safe.vision.action.STOP_SCREEN_DETECTION"
+        private const val ACTION_START = "com.safe.vision2.action.START_SCREEN_DETECTION"
+        private const val ACTION_STOP = "com.safe.vision2.action.STOP_SCREEN_DETECTION"
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_RESULT_DATA = "extra_result_data"
         private const val NOTIFICATION_CHANNEL_ID = "screen_detection_channel"

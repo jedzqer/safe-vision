@@ -25,7 +25,7 @@ Safe Vision 是一个 Android 本地敏感内容检测与隐私遮挡应用，�
 | Gradle | 8.10+ |
 | compileSdk / targetSdk | 36 |
 | minSdk | 24 |
-| 包名 | `com.safe.vision` |
+| 包名 | `com.safe.vision2` |
 
 常用命令：
 
@@ -167,10 +167,10 @@ safe-app/
 应用内主要输出目录：
 
 - 有检测结果图片：当前选中的输出文件夹，通常为 `SafeNet` 或用户自建文件夹
-- 无检测结果图片：`Android/data/com.safe.vision/files/no_detection/`
-- 视频输出：`Android/data/com.safe.vision/files/SafeVideo/`
-- 调试日志：`Android/data/com.safe.vision/files/logs/`
-- 错误报告：`Android/data/com.safe.vision/files/logs/error_reports/`
+- 无检测结果图片：`Android/data/com.safe.vision2/files/no_detection/`
+- 视频输出：`Android/data/com.safe.vision2/files/SafeVideo/`
+- 调试日志：`Android/data/com.safe.vision2/files/logs/`
+- 错误报告：`Android/data/com.safe.vision2/files/logs/error_reports/`
 
 系统导出目录：
 

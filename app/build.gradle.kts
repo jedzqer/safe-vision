@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.safe.vision"
+        applicationId = "com.safe.vision2"
         minSdk = 24
         targetSdk = 36
         versionCode = 53

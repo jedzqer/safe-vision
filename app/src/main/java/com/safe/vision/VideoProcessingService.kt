@@ -32,15 +32,15 @@ class VideoProcessingService : Service() {
     companion object {
         const val CHANNEL_ID = "video_processing_channel"
         const val NOTIFICATION_ID = 1002
-        const val ACTION_START_PROCESSING = "com.safe.vision.action.START_VIDEO_PROCESSING"
-        const val ACTION_CANCEL_PROCESSING = "com.safe.vision.action.CANCEL_VIDEO_PROCESSING"
-        const val EXTRA_URIS = "com.safe.vision.extra.VIDEO_URIS"
-        const val EXTRA_BLOCKED_LABELS = "com.safe.vision.extra.VIDEO_BLOCKED_LABELS"
-        const val EXTRA_REVERSE_LABELS = "com.safe.vision.extra.VIDEO_REVERSE_LABELS"
-        const val EXTRA_BLUR_MODE = "com.safe.vision.extra.VIDEO_BLUR_MODE"
-        const val EXTRA_SKIP_STRIDE = "com.safe.vision.extra.VIDEO_SKIP_STRIDE"
-        const val EXTRA_HIGH_LOAD_MODE = "com.safe.vision.extra.VIDEO_HIGH_LOAD_MODE"
-        const val EXTRA_LABEL_OVERRIDES = "com.safe.vision.extra.VIDEO_LABEL_OVERRIDES"
+        const val ACTION_START_PROCESSING = "com.safe.vision2.action.START_VIDEO_PROCESSING"
+        const val ACTION_CANCEL_PROCESSING = "com.safe.vision2.action.CANCEL_VIDEO_PROCESSING"
+        const val EXTRA_URIS = "com.safe.vision2.extra.VIDEO_URIS"
+        const val EXTRA_BLOCKED_LABELS = "com.safe.vision2.extra.VIDEO_BLOCKED_LABELS"
+        const val EXTRA_REVERSE_LABELS = "com.safe.vision2.extra.VIDEO_REVERSE_LABELS"
+        const val EXTRA_BLUR_MODE = "com.safe.vision2.extra.VIDEO_BLUR_MODE"
+        const val EXTRA_SKIP_STRIDE = "com.safe.vision2.extra.VIDEO_SKIP_STRIDE"
+        const val EXTRA_HIGH_LOAD_MODE = "com.safe.vision2.extra.VIDEO_HIGH_LOAD_MODE"
+        const val EXTRA_LABEL_OVERRIDES = "com.safe.vision2.extra.VIDEO_LABEL_OVERRIDES"
 
         fun startProcessing(
             context: Context,
