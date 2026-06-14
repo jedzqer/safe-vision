@@ -93,7 +93,7 @@ object BlurEffects {
     }
 
     fun scaleRect(rect: Rect, scale: Float, surfaceWidth: Int, surfaceHeight: Int): Rect {
-        val safeScale = scale.coerceAtLeast(1f)
+        val safeScale = scale.coerceIn(0.01f, 10f)
         val safeRect = clampRect(rect, surfaceWidth, surfaceHeight)
         if (safeRect.width() <= 0 || safeRect.height() <= 0) return safeRect
         if (safeScale == 1f) return safeRect
