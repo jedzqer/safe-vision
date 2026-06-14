@@ -6,7 +6,8 @@ object FolderModels {
     const val SAFE_NET_DIR = "SafeNet"
     const val NO_DETECTION_DIR = "no_detection"
     const val SAFE_VIDEO_DIR = "SafeVideo"
-    val SYSTEM_DIRS = setOf(SAFE_NET_DIR, NO_DETECTION_DIR, SAFE_VIDEO_DIR)
+    const val LOGS_DIR = "logs"
+    val SYSTEM_DIRS = setOf(SAFE_NET_DIR, NO_DETECTION_DIR, SAFE_VIDEO_DIR, LOGS_DIR)
 }
 
 enum class FolderType {

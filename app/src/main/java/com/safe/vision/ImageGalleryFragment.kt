@@ -106,6 +106,7 @@ class ImageGalleryFragment : Fragment() {
         val videoTitle = getString(R.string.gallery_video_title)
         viewLifecycleOwner.lifecycleScope.launch {
             val rootDir = getRootDir()
+            syncDiscoveredFolders(rootDir)
             val customFolders = appSettingsManager.getCustomImageFolders()
             val selectableFolders = listOf(FolderModels.SAFE_NET_DIR) + customFolders
 
@@ -134,6 +135,18 @@ class ImageGalleryFragment : Fragment() {
             val allEmpty = built.all { it.count == 0 }
             emptyText.visibility = if (allEmpty) View.VISIBLE else View.GONE
             folderSummaryContainer.visibility = if (allEmpty) View.GONE else View.VISIBLE
+        }
+    }
+
+    private fun syncDiscoveredFolders(rootDir: File) {
+        val knownFolders = appSettingsManager.getCustomImageFolders()
+        val discovered = rootDir.listFiles { file ->
+            file.isDirectory && file.name !in FolderModels.SYSTEM_DIRS
+        }?.map { it.name }?.filter { it.isNotBlank() }.orEmpty()
+        discovered.forEach { name ->
+            if (knownFolders.none { it.equals(name, ignoreCase = true) }) {
+                appSettingsManager.addCustomImageFolder(name)
+            }
         }
     }
 
