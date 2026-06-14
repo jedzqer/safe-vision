@@ -11,7 +11,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -337,13 +339,16 @@ class ImageGalleryFragment : Fragment() {
         private val onOpen: (GalleryFolderCard) -> Unit,
         private val onSelect: (GalleryFolderCard) -> Unit,
         private val onLongPress: (GalleryFolderCard) -> Unit
-    ) : RecyclerView.Adapter<FolderCardAdapter.FolderCardViewHolder>() {
+    ) : ListAdapter<GalleryFolderCard, FolderCardAdapter.FolderCardViewHolder>(DIFF_CALLBACK) {
 
-        private var items: List<GalleryFolderCard> = emptyList()
+        companion object {
+            private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<GalleryFolderCard>() {
+                override fun areItemsTheSame(oldItem: GalleryFolderCard, newItem: GalleryFolderCard): Boolean =
+                    oldItem.folderName == newItem.folderName
 
-        fun submitList(list: List<GalleryFolderCard>) {
-            items = list
-            notifyDataSetChanged()
+                override fun areContentsTheSame(oldItem: GalleryFolderCard, newItem: GalleryFolderCard): Boolean =
+                    oldItem == newItem
+            }
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FolderCardViewHolder {
@@ -352,10 +357,8 @@ class ImageGalleryFragment : Fragment() {
             return FolderCardViewHolder(view, thumbnailCacheManager)
         }
 
-        override fun getItemCount(): Int = items.size
-
         override fun onBindViewHolder(holder: FolderCardViewHolder, position: Int) {
-            val item = items[position]
+            val item = getItem(position)
             holder.bind(item)
             holder.openButton.setOnClickListener { onOpen(item) }
             holder.selectIndicator.setOnClickListener { onSelect(item) }

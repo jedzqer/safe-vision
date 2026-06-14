@@ -640,7 +640,12 @@ class GalleryFolderFullscreenFragment : Fragment() {
             resolver.openOutputStream(uri)?.use { output ->
                 val format = when (mimeType) {
                     "image/png" -> android.graphics.Bitmap.CompressFormat.PNG
-                    "image/webp" -> android.graphics.Bitmap.CompressFormat.WEBP
+                    "image/webp" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        android.graphics.Bitmap.CompressFormat.WEBP_LOSSY
+                    } else {
+                        @Suppress("DEPRECATION")
+                        android.graphics.Bitmap.CompressFormat.WEBP
+                    }
                     else -> android.graphics.Bitmap.CompressFormat.JPEG
                 }
                 if (!processed.compress(format, 95, output)) {

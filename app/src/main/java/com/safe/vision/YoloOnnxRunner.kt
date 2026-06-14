@@ -86,6 +86,7 @@ class YoloOnnxRunner(
                         if (rawData.isNotEmpty() && rawData[0] is Array<*>) {
                             val batchData = rawData[0] as Array<*>
                             if (batchData.isNotEmpty() && batchData[0] is FloatArray) {
+                                @Suppress("UNCHECKED_CAST")
                                 batchData as Array<FloatArray>
                             } else {
                                 DebugLogManager.addLog("模型检测", "错误: 数据格式不匹配")
