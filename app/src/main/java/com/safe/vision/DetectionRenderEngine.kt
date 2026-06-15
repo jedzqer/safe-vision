@@ -425,7 +425,8 @@ class DetectionRenderEngine(
             DebugLogManager.addLog("DetectionRenderEngine", "applyFullscreenMask: base bitmap is recycled, using fallback", DebugLogManager.LogLevel.ERROR)
             val w = kotlin.runCatching { base.width }.getOrDefault(1)
             val h = kotlin.runCatching { base.height }.getOrDefault(1)
-            val fallback = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            val fallbackConfig = if (mode == PrivacySettingsManager.BLUR_MODE_BLACK) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
+            val fallback = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), fallbackConfig)
             fallback.eraseColor(android.graphics.Color.BLACK)
             return fallback
         }
