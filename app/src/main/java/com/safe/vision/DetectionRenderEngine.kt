@@ -324,6 +324,14 @@ class DetectionRenderEngine(
         shouldOutline: (String) -> Boolean,
         callbacks: RenderCallbacks
     ): Bitmap {
+        if (base.isRecycled) {
+            DebugLogManager.addLog("DetectionRenderEngine", "applyReverseMask: base bitmap is recycled, using fallback", DebugLogManager.LogLevel.ERROR)
+            val w = kotlin.runCatching { base.width }.getOrDefault(1)
+            val h = kotlin.runCatching { base.height }.getOrDefault(1)
+            val fallback = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            fallback.eraseColor(android.graphics.Color.BLACK)
+            return fallback
+        }
         val safeRects = rects.mapNotNull { item ->
             val safeRect = BlurEffects.clampRect(item.rect, base.width, base.height)
             if (safeRect.width() > 0 && safeRect.height() > 0) item.copy(rect = safeRect) else null
@@ -413,6 +421,14 @@ class DetectionRenderEngine(
         stickerProvider: (String?) -> Bitmap?,
         callbacks: RenderCallbacks
     ): Bitmap {
+        if (base.isRecycled) {
+            DebugLogManager.addLog("DetectionRenderEngine", "applyFullscreenMask: base bitmap is recycled, using fallback", DebugLogManager.LogLevel.ERROR)
+            val w = kotlin.runCatching { base.width }.getOrDefault(1)
+            val h = kotlin.runCatching { base.height }.getOrDefault(1)
+            val fallback = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            fallback.eraseColor(android.graphics.Color.BLACK)
+            return fallback
+        }
         val outputConfig = if (mode == PrivacySettingsManager.BLUR_MODE_BLACK) {
             Bitmap.Config.RGB_565
         } else {

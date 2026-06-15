@@ -762,8 +762,15 @@ class VideoProcessingManager private constructor(private val context: Context) {
                         .firstOrNull { it.index == segment.detectionIndex }
                         ?.bitmap
                         ?: segment.frames.last().bitmap
-                    val detections = runner.run(detectionFrameBitmap, enrichFaceLandmarks)
-                        .filter { detection -> blocked.contains(detection.className) }
+                    val detectionCopy = detectionFrameBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                    val detections = try {
+                        runner.run(detectionCopy, enrichFaceLandmarks)
+                            .filter { detection -> blocked.contains(detection.className) }
+                    } finally {
+                        if (!detectionCopy.isRecycled) {
+                            detectionCopy.recycle()
+                        }
+                    }
                     detectionRunCount.incrementAndGet()
                     if (detections.isNotEmpty()) {
                         detectionHitCount.incrementAndGet()
@@ -823,6 +830,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
             currentCoroutineContext().ensureActive()
             for (preparedFrame in segment.frames) {
                 val sourceBitmap = preparedFrame.frame.bitmap
+                if (sourceBitmap.isRecycled) {
+                    DebugLogManager.addLog("视频处理", "渲染 worker#$workerLabel: frame #${preparedFrame.frame.index} sourceBitmap is recycled, skipping", DebugLogManager.LogLevel.WARN)
+                    continue
+                }
                 var ownedBitmap: Bitmap? = null
                 try {
                     val processedBitmap = detectionProcessor.applyDetections(
