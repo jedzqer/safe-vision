@@ -374,6 +374,11 @@ class DetectionRenderEngine(
             else -> BlurEffects.drawMosaic(outputCanvas, base, fullRect, privacySettings.getMosaicBlockSize())
         }
 
+        if (base.isRecycled) {
+            DebugLogManager.addLog("DetectionRenderEngine", "applyReverseMask: base bitmap recycled during effect render, returning output without safe areas", DebugLogManager.LogLevel.WARN)
+            return output
+        }
+
         safeRects.forEach { item ->
             if (item.circular) {
                 val circleBounds = BlurEffects.circumscribedCircleBounds(item.rect, base.width, base.height)

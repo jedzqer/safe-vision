@@ -629,11 +629,11 @@ class ImageViewerFragment : Fragment() {
                     val processedBitmap = withContext(Dispatchers.Default) {
                         privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
                     }
-                    if (!bitmap.isRecycled) {
+                    if (processedBitmap !== bitmap && !bitmap.isRecycled) {
                         bitmap.recycle()
                     }
                     if (!isAdded) {
-                        if (!processedBitmap.isRecycled) processedBitmap.recycle()
+                        if (processedBitmap !== bitmap && !processedBitmap.isRecycled) processedBitmap.recycle()
                         return@launch
                     }
                     releaseCurrentProcessedBitmap()
@@ -1078,7 +1078,7 @@ class ImageViewerFragment : Fragment() {
                 val processed = withContext(Dispatchers.Default) {
                     privacyProcessor.applyPrivacyBlur(bitmap, metadataFile)
                 }
-                if (!bitmap.isRecycled) {
+                if (processed !== bitmap && !bitmap.isRecycled) {
                     bitmap.recycle()
                 }
                 processed

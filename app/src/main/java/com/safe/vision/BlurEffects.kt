@@ -369,7 +369,7 @@ object BlurEffects {
 
             canvas.drawBitmap(mosaic, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
         } finally {
-            if (!region.isRecycled) region.recycle()
+            if (!region.isRecycled && region !== source) region.recycle()
             if (!mosaic.isRecycled) mosaic.recycle()
         }
     }
@@ -388,7 +388,7 @@ object BlurEffects {
         val blurred = try {
             gaussianBlur(region, radius)
         } finally {
-            if (!region.isRecycled) region.recycle()
+            if (!region.isRecycled && region !== source) region.recycle()
         }
         try {
             canvas.drawBitmap(blurred, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
@@ -458,7 +458,7 @@ object BlurEffects {
         val height = region.height
         val pixels = IntArray(width * height)
         region.getPixels(pixels, 0, width, 0, 0, width, height)
-        if (!region.isRecycled) region.recycle()
+        if (!region.isRecycled && region !== source) region.recycle()
 
         val gray = IntArray(width * height) { index ->
             val color = pixels[index]
