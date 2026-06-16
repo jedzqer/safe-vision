@@ -127,6 +127,7 @@ class BatchProcessingService : Service() {
         isProcessing = true
         DebugLogManager.addLog("批量处理服务", "开始批量处理，共 ${uris.size} 张图片")
         batchManager.setPreferredDetectedFolder(preferredDetectedFolder)
+        batchManager.resetProcessingState()
         
         // 启动前台服务
         startForeground(NOTIFICATION_ID, createInitialNotification())

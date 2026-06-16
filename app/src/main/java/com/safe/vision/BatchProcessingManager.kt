@@ -146,6 +146,10 @@ class BatchProcessingManager private constructor(private val context: Context) {
     fun setPreferredDetectedFolder(folderName: String) {
         preferredDetectedFolder = folderName.ifBlank { FolderModels.SAFE_NET_DIR }
     }
+
+    fun resetProcessingState() {
+        _processingState.value = BatchProcessingState.Idle
+    }
     
     private suspend fun startProcessing() {
         try {
