@@ -96,6 +96,13 @@ object DetectionMetadataIo {
     }
 
     fun write(file: File, items: List<EditableDetection>) {
+        val existingSegmentations = if (file.exists()) {
+            runCatching {
+                DetectionMetadataFormat.parse(file.readText(Charsets.UTF_8)).segmentations
+            }.getOrDefault(JSONArray())
+        } else {
+            JSONArray()
+        }
         val arr = JSONArray()
         items.forEach { rawItem ->
             val item = normalizeForWrite(rawItem)
@@ -150,7 +157,7 @@ object DetectionMetadataIo {
             arr.put(obj)
         }
         val profile = DetectionConfig.inferProfile(items.map { it.label })
-        file.writeText(DetectionMetadataFormat.build(arr, profile), Charsets.UTF_8)
+        file.writeText(DetectionMetadataFormat.build(arr, existingSegmentations, profile), Charsets.UTF_8)
     }
 
     private fun normalizeForWrite(item: EditableDetection): EditableDetection {

@@ -1314,16 +1314,8 @@ class ImageViewerFragment : Fragment() {
     }
 
     private fun parseMetadataLabels(metadataFile: File): Set<String> {
-        val array = DetectionMetadataFormat.parse(metadataFile.readText(Charsets.UTF_8)).detections
-        val labels = linkedSetOf<String>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            val label = obj.optString("class")
-            if (DetectionConfig.LABELS.contains(label)) {
-                labels.add(label)
-            }
-        }
-        return labels
+        val document = DetectionMetadataFormat.parse(metadataFile.readText(Charsets.UTF_8))
+        return DetectionMetadataFormat.collectAllLabels(document)
     }
 
     private fun showRandomQueueEmptyToastOnce() {

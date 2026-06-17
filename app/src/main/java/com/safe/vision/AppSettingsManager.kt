@@ -31,6 +31,7 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_METRONOME_ENABLED = "metronome_enabled"
         private const val KEY_METRONOME_INTERVAL_SECONDS = "metronome_interval_seconds"
         private const val KEY_DETECTION_MODEL_VARIANT = "detection_model_variant"
+        private const val KEY_BODY_PART_DETECTION_ENABLED = "body_part_detection_enabled"
         private const val KEY_SCREEN_DETECTION_ANIME_MODEL = "screen_detection_anime_model"
         private const val KEY_SCREEN_DETECTION_INTERVAL_SECONDS = "screen_detection_interval_seconds"
         private const val KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW = "screen_detection_use_system_alert_window"
@@ -112,6 +113,16 @@ class AppSettingsManager private constructor(context: Context) {
     fun setDetectionModelVariant(variant: DetectionModelVariant) {
         sharedPreferences.edit()
             .putString(KEY_DETECTION_MODEL_VARIANT, variant.prefValue)
+            .apply()
+    }
+
+    fun isBodyPartDetectionEnabled(): Boolean {
+        return sharedPreferences.getBoolean(KEY_BODY_PART_DETECTION_ENABLED, false)
+    }
+
+    fun setBodyPartDetectionEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(KEY_BODY_PART_DETECTION_ENABLED, enabled)
             .apply()
     }
 

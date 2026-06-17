@@ -11,8 +11,8 @@ android {
         applicationId = "com.safe.vision2"
         minSdk = 24
         targetSdk = 36
-        versionCode = 55
-        versionName = "2.0.1"
+        versionCode = 57
+        versionName = "2.0.3"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -43,7 +43,7 @@ android {
         jvmTarget = "17"
     }
 
-    sourceSets["main"].assets.srcDirs("src/main/assets", "../assets")
+    sourceSets["main"].assets.srcDirs("src/main/assets", "../assets", "../seg_clothe/onnx")
 
     buildFeatures {
         buildConfig = true

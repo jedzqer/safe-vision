@@ -8,10 +8,13 @@ import kotlin.math.max
  */
 object DetectionConfig {
     const val EYE_REGION_LABEL = "EYE_REGION"
+    const val BODY_FACE_LABEL = "BODY_FACE"
+    const val LEGACY_BODY_FACE_LABEL = "Face"
 
     enum class LabelProfile(val formatKey: String) {
         STANDARD("standard"),
         ANIME("anime"),
+        BODY("body"),
         MIXED("mixed");
 
         companion object {
@@ -56,8 +59,28 @@ object DetectionConfig {
         "Pussy"
     )
 
+    val BODY_LABELS: List<String> = listOf(
+        "Hat",
+        "Hair",
+        "Sunglasses",
+        "Upper-clothes",
+        "Skirt",
+        "Pants",
+        "Dress",
+        "Belt",
+        "Left-shoe",
+        "Right-shoe",
+        BODY_FACE_LABEL,
+        "Left-leg",
+        "Right-leg",
+        "Left-arm",
+        "Right-arm",
+        "Bag",
+        "Scarf"
+    )
+
     // All supported labels across saved metadata formats and settings.
-    val LABELS: List<String> = (STANDARD_LABELS + ANIME_LABELS + EYE_REGION_LABEL).distinct()
+    val LABELS: List<String> = (STANDARD_LABELS + ANIME_LABELS + BODY_LABELS + EYE_REGION_LABEL).distinct()
 
     // Locked labels cannot be disabled in UI.
     val STANDARD_LOCKED_LABELS: List<String> = listOf(
@@ -101,6 +124,23 @@ object DetectionConfig {
         "Feet" to "脚部",
         "Nipple" to "乳头",
         "Pussy" to "阴部",
+        "Hat" to "帽子",
+        "Hair" to "头发",
+        "Sunglasses" to "墨镜",
+        "Upper-clothes" to "上衣",
+        "Skirt" to "裙子",
+        "Pants" to "裤子",
+        "Dress" to "连衣裙",
+        "Belt" to "腰带",
+        "Left-shoe" to "左鞋",
+        "Right-shoe" to "右鞋",
+        BODY_FACE_LABEL to "面部",
+        "Left-leg" to "左腿",
+        "Right-leg" to "右腿",
+        "Left-arm" to "左臂",
+        "Right-arm" to "右臂",
+        "Bag" to "包",
+        "Scarf" to "围巾",
         EYE_REGION_LABEL to "眼睛"
     )
 
@@ -146,6 +186,7 @@ object DetectionConfig {
         return when (profile) {
             LabelProfile.STANDARD -> insertBeforeFirstFace(STANDARD_LABELS)
             LabelProfile.ANIME -> insertBeforeFirstFace(ANIME_LABELS)
+            LabelProfile.BODY -> BODY_LABELS
             LabelProfile.MIXED -> LABELS
         }
     }
@@ -163,6 +204,7 @@ object DetectionConfig {
         return when (profile) {
             LabelProfile.STANDARD -> STANDARD_LOCKED_LABELS
             LabelProfile.ANIME -> ANIME_LOCKED_LABELS
+            LabelProfile.BODY -> emptyList()
             LabelProfile.MIXED -> LOCKED_LABELS
         }
     }
@@ -183,13 +225,31 @@ object DetectionConfig {
         return FACE_LABELS.contains(label)
     }
 
+    fun normalizeSegmentationLabel(label: String): String {
+        return if (label == LEGACY_BODY_FACE_LABEL) BODY_FACE_LABEL else label
+    }
+
+    fun resolveProfileForLabel(
+        label: String,
+        eyeRegionProfile: LabelProfile = LabelProfile.STANDARD
+    ): LabelProfile {
+        return when {
+            isEyeRegionLabel(label) -> eyeRegionProfile
+            BODY_LABELS.contains(label) -> LabelProfile.BODY
+            ANIME_LABELS.contains(label) -> LabelProfile.ANIME
+            else -> LabelProfile.STANDARD
+        }
+    }
+
     fun inferProfile(labels: Collection<String>): LabelProfile {
         val known = labels.filter { LABELS.contains(it) }.toSet()
         if (known.isEmpty()) return LabelProfile.STANDARD
         val hasStandard = known.any { STANDARD_LABELS.contains(it) }
         val hasAnime = known.any { ANIME_LABELS.contains(it) }
+        val hasBody = known.any { BODY_LABELS.contains(it) }
         return when {
-            hasStandard && hasAnime -> LabelProfile.MIXED
+            listOf(hasStandard, hasAnime, hasBody).count { it } > 1 -> LabelProfile.MIXED
+            hasBody -> LabelProfile.BODY
             hasAnime -> LabelProfile.ANIME
             else -> LabelProfile.STANDARD
         }

@@ -13,6 +13,13 @@
     <string name="action_select_folder">Select Folder</string>
     <string name="action_batch_select">Batch Select Images</string>
     <string name="action_use_anime_model">Use Anime Model Detection</string>
+    <string name="action_use_body_part_detection">Enable Body Part Detection</string>
+    <string name="body_part_detection_enabled">Body part detection enabled</string>
+    <string name="body_part_detection_disabled">Body part detection disabled</string>
+    <string name="body_part_migration_title">Migrate Data</string>
+    <string name="body_part_migration_message">Legacy detection results were found. Add body part detection data now?</string>
+    <string name="body_part_migration_confirm">Migrate Now</string>
+    <string name="body_part_migration_later">Later</string>
     <string name="action_video_high_load">High-Load Video Mode (High-Performance Devices)</string>
     <string name="action_run_detection">Run Detection</string>
     <string name="action_start_screen_detection">Start Screen Detection</string>
@@ -292,6 +299,8 @@
     <string name="settings_label_effects_hint">Tap a label to toggle masking or set an effect. Unset labels use the global default effect.</string>
     <string name="settings_anime_label_effects_title">Anime Label Handling</string>
     <string name="settings_anime_label_effects_hint">When viewing JSON with anime label format, these label effect settings will be used</string>
+    <string name="settings_body_label_effects_title">Body Part Label Handling</string>
+    <string name="settings_body_label_effects_hint">Body part segmentation results use the label effect settings configured here</string>
     <string name="settings_label_dialog_title">Label Settings: %1$s</string>
     <string name="settings_label_enabled">Enable Mask</string>
     <string name="settings_label_reverse">Reverse Mask</string>

@@ -13,6 +13,13 @@
     <string name="action_select_folder">選擇資料夾</string>
     <string name="action_batch_select">批次選擇圖片</string>
     <string name="action_use_anime_model">使用動漫模型辨識</string>
+    <string name="action_use_body_part_detection">啟用人體部位辨識</string>
+    <string name="body_part_detection_enabled">人體部位辨識已開啟</string>
+    <string name="body_part_detection_disabled">人體部位辨識已關閉</string>
+    <string name="body_part_migration_title">遷移資料</string>
+    <string name="body_part_migration_message">偵測到舊版本辨識結果，是否現在補充人體部位辨識資料？</string>
+    <string name="body_part_migration_confirm">立即遷移</string>
+    <string name="body_part_migration_later">稍後</string>
     <string name="action_video_high_load">影片高負載模式（高效能裝置）</string>
     <string name="action_run_detection">執行偵測</string>
     <string name="status_placeholder">請選擇一張圖片進行偵測</string>
@@ -258,6 +265,8 @@
     <string name="settings_label_effects_hint">點擊標籤可開關遮罩或設定效果，未設定時使用全域預設效果</string>
     <string name="settings_anime_label_effects_title">動漫標籤處理</string>
     <string name="settings_anime_label_effects_hint">查看帶有動漫標籤格式的 JSON 時，將使用這裡的標籤效果設定</string>
+    <string name="settings_body_label_effects_title">人體部位標籤處理</string>
+    <string name="settings_body_label_effects_hint">人體部位識別結果會使用這裡的標籤效果設定</string>
     <string name="settings_label_dialog_title">標籤設定：%1$s</string>
     <string name="settings_label_enabled">啟用遮罩</string>
     <string name="settings_label_reverse">反向遮罩</string>

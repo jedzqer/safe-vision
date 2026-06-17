@@ -44,6 +44,8 @@ class BatchProcessingManager private constructor(private val context: Context) {
     @Volatile
     private var yoloRunner: YoloOnnxRunner? = null
     @Volatile
+    private var bodyPartRunner: BodyPartSegmentationRunner? = null
+    @Volatile
     private var isModelLoaded = false
     private var loadedModelVariant: DetectionModelVariant? = null
     private var processingJob: Job? = null
@@ -283,6 +285,25 @@ class BatchProcessingManager private constructor(private val context: Context) {
                 }
             }
         } finally {
+        }
+        val segmentations = try {
+            val variant = AppSettingsManager.getInstance(context).getDetectionModelVariant()
+            if (
+                variant == DetectionModelVariant.STANDARD &&
+                AppSettingsManager.getInstance(context).isBodyPartDetectionEnabled()
+            ) {
+                val segRunner = bodyPartRunner ?: withContext(Dispatchers.IO) {
+                    BodyPartSegmentationProvider.getRunner(context).also { bodyPartRunner = it }
+                }
+                inferenceMutex.withLock {
+                    withContext(Dispatchers.Default) {
+                        segRunner.run(bitmap)
+                    }
+                }
+            } else {
+                emptyList()
+            }
+        } finally {
             if (!bitmap.isRecycled) bitmap.recycle()
         }
         
@@ -292,6 +313,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
             bytes = bytes,
             originalName = task.fileName,
             detections = detections,
+            segmentations = segmentations,
             preferredDetectedFolder = preferredDetectedFolder
         )
         

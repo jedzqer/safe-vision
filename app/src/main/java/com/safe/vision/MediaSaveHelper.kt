@@ -23,12 +23,13 @@ object MediaSaveHelper {
         bytes: ByteArray,
         originalName: String?,
         detections: List<YoloOnnxRunner.Detection>,
+        segmentations: List<BodyPartMaskRegion> = emptyList(),
         preferredDetectedFolder: String = FolderModels.SAFE_NET_DIR
     ): SaveResult {
         val rootDir = context.getExternalFilesDir(null) ?: context.filesDir
         val safeDir = File(rootDir, preferredDetectedFolder).apply { if (!exists()) mkdirs() }
         val noDetectionDir = File(rootDir, FolderModels.NO_DETECTION_DIR).apply { if (!exists()) mkdirs() }
-        val hasDetections = detections.isNotEmpty()
+        val hasDetections = detections.isNotEmpty() || segmentations.isNotEmpty()
         val targetDir = if (hasDetections) safeDir else noDetectionDir
 
         val baseName = buildBaseFileName(originalName)
@@ -40,7 +41,7 @@ object MediaSaveHelper {
 
         val jsonFile = if (hasDetections) {
             val file = File(targetDir, "$resolvedBaseName.json")
-            file.writeText(buildMetadataJson(detections), Charsets.UTF_8)
+            file.writeText(buildMetadataJson(detections, segmentations), Charsets.UTF_8)
             file
         } else {
             null
@@ -49,7 +50,10 @@ object MediaSaveHelper {
         return SaveResult(imageFile, jsonFile, hasDetections)
     }
 
-    private fun buildMetadataJson(detections: List<YoloOnnxRunner.Detection>): String {
+    private fun buildMetadataJson(
+        detections: List<YoloOnnxRunner.Detection>,
+        segmentations: List<BodyPartMaskRegion>
+    ): String {
         val array = JSONArray()
         YoloOnnxRunner.withDerivedEyeRegionDetections(detections).forEach { detection ->
             val box = detection.box
@@ -97,8 +101,14 @@ object MediaSaveHelper {
             }
             array.put(obj)
         }
-        val profile = DetectionConfig.inferProfile(detections.map { it.className })
-        return DetectionMetadataFormat.build(array, profile)
+        val segmentationArray = JSONArray()
+        segmentations.forEach { region ->
+            segmentationArray.put(BodyPartSegmentationMetadata.toJsonObject(region))
+        }
+        val profile = DetectionConfig.inferProfile(
+            detections.map { it.className } + segmentations.map { it.label }
+        )
+        return DetectionMetadataFormat.build(array, segmentationArray, profile)
     }
 
     private fun buildBaseFileName(originalName: String?): String {

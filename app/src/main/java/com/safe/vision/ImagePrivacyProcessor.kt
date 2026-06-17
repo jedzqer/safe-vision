@@ -38,7 +38,11 @@ class ImagePrivacyProcessor {
             val metadata = withContext(Dispatchers.IO) { metadataFile.readText() }
             val metadataDoc = DetectionMetadataFormat.parse(metadata)
             val detections = metadataDoc.detections
-            val labelProfile = metadataDoc.labelProfile
+            val activeProfiles = linkedSetOf(metadataDoc.labelProfile).apply {
+                addAll(DetectionMetadataFormat.collectAllLabels(metadataDoc).map {
+                    DetectionConfig.resolveProfileForLabel(it, metadataDoc.labelProfile)
+                })
+            }
             val stickerCache = mutableMapOf<String?, Bitmap?>()
 
             fun getStickerBitmap(label: String?): Bitmap? {
@@ -109,9 +113,24 @@ class ImagePrivacyProcessor {
                 )
             }
 
+            for (i in 0 until metadataDoc.segmentations.length()) {
+                val segmentationObj = metadataDoc.segmentations.optJSONObject(i) ?: continue
+                val region = BodyPartSegmentationMetadata.fromJsonObject(segmentationObj) ?: continue
+                val rect = BlurEffects.clampRect(region.box, originalBitmap.width, originalBitmap.height)
+                if (rect.width() <= 0 || rect.height() <= 0) continue
+                rawRenderItems.add(
+                    DetectionRenderEngine.DetectionRenderItem(
+                        className = region.label,
+                        rect = rect,
+                        maskBitmap = region.maskAlphaBitmap
+                    )
+                )
+            }
+
             val hasExplicitEyeRegion = rawRenderItems.any { DetectionConfig.isEyeRegionLabel(it.className) }
             rawRenderItems.forEach { item ->
-                if (privacySettings.isLabelBlocked(item.className, labelProfile)) {
+                val itemProfile = DetectionConfig.resolveProfileForLabel(item.className, metadataDoc.labelProfile)
+                if (privacySettings.isLabelBlocked(item.className, itemProfile)) {
                     renderItems.add(item)
                 }
                 if (!hasExplicitEyeRegion && DetectionConfig.canDeriveEyeRegion(item.className)) {
@@ -127,7 +146,7 @@ class ImagePrivacyProcessor {
                         originalBitmap.width,
                         originalBitmap.height
                     )
-                    if (derivedRect != null && privacySettings.isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, labelProfile)) {
+                    if (derivedRect != null && privacySettings.isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, metadataDoc.labelProfile)) {
                         renderItems.add(
                             DetectionRenderEngine.DetectionRenderItem(
                                 className = DetectionConfig.EYE_REGION_LABEL,
@@ -152,15 +171,16 @@ class ImagePrivacyProcessor {
                 sourceBitmap = originalBitmap,
                 detections = renderItems,
                 settings = DetectionRenderEngine.RenderSettings(
-                    defaultBlurMode = privacySettings.getBlurMode(labelProfile),
-                    labelEffectOverrides = privacySettings.getLabelEffectOverrides(labelProfile),
-                    reverseLabels = privacySettings.getReverseLabels(labelProfile).toSet(),
+                    defaultBlurMode = privacySettings.getBlurMode(metadataDoc.labelProfile),
+                    defaultBlurModes = buildDefaultBlurModes(activeProfiles),
+                    labelEffectOverrides = buildCombinedLabelOverrides(activeProfiles),
+                    reverseLabels = buildCombinedReverseLabels(activeProfiles),
                     useCircularMask = privacySettings.isCircularMaskEnabled(),
                     fullScreenMaskWhenReverseLabelsMissing =
                         privacySettings.isReverseLabelMissFullscreenEnabled(),
                     reversePreRenderEnabled = privacySettings.isReversePreRenderEnabled(),
                     maskOutlineEnabled = privacySettings.isMaskOutlineEnabled(),
-                    maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet()
+                    maskOutlineLabels = buildCombinedMaskOutlineLabels(activeProfiles)
                 ),
                 stickerProvider = ::getStickerBitmap,
                 normalEffectSourceProvider = { originalBitmap },
@@ -183,6 +203,36 @@ class ImagePrivacyProcessor {
             e.printStackTrace()
             DebugLogManager.addLog("图片处理", "应用隐私遮挡失败: ${e.message}")
             return originalBitmap
+        }
+    }
+
+    private fun buildDefaultBlurModes(
+        profiles: Set<DetectionConfig.LabelProfile>
+    ): Map<DetectionConfig.LabelProfile, Int> {
+        return profiles.associateWith { privacySettings.getBlurMode(it) }
+    }
+
+    private fun buildCombinedLabelOverrides(
+        profiles: Set<DetectionConfig.LabelProfile>
+    ): Map<String, Int> {
+        return profiles.fold(emptyMap()) { acc, profile ->
+            acc + privacySettings.getLabelEffectOverrides(profile)
+        }
+    }
+
+    private fun buildCombinedReverseLabels(
+        profiles: Set<DetectionConfig.LabelProfile>
+    ): Set<String> {
+        return profiles.flatMapTo(linkedSetOf()) { profile ->
+            privacySettings.getReverseLabels(profile)
+        }
+    }
+
+    private fun buildCombinedMaskOutlineLabels(
+        profiles: Set<DetectionConfig.LabelProfile>
+    ): Set<String> {
+        return profiles.flatMapTo(linkedSetOf()) { profile ->
+            privacySettings.getMaskOutlineLabels(profile)
         }
     }
 

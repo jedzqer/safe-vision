@@ -90,6 +90,7 @@ class SettingsFragment : Fragment() {
     private lateinit var settingsScrollView: NestedScrollView
     private lateinit var labelChipGroup: ChipGroup
     private lateinit var animeLabelChipGroup: ChipGroup
+    private lateinit var bodyLabelChipGroup: ChipGroup
     private lateinit var labelSettingsInlineCard: MaterialCardView
     private lateinit var labelSettingsInlineContainer: LinearLayout
     private lateinit var stickerSummary: TextView
@@ -186,9 +187,13 @@ class SettingsFragment : Fragment() {
     private fun refreshLabelChips() {
         refreshLabelChipGroup(labelChipGroup, labelsForSettingsGroup(DetectionConfig.LabelProfile.STANDARD))
         refreshLabelChipGroup(animeLabelChipGroup, labelsForSettingsGroup(DetectionConfig.LabelProfile.ANIME))
+        refreshLabelChipGroup(bodyLabelChipGroup, labelsForSettingsGroup(DetectionConfig.LabelProfile.BODY))
     }
 
     private fun labelsForSettingsGroup(profile: DetectionConfig.LabelProfile): List<String> {
+        if (profile == DetectionConfig.LabelProfile.BODY) {
+            return DetectionConfig.getLabels(profile)
+        }
         val activeProfile = if (appSettings.getDetectionModelVariant() == DetectionModelVariant.ANIME) {
             DetectionConfig.LabelProfile.ANIME
         } else {
@@ -278,11 +283,7 @@ class SettingsFragment : Fragment() {
         }
         val override = privacySettings.getLabelEffectOverride(label)
         return if (override == null) {
-            val profile = if (DetectionConfig.ANIME_LABELS.contains(label)) {
-                DetectionConfig.LabelProfile.ANIME
-            } else {
-                DetectionConfig.LabelProfile.STANDARD
-            }
+            val profile = DetectionConfig.resolveProfileForLabel(label, DetectionConfig.LabelProfile.STANDARD)
             val defaultName = privacySettings.getBlurModeName(privacySettings.getBlurMode(profile))
             getString(R.string.settings_label_chip_default, displayName, defaultName)
         } else {
@@ -376,11 +377,7 @@ class SettingsFragment : Fragment() {
                 R.string.settings_label_effect_default,
                 privacySettings.getBlurModeName(
                     privacySettings.getBlurMode(
-                        if (DetectionConfig.ANIME_LABELS.contains(label)) {
-                            DetectionConfig.LabelProfile.ANIME
-                        } else {
-                            DetectionConfig.LabelProfile.STANDARD
-                        }
+                        DetectionConfig.resolveProfileForLabel(label, DetectionConfig.LabelProfile.STANDARD)
                     )
                 )
             )
@@ -517,15 +514,11 @@ class SettingsFragment : Fragment() {
                 topMargin = smallMargin
             }
         }
-        val labelProfile = if (DetectionConfig.ANIME_LABELS.contains(label)) {
-            DetectionConfig.LabelProfile.ANIME
-        } else {
-            DetectionConfig.LabelProfile.STANDARD
-        }
-        val globalScale = if (labelProfile == DetectionConfig.LabelProfile.ANIME) {
-            privacySettings.getAnimeMaskScale()
-        } else {
-            privacySettings.getMaskScale()
+        val labelProfile = DetectionConfig.resolveProfileForLabel(label, DetectionConfig.LabelProfile.STANDARD)
+        val globalScale = when (labelProfile) {
+            DetectionConfig.LabelProfile.ANIME -> privacySettings.getAnimeMaskScale()
+            DetectionConfig.LabelProfile.BODY -> privacySettings.getEffectiveMaskScale(label)
+            else -> privacySettings.getMaskScale()
         }
         val labelScaleOverride = privacySettings.getLabelMaskScaleOverride(label)
         val followGlobalCheck = CheckBox(context).apply {
@@ -619,10 +612,10 @@ class SettingsFragment : Fragment() {
     }
 
     private fun measureCollapsedChipSize(label: String): Pair<Float, Float> {
-        val group = if (DetectionConfig.ANIME_LABELS.contains(label)) {
-            animeLabelChipGroup
-        } else {
-            labelChipGroup
+        val group = when (DetectionConfig.resolveProfileForLabel(label, DetectionConfig.LabelProfile.STANDARD)) {
+            DetectionConfig.LabelProfile.ANIME -> animeLabelChipGroup
+            DetectionConfig.LabelProfile.BODY -> bodyLabelChipGroup
+            else -> labelChipGroup
         }
         val chip = createLabelChip(label)
         val widthSpec = View.MeasureSpec.makeMeasureSpec(group.width.coerceAtLeast(1), View.MeasureSpec.AT_MOST)
@@ -877,6 +870,7 @@ class SettingsFragment : Fragment() {
         maskScaleSeekBar = view.findViewById(R.id.maskScaleSeekBar)
         labelChipGroup = view.findViewById(R.id.labelChipGroup)
         animeLabelChipGroup = view.findViewById(R.id.animeLabelChipGroup)
+        bodyLabelChipGroup = view.findViewById(R.id.bodyLabelChipGroup)
         labelSettingsInlineCard = view.findViewById(R.id.labelSettingsInlineCard)
         labelSettingsInlineContainer = view.findViewById(R.id.labelSettingsInlineContainer)
         stickerSummary = view.findViewById(R.id.stickerSummary)

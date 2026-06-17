@@ -13,6 +13,13 @@
     <string name="action_select_folder">폴더 선택</string>
     <string name="action_batch_select">이미지 일괄 선택</string>
     <string name="action_use_anime_model">애니메이션 모델로 감지</string>
+    <string name="action_use_body_part_detection">신체 부위 인식 사용</string>
+    <string name="body_part_detection_enabled">신체 부위 인식이 켜졌습니다</string>
+    <string name="body_part_detection_disabled">신체 부위 인식이 꺼졌습니다</string>
+    <string name="body_part_migration_title">데이터 마이그레이션</string>
+    <string name="body_part_migration_message">이전 버전의 감지 결과를 찾았습니다. 지금 신체 부위 인식 데이터를 추가할까요?</string>
+    <string name="body_part_migration_confirm">지금 마이그레이션</string>
+    <string name="body_part_migration_later">나중에</string>
     <string name="action_video_high_load">동영상 고부하 모드(고성능 기기)</string>
     <string name="action_run_detection">감지 실행</string>
     <string name="status_placeholder">감지할 이미지를 선택하세요.</string>
@@ -258,6 +265,8 @@
     <string name="settings_label_effects_hint">라벨을 눌러 마스크를 켜거나 효과를 설정하세요. 설정되지 않은 라벨은 전역 기본 효과를 사용합니다.</string>
     <string name="settings_anime_label_effects_title">애니메이션 라벨 처리</string>
     <string name="settings_anime_label_effects_hint">애니메이션 라벨 형식의 JSON을 볼 때 이 라벨 효과 설정이 사용됩니다</string>
+    <string name="settings_body_label_effects_title">신체 부위 라벨 처리</string>
+    <string name="settings_body_label_effects_hint">신체 부위 분할 결과는 여기의 라벨 효과 설정을 사용합니다</string>
     <string name="settings_label_dialog_title">라벨 설정: %1$s</string>
     <string name="settings_label_enabled">마스크 사용</string>
     <string name="settings_label_reverse">역방향 마스크</string>

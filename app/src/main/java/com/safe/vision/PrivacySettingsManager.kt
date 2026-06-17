@@ -18,28 +18,37 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         private const val PREFS_NAME = "privacy_settings"
         private const val KEY_BLUR_MODE = "blur_mode"
         private const val KEY_ANIME_BLUR_MODE = "anime_blur_mode"
+        private const val KEY_BODY_BLUR_MODE = "body_blur_mode"
         private const val KEY_BLOCKED_LABELS = "blocked_labels"
         private const val KEY_ANIME_BLOCKED_LABELS = "anime_blocked_labels"
+        private const val KEY_BODY_BLOCKED_LABELS = "body_blocked_labels"
         private const val KEY_STICKER_URI = "sticker_uri"
         private const val KEY_ANIME_STICKER_URI = "anime_sticker_uri"
+        private const val KEY_BODY_STICKER_URI = "body_sticker_uri"
         private const val KEY_LABEL_STICKER_URIS = "label_sticker_uris"
         private const val KEY_ANIME_LABEL_STICKER_URIS = "anime_label_sticker_uris"
+        private const val KEY_BODY_LABEL_STICKER_URIS = "body_label_sticker_uris"
         private const val KEY_LABEL_EFFECT_OVERRIDES = "label_effect_overrides"
         private const val KEY_ANIME_LABEL_EFFECT_OVERRIDES = "anime_label_effect_overrides"
+        private const val KEY_BODY_LABEL_EFFECT_OVERRIDES = "body_label_effect_overrides"
         private const val KEY_REVERSE_LABELS = "reverse_labels"
         private const val KEY_ANIME_REVERSE_LABELS = "anime_reverse_labels"
+        private const val KEY_BODY_REVERSE_LABELS = "body_reverse_labels"
         private const val KEY_EYE_MODE_LABELS = "eye_mode_labels"
         private const val KEY_ANIME_EYE_MODE_LABELS = "anime_eye_mode_labels"
         private const val KEY_MOSAIC_BLOCK_SIZE = "mosaic_block_size"
         private const val KEY_GAUSSIAN_RADIUS = "gaussian_radius"
         private const val KEY_MASK_SCALE = "mask_scale"
         private const val KEY_ANIME_MASK_SCALE = "anime_mask_scale"
+        private const val KEY_BODY_MASK_SCALE = "body_mask_scale"
         private const val KEY_LABEL_MASK_SCALES = "label_mask_scales"
         private const val KEY_ANIME_LABEL_MASK_SCALES = "anime_label_mask_scales"
+        private const val KEY_BODY_LABEL_MASK_SCALES = "body_label_mask_scales"
         private const val KEY_CIRCULAR_MASK_ENABLED = "circular_mask_enabled"
         private const val KEY_MASK_OUTLINE_ENABLED = "mask_outline_enabled"
         private const val KEY_MASK_OUTLINE_LABELS = "mask_outline_labels"
         private const val KEY_ANIME_MASK_OUTLINE_LABELS = "anime_mask_outline_labels"
+        private const val KEY_BODY_MASK_OUTLINE_LABELS = "body_mask_outline_labels"
         private const val KEY_REVERSE_PRE_RENDER_ENABLED = "reverse_pre_render_enabled"
         private const val KEY_ACCESSIBILITY_EMPTY_REVERSE_FULLSCREEN_ENABLED =
             "accessibility_empty_reverse_fullscreen_enabled"
@@ -85,7 +94,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun getBlurMode(profile: DetectionConfig.LabelProfile): Int {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLUR_MODE else KEY_BLUR_MODE
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_BLUR_MODE
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_BLUR_MODE
+            else -> KEY_BLUR_MODE
+        }
         return sharedPrefs.getInt(key, BLUR_MODE_MOSAIC)
     }
     
@@ -97,7 +110,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun setBlurMode(profile: DetectionConfig.LabelProfile, mode: Int) {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLUR_MODE else KEY_BLUR_MODE
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_BLUR_MODE
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_BLUR_MODE
+            else -> KEY_BLUR_MODE
+        }
         sharedPrefs.edit().putInt(key, mode).apply()
     }
 
@@ -115,6 +132,14 @@ class PrivacySettingsManager private constructor(private val context: Context) {
 
     fun getAnimeStickerUri(): String? {
         return sharedPrefs.getString(KEY_ANIME_STICKER_URI, null)
+    }
+
+    fun setBodyStickerUri(uri: String?) {
+        sharedPrefs.edit().putString(KEY_BODY_STICKER_URI, uri).apply()
+    }
+
+    fun getBodyStickerUri(): String? {
+        return sharedPrefs.getString(KEY_BODY_STICKER_URI, null)
     }
 
     fun setLabelStickerUri(label: String, uri: String?) {
@@ -143,10 +168,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     fun getStickerUriForLabel(label: String?): String? {
         if (!label.isNullOrBlank()) {
             readLabelStickerUris(resolveProfileForLabel(label))[label]?.let { return it }
-            return if (resolveProfileForLabel(label) == DetectionConfig.LabelProfile.ANIME) {
-                getAnimeStickerUri()
-            } else {
-                getStickerUri()
+            return when (resolveProfileForLabel(label)) {
+                DetectionConfig.LabelProfile.ANIME -> getAnimeStickerUri()
+                DetectionConfig.LabelProfile.BODY -> getBodyStickerUri()
+                else -> getStickerUri()
             }
         }
         return getStickerUri()
@@ -188,6 +213,15 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         sharedPrefs.edit().putFloat(KEY_ANIME_MASK_SCALE, scale.coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX)).apply()
     }
 
+    fun getBodyMaskScale(): Float {
+        val stored = sharedPrefs.getFloat(KEY_BODY_MASK_SCALE, MASK_SCALE_DEFAULT)
+        return stored.coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX)
+    }
+
+    fun setBodyMaskScale(scale: Float) {
+        sharedPrefs.edit().putFloat(KEY_BODY_MASK_SCALE, scale.coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX)).apply()
+    }
+
     fun getLabelMaskScaleOverride(label: String): Float? {
         if (!DetectionConfig.LABELS.contains(label)) return null
         return readLabelMaskScales(resolveProfileForLabel(label))[label]
@@ -214,10 +248,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun getEffectiveMaskScale(label: String): Float {
-        return getLabelMaskScaleOverride(label) ?: if (resolveProfileForLabel(label) == DetectionConfig.LabelProfile.ANIME) {
-            getAnimeMaskScale()
-        } else {
-            getMaskScale()
+        return getLabelMaskScaleOverride(label) ?: when (resolveProfileForLabel(label)) {
+            DetectionConfig.LabelProfile.ANIME -> getAnimeMaskScale()
+            DetectionConfig.LabelProfile.BODY -> getBodyMaskScale()
+            else -> getMaskScale()
         }
     }
 
@@ -243,7 +277,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
 
     fun getMaskOutlineLabels(profile: DetectionConfig.LabelProfile): List<String> {
         val labelsForProfile = DetectionConfig.getLabels(profile).filterNot { isReverseLockedInProfile(it, profile) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_MASK_OUTLINE_LABELS else KEY_MASK_OUTLINE_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_MASK_OUTLINE_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_MASK_OUTLINE_LABELS
+            else -> KEY_MASK_OUTLINE_LABELS
+        }
         val fallback = if (labelsForProfile.isEmpty()) DetectionConfig.getLabels(profile) else labelsForProfile
         val stored = sharedPrefs.getString(key, null) ?: return fallback
         return try {
@@ -271,7 +309,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val finalLabels = if (sanitized.isEmpty()) allowed else sanitized
         val jsonArray = JSONArray()
         finalLabels.forEach { jsonArray.put(it) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_MASK_OUTLINE_LABELS else KEY_MASK_OUTLINE_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_MASK_OUTLINE_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_MASK_OUTLINE_LABELS
+            else -> KEY_MASK_OUTLINE_LABELS
+        }
         sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
     }
 
@@ -309,14 +351,17 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val name: String,
         val blurMode: Int,
         val animeBlurMode: Int,
+        val bodyBlurMode: Int,
         val circularMaskEnabled: Boolean,
         val maskOutlineEnabled: Boolean,
         val mosaicBlockSize: Int,
         val gaussianRadius: Int,
         val maskScale: Float,
         val animeMaskScale: Float,
+        val bodyMaskScale: Float,
         val stickerUri: String?,
         val animeStickerUri: String?,
+        val bodyStickerUri: String?,
         val labelStickerUris: Map<String, String>,
         val labelMaskScales: Map<String, Float>,
         val blockedLabels: List<String>,
@@ -344,7 +389,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun getBlockedLabels(profile: DetectionConfig.LabelProfile): List<String> {
-        val storedLabels = readStoredBlockedLabels(profile) ?: getLockedLabels(profile)
+        val storedLabels = readStoredBlockedLabels(profile) ?: defaultBlockedLabelsForProfile(profile)
         return mergeWithLockedLabels(profile, storedLabels)
     }
     
@@ -358,7 +403,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     fun setBlockedLabels(profile: DetectionConfig.LabelProfile, labels: List<String>) {
         val jsonArray = JSONArray()
         mergeWithLockedLabels(profile, labels).forEach { jsonArray.put(it) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLOCKED_LABELS else KEY_BLOCKED_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_BLOCKED_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_BLOCKED_LABELS
+            else -> KEY_BLOCKED_LABELS
+        }
         sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
     }
     
@@ -636,11 +685,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun resolveProfileForLabel(label: String): DetectionConfig.LabelProfile {
-        return when {
-            DetectionConfig.isEyeRegionLabel(label) -> getCurrentProfile()
-            DetectionConfig.ANIME_LABELS.contains(label) -> DetectionConfig.LabelProfile.ANIME
-            else -> DetectionConfig.LabelProfile.STANDARD
-        }
+        return DetectionConfig.resolveProfileForLabel(label, getCurrentProfile())
     }
 
     private fun getLockedLabels(profile: DetectionConfig.LabelProfile): List<String> {
@@ -660,37 +705,46 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             name = name,
             blurMode = getBlurMode(DetectionConfig.LabelProfile.STANDARD),
             animeBlurMode = getBlurMode(DetectionConfig.LabelProfile.ANIME),
+            bodyBlurMode = getBlurMode(DetectionConfig.LabelProfile.BODY),
             circularMaskEnabled = isCircularMaskEnabled(),
             maskOutlineEnabled = isMaskOutlineEnabled(),
             mosaicBlockSize = getMosaicBlockSize(),
             gaussianRadius = getGaussianRadius(),
             maskScale = getMaskScale(),
             animeMaskScale = getAnimeMaskScale(),
+            bodyMaskScale = getBodyMaskScale(),
             stickerUri = getStickerUri(),
             animeStickerUri = getAnimeStickerUri(),
+            bodyStickerUri = getBodyStickerUri(),
             labelStickerUris = mergeLabelMaps(
                 getLabelStickerUris(DetectionConfig.LabelProfile.STANDARD),
-                getLabelStickerUris(DetectionConfig.LabelProfile.ANIME)
+                getLabelStickerUris(DetectionConfig.LabelProfile.ANIME),
+                getLabelStickerUris(DetectionConfig.LabelProfile.BODY)
             ),
             labelMaskScales = mergeLabelMaps(
                 getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.STANDARD),
-                getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.ANIME)
+                getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.ANIME),
+                getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.BODY)
             ),
             blockedLabels = mergeLabelLists(
                 getBlockedLabels(DetectionConfig.LabelProfile.STANDARD),
-                getBlockedLabels(DetectionConfig.LabelProfile.ANIME)
+                getBlockedLabels(DetectionConfig.LabelProfile.ANIME),
+                getBlockedLabels(DetectionConfig.LabelProfile.BODY)
             ),
             labelEffectOverrides = mergeLabelMaps(
                 getLabelEffectOverrides(DetectionConfig.LabelProfile.STANDARD),
-                getLabelEffectOverrides(DetectionConfig.LabelProfile.ANIME)
+                getLabelEffectOverrides(DetectionConfig.LabelProfile.ANIME),
+                getLabelEffectOverrides(DetectionConfig.LabelProfile.BODY)
             ),
             reverseLabels = mergeLabelLists(
                 getReverseLabels(DetectionConfig.LabelProfile.STANDARD),
-                getReverseLabels(DetectionConfig.LabelProfile.ANIME)
+                getReverseLabels(DetectionConfig.LabelProfile.ANIME),
+                getReverseLabels(DetectionConfig.LabelProfile.BODY)
             ),
             maskOutlineLabels = mergeLabelLists(
                 getMaskOutlineLabels(DetectionConfig.LabelProfile.STANDARD),
-                getMaskOutlineLabels(DetectionConfig.LabelProfile.ANIME)
+                getMaskOutlineLabels(DetectionConfig.LabelProfile.ANIME),
+                getMaskOutlineLabels(DetectionConfig.LabelProfile.BODY)
             ),
             reversePreRenderEnabled = isReversePreRenderEnabled(),
             accessibilityEmptyReverseFullscreenEnabled = isAccessibilityEmptyReverseFullscreenEnabled(),
@@ -701,19 +755,24 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     private fun applySnapshot(preset: PrivacyPreset) {
         val standardBlocked = filterLabelsForProfile(preset.blockedLabels, DetectionConfig.LabelProfile.STANDARD)
         val animeBlocked = filterLabelsForProfile(preset.blockedLabels, DetectionConfig.LabelProfile.ANIME)
+        val bodyBlocked = filterLabelsForProfile(preset.blockedLabels, DetectionConfig.LabelProfile.BODY)
         val standardReverse = filterLabelsForProfile(preset.reverseLabels, DetectionConfig.LabelProfile.STANDARD)
         val animeReverse = filterLabelsForProfile(preset.reverseLabels, DetectionConfig.LabelProfile.ANIME)
+        val bodyReverse = filterLabelsForProfile(preset.reverseLabels, DetectionConfig.LabelProfile.BODY)
 
         setBlurMode(DetectionConfig.LabelProfile.STANDARD, preset.blurMode)
         setBlurMode(DetectionConfig.LabelProfile.ANIME, preset.animeBlurMode)
+        setBlurMode(DetectionConfig.LabelProfile.BODY, preset.bodyBlurMode)
         setCircularMaskEnabled(preset.circularMaskEnabled)
         setMaskOutlineEnabled(preset.maskOutlineEnabled)
         setMosaicBlockSize(preset.mosaicBlockSize)
         setGaussianRadius(preset.gaussianRadius)
         setMaskScale(preset.maskScale)
         setAnimeMaskScale(preset.animeMaskScale)
+        setBodyMaskScale(preset.bodyMaskScale)
         setStickerUri(preset.stickerUri)
         setAnimeStickerUri(preset.animeStickerUri)
+        setBodyStickerUri(preset.bodyStickerUri)
         writeLabelStickerUris(
             DetectionConfig.LabelProfile.STANDARD,
             filterMapForProfile(preset.labelStickerUris, DetectionConfig.LabelProfile.STANDARD)
@@ -721,6 +780,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         writeLabelStickerUris(
             DetectionConfig.LabelProfile.ANIME,
             filterMapForProfile(preset.labelStickerUris, DetectionConfig.LabelProfile.ANIME)
+        )
+        writeLabelStickerUris(
+            DetectionConfig.LabelProfile.BODY,
+            filterMapForProfile(preset.labelStickerUris, DetectionConfig.LabelProfile.BODY)
         )
         writeLabelMaskScales(
             DetectionConfig.LabelProfile.STANDARD,
@@ -730,8 +793,13 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             DetectionConfig.LabelProfile.ANIME,
             filterMapForProfile(preset.labelMaskScales, DetectionConfig.LabelProfile.ANIME)
         )
+        writeLabelMaskScales(
+            DetectionConfig.LabelProfile.BODY,
+            filterMapForProfile(preset.labelMaskScales, DetectionConfig.LabelProfile.BODY)
+        )
         writeStoredBlockedLabels(DetectionConfig.LabelProfile.STANDARD, standardBlocked)
         writeStoredBlockedLabels(DetectionConfig.LabelProfile.ANIME, animeBlocked)
+        writeStoredBlockedLabels(DetectionConfig.LabelProfile.BODY, bodyBlocked)
         writeLabelEffectOverrides(
             DetectionConfig.LabelProfile.STANDARD,
             filterMapForProfile(preset.labelEffectOverrides, DetectionConfig.LabelProfile.STANDARD)
@@ -740,8 +808,13 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             DetectionConfig.LabelProfile.ANIME,
             filterMapForProfile(preset.labelEffectOverrides, DetectionConfig.LabelProfile.ANIME)
         )
+        writeLabelEffectOverrides(
+            DetectionConfig.LabelProfile.BODY,
+            filterMapForProfile(preset.labelEffectOverrides, DetectionConfig.LabelProfile.BODY)
+        )
         setReverseLabels(DetectionConfig.LabelProfile.STANDARD, standardReverse)
         setReverseLabels(DetectionConfig.LabelProfile.ANIME, animeReverse)
+        setReverseLabels(DetectionConfig.LabelProfile.BODY, bodyReverse)
         setMaskOutlineLabels(
             DetectionConfig.LabelProfile.STANDARD,
             filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.STANDARD)
@@ -749,6 +822,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         setMaskOutlineLabels(
             DetectionConfig.LabelProfile.ANIME,
             filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.ANIME)
+        )
+        setMaskOutlineLabels(
+            DetectionConfig.LabelProfile.BODY,
+            filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.BODY)
         )
         setReversePreRenderEnabled(preset.reversePreRenderEnabled)
         setAccessibilityEmptyReverseFullscreenEnabled(preset.accessibilityEmptyReverseFullscreenEnabled)
@@ -779,8 +856,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         if (!isValidBlurMode(blurMode)) return null
         val animeBlurMode = obj.optInt("animeBlurMode", blurMode)
         if (!isValidBlurMode(animeBlurMode)) return null
+        val bodyBlurMode = obj.optInt("bodyBlurMode", blurMode)
+        if (!isValidBlurMode(bodyBlurMode)) return null
         val stickerUri = obj.opt("stickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         val animeStickerUri = obj.opt("animeStickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: stickerUri
+        val bodyStickerUri = obj.opt("bodyStickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: stickerUri
         val legacyEyeModeLabels = parseFaceLabelList(obj.optJSONArray("eyeModeLabels"))
         val blockedLabels = parseLabelList(
             obj.optJSONArray("blockedLabels"),
@@ -797,6 +877,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             name = name,
             blurMode = blurMode,
             animeBlurMode = animeBlurMode,
+            bodyBlurMode = bodyBlurMode,
             circularMaskEnabled = obj.optBoolean("circularMaskEnabled", false),
             maskOutlineEnabled = obj.optBoolean("maskOutlineEnabled", false),
             mosaicBlockSize = obj.optInt("mosaicBlockSize", MOSAIC_BLOCK_DEFAULT).coerceIn(MOSAIC_BLOCK_MIN, MOSAIC_BLOCK_MAX),
@@ -805,8 +886,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 .coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX),
             animeMaskScale = obj.optDouble("animeMaskScale", obj.optDouble("maskScale", MASK_SCALE_DEFAULT.toDouble())).toFloat()
                 .coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX),
+            bodyMaskScale = obj.optDouble("bodyMaskScale", obj.optDouble("maskScale", MASK_SCALE_DEFAULT.toDouble())).toFloat()
+                .coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX),
             stickerUri = stickerUri,
             animeStickerUri = animeStickerUri,
+            bodyStickerUri = bodyStickerUri,
             labelStickerUris = parseLabelStickerUris(obj.optJSONObject("labelStickerUris")),
             labelMaskScales = parseScaleOverrides(obj.optJSONObject("labelMaskScales")),
             blockedLabels = blockedLabels,
@@ -924,14 +1008,17 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         return JSONObject()
             .put("blurMode", preset.blurMode)
             .put("animeBlurMode", preset.animeBlurMode)
+            .put("bodyBlurMode", preset.bodyBlurMode)
             .put("circularMaskEnabled", preset.circularMaskEnabled)
             .put("maskOutlineEnabled", preset.maskOutlineEnabled)
             .put("mosaicBlockSize", preset.mosaicBlockSize)
             .put("gaussianRadius", preset.gaussianRadius)
             .put("maskScale", preset.maskScale)
             .put("animeMaskScale", preset.animeMaskScale)
+            .put("bodyMaskScale", preset.bodyMaskScale)
             .put("stickerUri", preset.stickerUri)
             .put("animeStickerUri", preset.animeStickerUri)
+            .put("bodyStickerUri", preset.bodyStickerUri)
             .put("labelStickerUris", JSONObject().apply {
                 preset.labelStickerUris.forEach { (label, uri) -> put(label, uri) }
             })
@@ -951,6 +1038,13 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 "reverseLabelMissFullscreenEnabled",
                 preset.reverseLabelMissFullscreenEnabled
             )
+    }
+
+    private fun defaultBlockedLabelsForProfile(profile: DetectionConfig.LabelProfile): List<String> {
+        return when (profile) {
+            DetectionConfig.LabelProfile.BODY -> emptyList()
+            else -> DetectionConfig.getLabels(profile)
+        }
     }
 
     private fun <T> mergeLabelMaps(vararg maps: Map<String, T>): Map<String, T> {
@@ -986,7 +1080,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun readStoredBlockedLabels(profile: DetectionConfig.LabelProfile): List<String>? {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLOCKED_LABELS else KEY_BLOCKED_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_BLOCKED_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_BLOCKED_LABELS
+            else -> KEY_BLOCKED_LABELS
+        }
         val labelsJson = sharedPrefs.getString(key, null) ?: return null
         return try {
             val jsonArray = JSONArray(labelsJson)
@@ -1004,7 +1102,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val allowed = DetectionConfig.getLabels(profile).toSet()
         val jsonArray = JSONArray()
         labels.filter { allowed.contains(it) }.distinct().forEach { jsonArray.put(it) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_BLOCKED_LABELS else KEY_BLOCKED_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_BLOCKED_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_BLOCKED_LABELS
+            else -> KEY_BLOCKED_LABELS
+        }
         sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
     }
 
@@ -1042,7 +1144,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun readStoredReverseLabels(profile: DetectionConfig.LabelProfile): List<String>? {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_REVERSE_LABELS else KEY_REVERSE_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_REVERSE_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_REVERSE_LABELS
+            else -> KEY_REVERSE_LABELS
+        }
         val labelsJson = sharedPrefs.getString(key, null) ?: return null
         return try {
             val jsonArray = JSONArray(labelsJson)
@@ -1061,7 +1167,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun readLabelEffectOverrides(profile: DetectionConfig.LabelProfile): MutableMap<String, Int> {
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_EFFECT_OVERRIDES else KEY_LABEL_EFFECT_OVERRIDES
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_EFFECT_OVERRIDES
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_EFFECT_OVERRIDES
+            else -> KEY_LABEL_EFFECT_OVERRIDES
+        }
         val json = sharedPrefs.getString(key, null) ?: return mutableMapOf()
         return try {
             val obj = JSONObject(json)
@@ -1091,14 +1201,22 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 obj.put(label, mode)
             }
         }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_EFFECT_OVERRIDES else KEY_LABEL_EFFECT_OVERRIDES
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_EFFECT_OVERRIDES
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_EFFECT_OVERRIDES
+            else -> KEY_LABEL_EFFECT_OVERRIDES
+        }
         sharedPrefs.edit().putString(key, obj.toString()).apply()
     }
 
     private fun setReverseLabels(profile: DetectionConfig.LabelProfile, labels: List<String>) {
         val jsonArray = JSONArray()
         labels.filterNot { isReverseLockedInProfile(it, profile) }.forEach { jsonArray.put(it) }
-        val key = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_REVERSE_LABELS else KEY_REVERSE_LABELS
+        val key = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_REVERSE_LABELS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_REVERSE_LABELS
+            else -> KEY_REVERSE_LABELS
+        }
         sharedPrefs.edit().putString(key, jsonArray.toString()).apply()
         normalizeProtectedLabelState(profile)
     }
@@ -1119,7 +1237,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun readLabelStickerUris(profile: DetectionConfig.LabelProfile): MutableMap<String, String> {
-        val keyName = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_STICKER_URIS else KEY_LABEL_STICKER_URIS
+        val keyName = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_STICKER_URIS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_STICKER_URIS
+            else -> KEY_LABEL_STICKER_URIS
+        }
         val json = sharedPrefs.getString(keyName, null) ?: return mutableMapOf()
         return try {
             val obj = JSONObject(json)
@@ -1149,7 +1271,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 obj.put(label, uri)
             }
         }
-        val keyName = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_STICKER_URIS else KEY_LABEL_STICKER_URIS
+        val keyName = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_STICKER_URIS
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_STICKER_URIS
+            else -> KEY_LABEL_STICKER_URIS
+        }
         sharedPrefs.edit().putString(keyName, obj.toString()).apply()
     }
 
@@ -1158,7 +1284,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun readLabelMaskScales(profile: DetectionConfig.LabelProfile): MutableMap<String, Float> {
-        val keyName = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_MASK_SCALES else KEY_LABEL_MASK_SCALES
+        val keyName = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_MASK_SCALES
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_MASK_SCALES
+            else -> KEY_LABEL_MASK_SCALES
+        }
         val json = sharedPrefs.getString(keyName, null) ?: return mutableMapOf()
         return try {
             val obj = JSONObject(json)
@@ -1188,7 +1318,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 obj.put(label, scale.coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX).toDouble())
             }
         }
-        val keyName = if (profile == DetectionConfig.LabelProfile.ANIME) KEY_ANIME_LABEL_MASK_SCALES else KEY_LABEL_MASK_SCALES
+        val keyName = when (profile) {
+            DetectionConfig.LabelProfile.ANIME -> KEY_ANIME_LABEL_MASK_SCALES
+            DetectionConfig.LabelProfile.BODY -> KEY_BODY_LABEL_MASK_SCALES
+            else -> KEY_LABEL_MASK_SCALES
+        }
         sharedPrefs.edit().putString(keyName, obj.toString()).apply()
     }
 }

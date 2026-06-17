@@ -49,6 +49,7 @@ class ImageProcessingFragment : Fragment() {
     }
 
     private var yoloRunner: YoloOnnxRunner? = null
+    private var bodyPartRunner: BodyPartSegmentationRunner? = null
     private lateinit var imagePreview: ImageView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
@@ -58,6 +59,7 @@ class ImageProcessingFragment : Fragment() {
     private lateinit var runButton: Button
     private lateinit var screenDetectionButton: Button
     private lateinit var animeModelSwitch: Switch
+    private lateinit var bodyPartDetectionSwitch: Switch
     private lateinit var videoHighLoadSwitch: Switch
     private lateinit var batchResultsRecyclerView: RecyclerView
     
@@ -194,6 +196,7 @@ class ImageProcessingFragment : Fragment() {
         runButton = view.findViewById(R.id.btnRunModel)
         screenDetectionButton = view.findViewById(R.id.btnScreenDetection)
         animeModelSwitch = view.findViewById(R.id.switchAnimeModel)
+        bodyPartDetectionSwitch = view.findViewById(R.id.switchBodyPartDetection)
         videoHighLoadSwitch = view.findViewById(R.id.switchVideoHighLoad)
         batchResultsRecyclerView = view.findViewById(R.id.batchResultsRecyclerView)
 
@@ -209,6 +212,9 @@ class ImageProcessingFragment : Fragment() {
         privacySettingsManager = PrivacySettingsManager.getInstance(requireContext())
         appSettingsManager = AppSettingsManager.getInstance(requireContext())
         animeModelSwitch.isChecked = appSettingsManager.getDetectionModelVariant() == DetectionModelVariant.ANIME
+        bodyPartDetectionSwitch.isChecked = appSettingsManager.isBodyPartDetectionEnabled()
+        bodyPartDetectionSwitch.isEnabled =
+            appSettingsManager.getDetectionModelVariant() == DetectionModelVariant.STANDARD
         animeModelSwitch.setOnCheckedChangeListener { _, isChecked ->
             val newVariant = if (isChecked) DetectionModelVariant.ANIME else DetectionModelVariant.STANDARD
             if (appSettingsManager.getDetectionModelVariant() == newVariant) return@setOnCheckedChangeListener
@@ -216,12 +222,26 @@ class ImageProcessingFragment : Fragment() {
             yoloRunner = null
             isModelLoaded = false
             loadedModelVariant = null
+            bodyPartDetectionSwitch.isEnabled = newVariant == DetectionModelVariant.STANDARD
             Toast.makeText(
                 requireContext(),
                 getString(R.string.image_processing_model_switched, newVariant.displayName),
                 Toast.LENGTH_SHORT
             ).show()
             DebugLogManager.addLog("模型", "首页检测模型切换为: ${newVariant.runtimeLabel}")
+        }
+        bodyPartDetectionSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (appSettingsManager.isBodyPartDetectionEnabled() == isChecked) return@setOnCheckedChangeListener
+            appSettingsManager.setBodyPartDetectionEnabled(isChecked)
+            Toast.makeText(
+                requireContext(),
+                if (isChecked) {
+                    getString(R.string.body_part_detection_enabled)
+                } else {
+                    getString(R.string.body_part_detection_disabled)
+                },
+                Toast.LENGTH_SHORT
+            ).show()
         }
         videoHighLoadSwitch.isChecked = appSettingsManager.isVideoHighLoadEnabled()
         videoHighLoadSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -842,8 +862,26 @@ class ImageProcessingFragment : Fragment() {
                 val detections = withContext(Dispatchers.Default) {
                     runner.run(bitmap)
                 }
+                val bodySegmentations = if (
+                    targetVariant == DetectionModelVariant.STANDARD &&
+                    appSettingsManager.isBodyPartDetectionEnabled()
+                ) {
+                    val segRunner = bodyPartRunner ?: withContext(Dispatchers.IO) {
+                        BodyPartSegmentationProvider.getRunner(requireContext()).also {
+                            bodyPartRunner = it
+                        }
+                    }
+                    withContext(Dispatchers.Default) {
+                        segRunner.run(bitmap)
+                    }
+                } else {
+                    emptyList()
+                }
                 
-                DebugLogManager.addLog("图片处理", "推理完成，检测到 ${detections.size} 个目标")
+                DebugLogManager.addLog(
+                    "图片处理",
+                    "推理完成，检测到 ${detections.size} 个框目标，${bodySegmentations.size} 个部位区域"
+                )
                 progressBar.progress = 80
                 updateSingleProgressText(80)
                 
@@ -868,6 +906,7 @@ class ImageProcessingFragment : Fragment() {
                         bytes = bytes,
                         originalName = selectedName,
                         detections = detections,
+                        segmentations = bodySegmentations,
                         preferredDetectedFolder = selectedDetectedFolder
                     )
                 }

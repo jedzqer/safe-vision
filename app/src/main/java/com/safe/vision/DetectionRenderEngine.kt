@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
 import kotlin.math.abs
@@ -16,6 +18,7 @@ class DetectionRenderEngine(
     data class DetectionRenderItem(
         val className: String,
         val rect: Rect,
+        val maskBitmap: Bitmap? = null,
         val boxRotationDegrees: Float? = null,
         val leftEye: PointF? = null,
         val rightEye: PointF? = null,
@@ -25,6 +28,9 @@ class DetectionRenderEngine(
 
     data class RenderSettings(
         val defaultBlurMode: Int,
+        val defaultBlurModes: Map<DetectionConfig.LabelProfile, Int> = mapOf(
+            DetectionConfig.LabelProfile.STANDARD to defaultBlurMode
+        ),
         val labelEffectOverrides: Map<String, Int>,
         val reverseLabels: Set<String>,
         val useCircularMask: Boolean,
@@ -45,6 +51,7 @@ class DetectionRenderEngine(
         val circular: Boolean,
         val label: String,
         val clipPath: Path? = null,
+        val maskBitmap: Bitmap? = null,
         val rotationDegrees: Float = 0f
     )
 
@@ -56,6 +63,7 @@ class DetectionRenderEngine(
         val allowCircular: Boolean,
         val usesEyeStrip: Boolean,
         val clipPath: Path?,
+        val maskBitmap: Bitmap?,
         val rotationDegrees: Float,
         val boxRotationDegrees: Float = 0f
     )
@@ -68,6 +76,11 @@ class DetectionRenderEngine(
 
     companion object {
         private const val EYE_STRIP_ASPECT_MAX = 3f
+    }
+
+    private fun defaultModeForLabel(label: String, settings: RenderSettings): Int {
+        val profile = DetectionConfig.resolveProfileForLabel(label)
+        return settings.defaultBlurModes[profile] ?: settings.defaultBlurMode
     }
 
     fun applyDetections(
@@ -85,7 +98,9 @@ class DetectionRenderEngine(
                 detections.none { settings.reverseLabels.contains(it.className) }
         if (shouldFullscreenFallback) {
             val firstReverseLabel = settings.reverseLabels.firstOrNull()
-            val rawMode = firstReverseLabel?.let { settings.labelEffectOverrides[it] } ?: settings.defaultBlurMode
+            val rawMode = firstReverseLabel?.let {
+                settings.labelEffectOverrides[it] ?: defaultModeForLabel(it, settings)
+            } ?: settings.defaultBlurMode
             val fullscreenMode = if (rawMode == PrivacySettingsManager.BLUR_MODE_EYES) {
                 PrivacySettingsManager.BLUR_MODE_MOSAIC
             } else {
@@ -116,7 +131,8 @@ class DetectionRenderEngine(
             val rect = BlurEffects.clampRect(detection.rect, sourceBitmap.width, sourceBitmap.height)
             if (rect.width() <= 0 || rect.height() <= 0) return@forEach
 
-            val blurMode = settings.labelEffectOverrides[detection.className] ?: settings.defaultBlurMode
+            val blurMode = settings.labelEffectOverrides[detection.className]
+                ?: defaultModeForLabel(detection.className, settings)
             val usesEyeStrip = DetectionConfig.isEyeRegionLabel(detection.className)
             val eyeTarget = if (usesEyeStrip) {
                 resolveEyeTarget(detection, rect, sourceBitmap.width, sourceBitmap.height)
@@ -150,6 +166,7 @@ class DetectionRenderEngine(
             val renderMode = resolveRenderMode(blurMode, settings.defaultBlurMode)
             val allowCircular = settings.useCircularMask && !usesEyeStrip
             val clipPath = when {
+                detection.maskBitmap != null -> null
                 usesEyeStrip -> scaledEyePath
                 abs(detection.boxRotationDegrees ?: 0f) > 0.01f -> {
                     BlurEffects.rotatedRectPath(
@@ -173,6 +190,7 @@ class DetectionRenderEngine(
                         circular = allowCircular,
                         label = detection.className,
                         clipPath = clipPath,
+                        maskBitmap = detection.maskBitmap,
                         rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else detection.boxRotationDegrees ?: 0f
                     )
                 )
@@ -191,6 +209,7 @@ class DetectionRenderEngine(
                         allowCircular = allowCircular,
                         usesEyeStrip = usesEyeStrip,
                         clipPath = clipPath,
+                        maskBitmap = detection.maskBitmap,
                         rotationDegrees = if (usesEyeStrip) eyeTarget?.rotationDegrees ?: 0f else 0f,
                         boxRotationDegrees = if (usesEyeStrip) 0f else detection.boxRotationDegrees ?: 0f
                     )
@@ -284,7 +303,12 @@ class DetectionRenderEngine(
             }
         }
         var outlineShape: BlurEffects.OutlineShape? = null
-        if (task.allowCircular) {
+        if (task.maskBitmap != null) {
+            renderMaskTask(canvas, source, task, stickerProvider, callbacks)
+            if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
+                outlineShape = BlurEffects.OutlineShape.RectShape(task.drawRect)
+            }
+        } else if (task.allowCircular) {
             val circleBounds = BlurEffects.circumscribedCircleBounds(task.drawRect, source.width, source.height)
             BlurEffects.drawWithCircularClip(canvas, task.drawRect) { applyEffect(circleBounds) }
             if (shouldOutline(task.className) && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
@@ -314,6 +338,51 @@ class DetectionRenderEngine(
             }
         }
         return outlineShape
+    }
+
+    private fun renderMaskTask(
+        canvas: Canvas,
+        source: Bitmap,
+        task: NormalRenderTask,
+        stickerProvider: (String?) -> Bitmap?,
+        callbacks: RenderCallbacks
+    ) {
+        val mask = task.maskBitmap ?: return
+        val temp = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val tempCanvas = Canvas(temp)
+        when (task.renderMode) {
+            PrivacySettingsManager.BLUR_MODE_BLACK -> BlurEffects.drawBlack(tempCanvas, task.drawRect)
+            PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
+                BlurEffects.drawGaussian(tempCanvas, source, task.drawRect, privacySettings.getGaussianRadius())
+            }
+            PrivacySettingsManager.BLUR_MODE_SOBEL -> BlurEffects.drawSobelEdge(tempCanvas, source, task.drawRect)
+            PrivacySettingsManager.BLUR_MODE_STICKER -> {
+                val stickerBitmap = stickerProvider(task.className)
+                if (stickerBitmap != null) {
+                    BlurEffects.drawSticker(
+                        tempCanvas,
+                        stickerBitmap,
+                        task.drawRect,
+                        source.width,
+                        source.height,
+                        fitInsideRect = false,
+                        rotationDegrees = 0f
+                    )
+                } else {
+                    callbacks.onNormalStickerFallback()
+                    BlurEffects.drawMosaic(tempCanvas, source, task.drawRect, privacySettings.getMosaicBlockSize())
+                }
+            }
+            else -> BlurEffects.drawMosaic(tempCanvas, source, task.drawRect, privacySettings.getMosaicBlockSize())
+        }
+        val checkpoint = canvas.saveLayer(null, null)
+        canvas.drawBitmap(temp, 0f, 0f, null)
+        val maskPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+        }
+        canvas.drawBitmap(mask, null, RectF(task.drawRect), maskPaint)
+        canvas.restoreToCount(checkpoint)
+        if (!temp.isRecycled) temp.recycle()
     }
 
     private fun applyReverseMask(
@@ -390,6 +459,16 @@ class DetectionRenderEngine(
                 outputCanvas.clipPath(item.clipPath)
                 outputCanvas.drawBitmap(base, 0f, 0f, null)
                 outputCanvas.restoreToCount(save)
+            } else if (item.maskBitmap != null) {
+                val temp = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
+                val tempCanvas = Canvas(temp)
+                tempCanvas.drawBitmap(base, item.rect, item.rect, null)
+                val clearPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+                }
+                tempCanvas.drawBitmap(item.maskBitmap, null, RectF(item.rect), clearPaint)
+                outputCanvas.drawBitmap(temp, 0f, 0f, null)
+                if (!temp.isRecycled) temp.recycle()
             } else {
                 outputCanvas.drawBitmap(base, item.rect, item.rect, null)
             }
