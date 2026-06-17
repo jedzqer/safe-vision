@@ -43,7 +43,7 @@ android {
         jvmTarget = "17"
     }
 
-    sourceSets["main"].assets.srcDirs("src/main/assets", "../assets", "../seg_clothe/onnx")
+    sourceSets["main"].assets.srcDirs("src/main/assets", "../assets")
 
     buildFeatures {
         buildConfig = true

@@ -181,7 +181,7 @@ class BodyPartSegmentationRunner(
     private fun ensureModelFile(): File {
         val modelFile = File(appContext.cacheDir, "seg_clothe_model.onnx")
         if (!modelFile.exists()) {
-            appContext.assets.open("model.onnx").use { input ->
+            appContext.assets.open("segformer_body_seg.onnx").use { input ->
                 modelFile.outputStream().use { output -> input.copyTo(output) }
             }
         }
