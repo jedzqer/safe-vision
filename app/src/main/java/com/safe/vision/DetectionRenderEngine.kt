@@ -378,6 +378,8 @@ class DetectionRenderEngine(
         val checkpoint = canvas.saveLayer(null, null)
         canvas.drawBitmap(temp, 0f, 0f, null)
         val maskPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
         }
         canvas.drawBitmap(mask, null, RectF(task.drawRect), maskPaint)

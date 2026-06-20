@@ -11,6 +11,8 @@ import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
 import java.util.ArrayDeque
+import kotlin.math.exp
+import kotlin.math.roundToInt
 
 class BodyPartSegmentationRunner(
     context: Context
@@ -48,8 +50,13 @@ class BodyPartSegmentationRunner(
                 }
             }
             try {
-                val labelMap = upsampleAndArgmax(logits, bitmap.width, bitmap.height)
-                return extractRegions(labelMap, bitmap.width, bitmap.height)
+                val classified = upsampleAndClassify(logits, bitmap.width, bitmap.height)
+                return extractRegions(
+                    classified.labelMap,
+                    classified.alphaMap,
+                    bitmap.width,
+                    bitmap.height
+                )
             } finally {
                 if (!scaled.isRecycled) scaled.recycle()
             }
@@ -77,16 +84,28 @@ class BodyPartSegmentationRunner(
         )
     }
 
-    private fun upsampleAndArgmax(
+    private data class ClassifiedSegmentation(
+        val labelMap: IntArray,
+        val alphaMap: IntArray
+    )
+
+    private fun upsampleAndClassify(
         logits: Array<Array<FloatArray>>,
         targetWidth: Int,
         targetHeight: Int
-    ): IntArray {
+    ): ClassifiedSegmentation {
         val classes = logits.size
         val srcHeight = logits.firstOrNull()?.size ?: 0
         val srcWidth = logits.firstOrNull()?.firstOrNull()?.size ?: 0
-        if (classes == 0 || srcHeight == 0 || srcWidth == 0) return IntArray(targetWidth * targetHeight)
-        val out = IntArray(targetWidth * targetHeight)
+        if (classes == 0 || srcHeight == 0 || srcWidth == 0) {
+            return ClassifiedSegmentation(
+                labelMap = IntArray(targetWidth * targetHeight),
+                alphaMap = IntArray(targetWidth * targetHeight)
+            )
+        }
+        val labelMap = IntArray(targetWidth * targetHeight)
+        val alphaMap = IntArray(targetWidth * targetHeight)
+        val interpolatedLogits = FloatArray(classes)
         for (y in 0 until targetHeight) {
             val srcY = if (targetHeight <= 1) 0f else y * (srcHeight - 1f) / (targetHeight - 1f)
             val y0 = srcY.toInt().coerceIn(0, srcHeight - 1)
@@ -108,18 +127,40 @@ class BodyPartSegmentationRunner(
                     val top = topLeft + (topRight - topLeft) * wx
                     val bottom = bottomLeft + (bottomRight - bottomLeft) * wx
                     val value = top + (bottom - top) * wy
+                    interpolatedLogits[label] = value
                     if (value > bestValue) {
                         bestValue = value
                         bestLabel = label
                     }
                 }
-                out[y * targetWidth + x] = bestLabel
+                val alpha = if (bestLabel <= 0) {
+                    0
+                } else {
+                    var softmaxDenominator = 0.0
+                    for (label in 0 until classes) {
+                        softmaxDenominator += exp((interpolatedLogits[label] - bestValue).toDouble())
+                    }
+                    val probability = if (softmaxDenominator > 0.0) {
+                        1.0 / softmaxDenominator
+                    } else {
+                        0.0
+                    }
+                    (probability * 255.0).roundToInt().coerceIn(0, 255)
+                }
+                val index = y * targetWidth + x
+                labelMap[index] = bestLabel
+                alphaMap[index] = alpha
             }
         }
-        return out
+        return ClassifiedSegmentation(labelMap = labelMap, alphaMap = alphaMap)
     }
 
-    private fun extractRegions(labelMap: IntArray, width: Int, height: Int): List<BodyPartMaskRegion> {
+    private fun extractRegions(
+        labelMap: IntArray,
+        alphaMap: IntArray,
+        width: Int,
+        height: Int
+    ): List<BodyPartMaskRegion> {
         val visited = BooleanArray(labelMap.size)
         val results = mutableListOf<BodyPartMaskRegion>()
         val queue = ArrayDeque<Int>()
@@ -164,7 +205,7 @@ class BodyPartSegmentationRunner(
             for (pixelIndex in pixels) {
                 val x = pixelIndex % width - minX
                 val y = pixelIndex / width - minY
-                maskPixels[y * boxWidth + x] = Color.argb(255, 255, 255, 255)
+                maskPixels[y * boxWidth + x] = Color.argb(alphaMap[pixelIndex], 255, 255, 255)
             }
             mask.setPixels(maskPixels, 0, boxWidth, 0, 0, boxWidth, boxHeight)
             results.add(

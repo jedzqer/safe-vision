@@ -8,7 +8,7 @@ object DetectionMetadataFormat {
     private const val KEY_LABEL_FORMAT = "label_format"
     private const val KEY_DETECTIONS = "detections"
     private const val KEY_SEGMENTATIONS = "segmentations"
-    private const val CURRENT_SCHEMA_VERSION = 3
+    private const val CURRENT_SCHEMA_VERSION = 4
 
     data class Document(
         val detections: JSONArray,

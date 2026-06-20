@@ -9,31 +9,43 @@ data class BodyPartMaskRegion(
     val box: Rect,
     val maskAlphaBitmap: Bitmap
 ) {
-    fun encodeMaskToRle(): IntArray {
+    data class AlphaRle(
+        val counts: IntArray,
+        val values: IntArray
+    )
+
+    fun encodeMaskToAlphaRle(): AlphaRle {
         val width = maskAlphaBitmap.width
         val height = maskAlphaBitmap.height
-        if (width <= 0 || height <= 0) return intArrayOf()
+        if (width <= 0 || height <= 0) return AlphaRle(intArrayOf(), intArrayOf())
         val pixels = IntArray(width * height)
         maskAlphaBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val counts = ArrayList<Int>()
-        var currentValue = 0
+        val values = ArrayList<Int>()
+        var currentValue = -1
         var runLength = 0
         for (pixel in pixels) {
-            val value = if (Color.alpha(pixel) > 0) 1 else 0
+            val value = Color.alpha(pixel).coerceIn(0, 255)
             if (value == currentValue) {
                 runLength++
             } else {
-                counts.add(runLength)
+                if (runLength > 0) {
+                    counts.add(runLength)
+                    values.add(currentValue)
+                }
                 currentValue = value
                 runLength = 1
             }
         }
-        counts.add(runLength)
-        return counts.toIntArray()
+        if (runLength > 0) {
+            counts.add(runLength)
+            values.add(currentValue)
+        }
+        return AlphaRle(counts.toIntArray(), values.toIntArray())
     }
 
     companion object {
-        fun decodeMaskFromRle(width: Int, height: Int, counts: IntArray): Bitmap? {
+        fun decodeMaskFromBinaryRle(width: Int, height: Int, counts: IntArray): Bitmap? {
             if (width <= 0 || height <= 0) return null
             val totalPixels = width * height
             val maskPixels = IntArray(totalPixels)
@@ -60,6 +72,31 @@ data class BodyPartMaskRegion(
                 setPixels(maskPixels, 0, width, 0, 0, width, height)
             }
         }
+
+        fun decodeMaskFromAlphaRle(width: Int, height: Int, counts: IntArray, values: IntArray): Bitmap? {
+            if (width <= 0 || height <= 0) return null
+            if (counts.size != values.size) return null
+            val totalPixels = width * height
+            val maskPixels = IntArray(totalPixels)
+            var offset = 0
+            for (i in counts.indices) {
+                val count = counts[i]
+                val alpha = values[i].coerceIn(0, 255)
+                if (count < 0) return null
+                repeat(count) {
+                    if (offset >= totalPixels) return@repeat
+                    maskPixels[offset] = Color.argb(alpha, 255, 255, 255)
+                    offset++
+                }
+            }
+            while (offset < totalPixels) {
+                maskPixels[offset] = Color.argb(0, 255, 255, 255)
+                offset++
+            }
+            return Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8).apply {
+                setPixels(maskPixels, 0, width, 0, 0, width, height)
+            }
+        }
     }
 }
 
@@ -69,17 +106,20 @@ object BodyPartSegmentationMetadata {
     private const val KEY_MASK_ORIGIN = "origin"
     private const val KEY_MASK_SIZE = "size"
     private const val KEY_MASK_COUNTS = "counts"
+    private const val KEY_MASK_VALUES = "values"
     private const val MASK_ENCODING_RLE_V1 = "rle_v1"
+    private const val MASK_ENCODING_ALPHA_RLE_V2 = "alpha_rle_v2"
 
     fun toJsonObject(region: BodyPartMaskRegion): org.json.JSONObject {
         val box = region.box
         val mask = region.maskAlphaBitmap
+        val encoded = region.encodeMaskToAlphaRle()
         return org.json.JSONObject()
             .put("class", DetectionConfig.normalizeSegmentationLabel(region.label))
             .put(
                 KEY_MASK,
                 org.json.JSONObject()
-                    .put(KEY_MASK_ENCODING, MASK_ENCODING_RLE_V1)
+                    .put(KEY_MASK_ENCODING, MASK_ENCODING_ALPHA_RLE_V2)
                     .put(
                         KEY_MASK_ORIGIN,
                         org.json.JSONArray().apply {
@@ -97,7 +137,13 @@ object BodyPartSegmentationMetadata {
                     .put(
                         KEY_MASK_COUNTS,
                         org.json.JSONArray().apply {
-                            region.encodeMaskToRle().forEach { put(it) }
+                            encoded.counts.forEach { put(it) }
+                        }
+                    )
+                    .put(
+                        KEY_MASK_VALUES,
+                        org.json.JSONArray().apply {
+                            encoded.values.forEach { put(it) }
                         }
                     )
             )
@@ -116,7 +162,6 @@ object BodyPartSegmentationMetadata {
 
     private fun decodeMaskObject(obj: org.json.JSONObject?): Pair<Rect, Bitmap>? {
         if (obj == null) return null
-        if (obj.optString(KEY_MASK_ENCODING) != MASK_ENCODING_RLE_V1) return null
         val originArray = obj.optJSONArray(KEY_MASK_ORIGIN) ?: return null
         val sizeArray = obj.optJSONArray(KEY_MASK_SIZE) ?: return null
         if (originArray.length() < 2 || sizeArray.length() < 2) return null
@@ -129,7 +174,17 @@ object BodyPartSegmentationMetadata {
         val counts = IntArray(countsArray.length()) { index ->
             countsArray.optInt(index, -1)
         }
-        val bitmap = BodyPartMaskRegion.decodeMaskFromRle(width, height, counts) ?: return null
+        val bitmap = when (obj.optString(KEY_MASK_ENCODING)) {
+            MASK_ENCODING_RLE_V1 -> BodyPartMaskRegion.decodeMaskFromBinaryRle(width, height, counts)
+            MASK_ENCODING_ALPHA_RLE_V2 -> {
+                val valuesArray = obj.optJSONArray(KEY_MASK_VALUES) ?: return null
+                val values = IntArray(valuesArray.length()) { index ->
+                    valuesArray.optInt(index, -1)
+                }
+                BodyPartMaskRegion.decodeMaskFromAlphaRle(width, height, counts, values)
+            }
+            else -> null
+        } ?: return null
         return Rect(left, top, left + width, top + height) to ensureAlphaMask(bitmap)
     }
 
