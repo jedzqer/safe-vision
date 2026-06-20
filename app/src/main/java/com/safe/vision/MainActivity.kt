@@ -11,13 +11,11 @@ import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.io.File
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -90,7 +88,6 @@ class MainActivity : AppCompatActivity() {
 
         handleIncomingShareIntent(intent)
         maybeShowFirstLaunchDialog()
-        maybeShowBodyPartMigrationDialog()
         window.decorView.post {
             ErrorReportManager.maybeShowPendingCrashDialog(this)
         }
@@ -250,26 +247,5 @@ class MainActivity : AppCompatActivity() {
             }
             .setCancelable(false)
             .show()
-    }
-
-    private fun maybeShowBodyPartMigrationDialog() {
-        val migrationManager = BodyPartMigrationManager.getInstance(this)
-        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-        val hasShownWelcome = prefs.getBoolean("welcome_shown", false)
-        if (!hasShownWelcome) return
-        if (migrationManager.isMigrationDone()) return
-        lifecycleScope.launch {
-            if (!migrationManager.hasLegacyJsonImagesAsync()) return@launch
-            if (isFinishing || isDestroyed) return@launch
-            DialogUtils.builder(this@MainActivity)
-                .setTitle(R.string.body_part_migration_title)
-                .setMessage(R.string.body_part_migration_message)
-                .setPositiveButton(R.string.body_part_migration_confirm) { dialog, _ ->
-                    migrationManager.startMigration()
-                    dialog.dismiss()
-                }
-                .setNegativeButton(R.string.body_part_migration_later, null)
-                .show()
-        }
     }
 }

@@ -14,15 +14,17 @@ import kotlinx.coroutines.withContext
  */
 class ImagePrivacyProcessor {
     private val privacySettings: PrivacySettingsManager
+    private val appSettings: AppSettingsManager
     private val renderEngine: DetectionRenderEngine
     private val context: Context
-    
+
     constructor(context: Context) {
         this.context = context.applicationContext
         privacySettings = PrivacySettingsManager.getInstance(this.context)
+        appSettings = AppSettingsManager.getInstance(this.context)
         renderEngine = DetectionRenderEngine(privacySettings)
     }
-    
+
     /**
      * 对图片应用隐私遮挡
      * @param originalBitmap 原始图片
@@ -33,7 +35,7 @@ class ImagePrivacyProcessor {
         if (metadataFile == null || !metadataFile.exists()) {
             return originalBitmap
         }
-        
+
         try {
             val metadata = withContext(Dispatchers.IO) { metadataFile.readText() }
             val metadataDoc = DetectionMetadataFormat.parse(metadata)
@@ -113,18 +115,21 @@ class ImagePrivacyProcessor {
                 )
             }
 
-            for (i in 0 until metadataDoc.segmentations.length()) {
-                val segmentationObj = metadataDoc.segmentations.optJSONObject(i) ?: continue
-                val region = BodyPartSegmentationMetadata.fromJsonObject(segmentationObj) ?: continue
-                val rect = BlurEffects.clampRect(region.box, originalBitmap.width, originalBitmap.height)
-                if (rect.width() <= 0 || rect.height() <= 0) continue
-                rawRenderItems.add(
-                    DetectionRenderEngine.DetectionRenderItem(
-                        className = region.label,
-                        rect = rect,
-                        maskBitmap = region.maskAlphaBitmap
+            val bodyPartViewEnabled = appSettings.isBodyPartViewEnabled()
+            if (bodyPartViewEnabled) {
+                for (i in 0 until metadataDoc.segmentations.length()) {
+                    val segmentationObj = metadataDoc.segmentations.optJSONObject(i) ?: continue
+                    val region = BodyPartSegmentationMetadata.fromJsonObject(segmentationObj) ?: continue
+                    val rect = BlurEffects.clampRect(region.box, originalBitmap.width, originalBitmap.height)
+                    if (rect.width() <= 0 || rect.height() <= 0) continue
+                    renderItems.add(
+                        DetectionRenderEngine.DetectionRenderItem(
+                            className = region.label,
+                            rect = rect,
+                            maskBitmap = region.maskAlphaBitmap
+                        )
                     )
-                )
+                }
             }
 
             val hasExplicitEyeRegion = rawRenderItems.any { DetectionConfig.isEyeRegionLabel(it.className) }
