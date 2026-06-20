@@ -24,7 +24,6 @@ import android.widget.RadioGroup
 import android.widget.ScrollView as AndroidScrollView
 import android.widget.SeekBar
 import android.widget.TextView
-import android.widget.Switch
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.AttrRes
@@ -92,7 +91,6 @@ class SettingsFragment : Fragment() {
     private lateinit var labelChipGroup: ChipGroup
     private lateinit var animeLabelChipGroup: ChipGroup
     private lateinit var bodyLabelChipGroup: ChipGroup
-    private lateinit var bodyPartViewSwitch: Switch
     private lateinit var labelSettingsInlineCard: MaterialCardView
     private lateinit var labelSettingsInlineContainer: LinearLayout
     private lateinit var stickerSummary: TextView
@@ -873,7 +871,6 @@ class SettingsFragment : Fragment() {
         labelChipGroup = view.findViewById(R.id.labelChipGroup)
         animeLabelChipGroup = view.findViewById(R.id.animeLabelChipGroup)
         bodyLabelChipGroup = view.findViewById(R.id.bodyLabelChipGroup)
-        bodyPartViewSwitch = view.findViewById(R.id.bodyPartViewSwitch)
         labelSettingsInlineCard = view.findViewById(R.id.labelSettingsInlineCard)
         labelSettingsInlineContainer = view.findViewById(R.id.labelSettingsInlineContainer)
         stickerSummary = view.findViewById(R.id.stickerSummary)
@@ -1262,25 +1259,8 @@ class SettingsFragment : Fragment() {
             DebugLogManager.addLog("设置", "已切换为默认贴纸")
         }
 
-        setupBodyPartViewSwitch()
-
         refreshLabelChips()
         updateStickerSummary()
-    }
-
-    private fun setupBodyPartViewSwitch() {
-        bodyPartViewSwitch.isChecked = appSettings.isBodyPartViewEnabled()
-        bodyPartViewSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (appSettings.isBodyPartViewEnabled() == isChecked) return@setOnCheckedChangeListener
-            appSettings.setBodyPartViewEnabled(isChecked)
-            val msgRes = if (isChecked) {
-                R.string.body_part_view_enabled
-            } else {
-                R.string.body_part_view_disabled
-            }
-            Toast.makeText(requireContext(), msgRes, Toast.LENGTH_SHORT).show()
-            DebugLogManager.addLog("设置", "媒体浏览人体部位显示切换为${if (isChecked) "开启" else "关闭"}")
-        }
     }
 
     private fun saveCurrentPreset() {

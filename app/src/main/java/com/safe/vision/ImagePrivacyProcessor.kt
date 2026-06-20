@@ -14,14 +14,12 @@ import kotlinx.coroutines.withContext
  */
 class ImagePrivacyProcessor {
     private val privacySettings: PrivacySettingsManager
-    private val appSettings: AppSettingsManager
     private val renderEngine: DetectionRenderEngine
     private val context: Context
 
     constructor(context: Context) {
         this.context = context.applicationContext
         privacySettings = PrivacySettingsManager.getInstance(this.context)
-        appSettings = AppSettingsManager.getInstance(this.context)
         renderEngine = DetectionRenderEngine(privacySettings)
     }
 
@@ -115,21 +113,21 @@ class ImagePrivacyProcessor {
                 )
             }
 
-            val bodyPartViewEnabled = appSettings.isBodyPartViewEnabled()
-            if (bodyPartViewEnabled) {
-                for (i in 0 until metadataDoc.segmentations.length()) {
-                    val segmentationObj = metadataDoc.segmentations.optJSONObject(i) ?: continue
-                    val region = BodyPartSegmentationMetadata.fromJsonObject(segmentationObj) ?: continue
-                    val rect = BlurEffects.clampRect(region.box, originalBitmap.width, originalBitmap.height)
-                    if (rect.width() <= 0 || rect.height() <= 0) continue
-                    renderItems.add(
-                        DetectionRenderEngine.DetectionRenderItem(
-                            className = region.label,
-                            rect = rect,
-                            maskBitmap = region.maskAlphaBitmap
-                        )
-                    )
+            for (i in 0 until metadataDoc.segmentations.length()) {
+                val segmentationObj = metadataDoc.segmentations.optJSONObject(i) ?: continue
+                val region = BodyPartSegmentationMetadata.fromJsonObject(segmentationObj) ?: continue
+                if (!privacySettings.isLabelBlocked(region.label, DetectionConfig.LabelProfile.BODY)) {
+                    continue
                 }
+                val rect = BlurEffects.clampRect(region.box, originalBitmap.width, originalBitmap.height)
+                if (rect.width() <= 0 || rect.height() <= 0) continue
+                renderItems.add(
+                    DetectionRenderEngine.DetectionRenderItem(
+                        className = region.label,
+                        rect = rect,
+                        maskBitmap = region.maskAlphaBitmap
+                    )
+                )
             }
 
             val hasExplicitEyeRegion = rawRenderItems.any { DetectionConfig.isEyeRegionLabel(it.className) }

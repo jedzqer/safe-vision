@@ -10,7 +10,7 @@ import android.graphics.Rect
 import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
-import java.util.ArrayDeque
+import java.util.LinkedHashMap
 import kotlin.math.exp
 import kotlin.math.roundToInt
 
@@ -161,62 +161,83 @@ class BodyPartSegmentationRunner(
         width: Int,
         height: Int
     ): List<BodyPartMaskRegion> {
-        val visited = BooleanArray(labelMap.size)
-        val results = mutableListOf<BodyPartMaskRegion>()
-        val queue = ArrayDeque<Int>()
-        val neighbors = intArrayOf(-1, 1, 0, 0)
-        val neighborYs = intArrayOf(0, 0, -1, 1)
+        val aggregateMasks = LinkedHashMap<String, IntArray>()
+        val bounds = LinkedHashMap<String, IntArray>()
 
         for (index in labelMap.indices) {
             val labelId = labelMap[index]
-            if (labelId <= 0 || visited[index]) continue
-            val label = DetectionConfig.BODY_LABELS.getOrNull(labelId - 1) ?: continue
-            var minX = width
-            var minY = height
-            var maxX = -1
-            var maxY = -1
-            val pixels = mutableListOf<Int>()
-            visited[index] = true
-            queue.add(index)
-            while (queue.isNotEmpty()) {
-                val current = queue.removeFirst()
-                val x = current % width
-                val y = current / width
-                pixels.add(current)
-                if (x < minX) minX = x
-                if (y < minY) minY = y
-                if (x > maxX) maxX = x
-                if (y > maxY) maxY = y
-                for (n in 0 until 4) {
-                    val nx = x + neighbors[n]
-                    val ny = y + neighborYs[n]
-                    if (nx !in 0 until width || ny !in 0 until height) continue
-                    val next = ny * width + nx
-                    if (visited[next] || labelMap[next] != labelId) continue
-                    visited[next] = true
-                    queue.add(next)
-                }
-            }
-            if (maxX < minX || maxY < minY) continue
+            if (labelId <= 0) continue
+            val rawLabel = rawModelLabelForId(labelId) ?: continue
+            val aggregateLabel = DetectionConfig.mapRawBodyLabelToAggregateLabel(rawLabel) ?: continue
+            val alpha = alphaMap[index].coerceIn(0, 255)
+            if (alpha <= 0) continue
+
+            val pixels = aggregateMasks.getOrPut(aggregateLabel) { IntArray(width * height) }
+            pixels[index] = maxOf(pixels[index], alpha)
+
+            val x = index % width
+            val y = index / width
+            val currentBounds = bounds.getOrPut(aggregateLabel) { intArrayOf(width, height, -1, -1) }
+            if (x < currentBounds[0]) currentBounds[0] = x
+            if (y < currentBounds[1]) currentBounds[1] = y
+            if (x > currentBounds[2]) currentBounds[2] = x
+            if (y > currentBounds[3]) currentBounds[3] = y
+        }
+
+        return aggregateMasks.mapNotNull { (label, pixels) ->
+            val labelBounds = bounds[label] ?: return@mapNotNull null
+            val minX = labelBounds[0]
+            val minY = labelBounds[1]
+            val maxX = labelBounds[2]
+            val maxY = labelBounds[3]
+            if (maxX < minX || maxY < minY) return@mapNotNull null
+
             val boxWidth = maxX - minX + 1
             val boxHeight = maxY - minY + 1
-            val mask = Bitmap.createBitmap(boxWidth, boxHeight, Bitmap.Config.ALPHA_8)
-            val maskPixels = IntArray(boxWidth * boxHeight)
-            for (pixelIndex in pixels) {
-                val x = pixelIndex % width - minX
-                val y = pixelIndex / width - minY
-                maskPixels[y * boxWidth + x] = Color.argb(alphaMap[pixelIndex], 255, 255, 255)
+            val croppedPixels = IntArray(boxWidth * boxHeight)
+            for (y in minY..maxY) {
+                val srcOffset = y * width
+                val dstOffset = (y - minY) * boxWidth
+                for (x in minX..maxX) {
+                    val alpha = pixels[srcOffset + x]
+                    if (alpha > 0) {
+                        croppedPixels[dstOffset + (x - minX)] = Color.argb(alpha, 255, 255, 255)
+                    }
+                }
             }
-            mask.setPixels(maskPixels, 0, boxWidth, 0, 0, boxWidth, boxHeight)
-            results.add(
-                BodyPartMaskRegion(
-                    label = label,
-                    box = Rect(minX, minY, maxX + 1, maxY + 1),
-                    maskAlphaBitmap = mask
-                )
+
+            val mask = Bitmap.createBitmap(boxWidth, boxHeight, Bitmap.Config.ALPHA_8).apply {
+                setPixels(croppedPixels, 0, boxWidth, 0, 0, boxWidth, boxHeight)
+            }
+            BodyPartMaskRegion(
+                label = label,
+                box = Rect(minX, minY, maxX + 1, maxY + 1),
+                maskAlphaBitmap = mask
             )
         }
-        return results
+    }
+
+    private fun rawModelLabelForId(labelId: Int): String? {
+        return when (labelId) {
+            1 -> "Hat"
+            2 -> "Hair"
+            3 -> "Sunglasses"
+            4 -> "Upper-clothes"
+            5 -> "Skirt"
+            6 -> "Pants"
+            7 -> "Dress"
+            8 -> "Belt"
+            9 -> "Left-shoe"
+            10 -> "Right-shoe"
+            11 -> "Face"
+            12 -> "Left-leg"
+            13 -> "Right-leg"
+            14 -> "Left-arm"
+            15 -> "Right-arm"
+            16 -> "Bag"
+            17 -> "Scarf"
+            else -> null
+        }
     }
 
     private fun ensureModelFile(): File {

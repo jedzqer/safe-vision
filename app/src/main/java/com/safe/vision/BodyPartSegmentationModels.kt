@@ -111,11 +111,14 @@ object BodyPartSegmentationMetadata {
     private const val MASK_ENCODING_ALPHA_RLE_V2 = "alpha_rle_v2"
 
     fun toJsonObject(region: BodyPartMaskRegion): org.json.JSONObject {
+        require(DetectionConfig.BODY_LABELS.contains(region.label)) {
+            "Unsupported body segmentation label: ${region.label}"
+        }
         val box = region.box
         val mask = region.maskAlphaBitmap
         val encoded = region.encodeMaskToAlphaRle()
         return org.json.JSONObject()
-            .put("class", DetectionConfig.normalizeSegmentationLabel(region.label))
+            .put("class", region.label)
             .put(
                 KEY_MASK,
                 org.json.JSONObject()
@@ -150,7 +153,7 @@ object BodyPartSegmentationMetadata {
     }
 
     fun fromJsonObject(obj: org.json.JSONObject): BodyPartMaskRegion? {
-        val label = DetectionConfig.normalizeSegmentationLabel(obj.optString("class"))
+        val label = obj.optString("class")
         if (!DetectionConfig.BODY_LABELS.contains(label)) return null
         val decoded = decodeMaskObject(obj.optJSONObject(KEY_MASK)) ?: return null
         return BodyPartMaskRegion(

@@ -75,8 +75,8 @@ object DetectionMetadataFormat {
         }
         for (i in 0 until segmentations.length()) {
             val obj = segmentations.optJSONObject(i) ?: continue
-            val label = DetectionConfig.normalizeSegmentationLabel(obj.optString("class"))
-            if (label.isNotBlank()) labels.add(label)
+            val label = obj.optString("class")
+            if (DetectionConfig.BODY_LABELS.contains(label)) labels.add(label)
         }
         return labels
     }
@@ -90,8 +90,8 @@ object DetectionMetadataFormat {
         }
         for (i in 0 until document.segmentations.length()) {
             val obj = document.segmentations.optJSONObject(i) ?: continue
-            val label = DetectionConfig.normalizeSegmentationLabel(obj.optString("class"))
-            if (DetectionConfig.LABELS.contains(label)) labels.add(label)
+            val label = obj.optString("class")
+            if (DetectionConfig.BODY_LABELS.contains(label)) labels.add(label)
         }
         return labels
     }

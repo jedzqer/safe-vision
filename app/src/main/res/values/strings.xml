@@ -295,12 +295,8 @@
     <string name="settings_label_effects_hint">点击标签可开关遮挡或设置效果，未设置时使用全局默认效果</string>
     <string name="settings_anime_label_effects_title">动漫标签处理</string>
     <string name="settings_anime_label_effects_hint">查看带有动漫标签格式的 JSON 时，将使用这里的标签效果配置</string>
-    <string name="settings_body_label_effects_title">人体部位标签处理</string>
-    <string name="settings_body_part_view_title">媒体浏览时显示人体部位遮挡</string>
-    <string name="settings_body_part_view_summary">开启后，已识别的人体部位将在媒体浏览中显示遮挡效果。此总开关会覆盖下方人体部位单标签设置。</string>
-    <string name="body_part_view_enabled">媒体浏览人体部位遮挡已开启</string>
-    <string name="body_part_view_disabled">媒体浏览人体部位遮挡已关闭</string>
-    <string name="settings_body_label_effects_hint">人体部位识别结果会使用这里的标签效果配置</string>
+    <string name="settings_body_label_effects_title">人体双标签分割处理</string>
+    <string name="settings_body_label_effects_hint">人体分割结果会合并为衣物和皮肤两个标签，并使用这里的标签效果配置</string>
     <string name="settings_label_dialog_title">标签设置：%1$s</string>
     <string name="settings_label_enabled">启用遮挡</string>
     <string name="settings_label_reverse">反向遮挡</string>

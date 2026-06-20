@@ -261,12 +261,8 @@
     <string name="settings_label_effects_hint">라벨을 눌러 마스크를 켜거나 효과를 설정하세요. 설정되지 않은 라벨은 전역 기본 효과를 사용합니다.</string>
     <string name="settings_anime_label_effects_title">애니메이션 라벨 처리</string>
     <string name="settings_anime_label_effects_hint">애니메이션 라벨 형식의 JSON을 볼 때 이 라벨 효과 설정이 사용됩니다</string>
-    <string name="settings_body_label_effects_title">신체 부위 라벨 처리</string>
-    <string name="settings_body_part_view_title">뷰어에서 신체 부위 마스킹 표시</string>
-    <string name="settings_body_part_view_summary">활성화하면 감지된 신체 부위가 미디어 뷰어에서 마스킹되어 표시됩니다. 이 마스터 스위치는 아래의 신체 부위 개별 라벨 설정을 무시합니다.</string>
-    <string name="body_part_view_enabled">뷰어에서 신체 부위 마스킹이 켜졌습니다</string>
-    <string name="body_part_view_disabled">뷰어에서 신체 부위 마스킹이 꺼졌습니다</string>
-    <string name="settings_body_label_effects_hint">신체 부위 분할 결과는 여기의 라벨 효과 설정을 사용합니다</string>
+    <string name="settings_body_label_effects_title">2라벨 신체 분할 처리</string>
+    <string name="settings_body_label_effects_hint">신체 분할 결과는 의복과 피부 두 라벨로 합쳐지며, 여기서 설정한 라벨 효과를 사용합니다</string>
     <string name="settings_label_dialog_title">라벨 설정: %1$s</string>
     <string name="settings_label_enabled">마스크 사용</string>
     <string name="settings_label_reverse">역방향 마스크</string>

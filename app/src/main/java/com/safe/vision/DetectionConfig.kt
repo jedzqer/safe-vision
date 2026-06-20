@@ -8,8 +8,32 @@ import kotlin.math.max
  */
 object DetectionConfig {
     const val EYE_REGION_LABEL = "EYE_REGION"
-    const val BODY_FACE_LABEL = "BODY_FACE"
-    const val LEGACY_BODY_FACE_LABEL = "Face"
+    const val BODY_CLOTHING_LABEL = "BODY_CLOTHING"
+    const val BODY_SKIN_LABEL = "BODY_SKIN"
+
+    private val RAW_BODY_CLOTHING_LABELS: Set<String> = setOf(
+        "Hat",
+        "Sunglasses",
+        "Upper-clothes",
+        "Skirt",
+        "Pants",
+        "Dress",
+        "Belt",
+        "Left-shoe",
+        "Right-shoe",
+        "Bag",
+        "Scarf"
+    )
+
+    private val RAW_BODY_SKIN_LABELS: Set<String> = setOf(
+        "Hair",
+        "BODY_FACE",
+        "Face",
+        "Left-leg",
+        "Right-leg",
+        "Left-arm",
+        "Right-arm"
+    )
 
     enum class LabelProfile(val formatKey: String) {
         STANDARD("standard"),
@@ -60,23 +84,8 @@ object DetectionConfig {
     )
 
     val BODY_LABELS: List<String> = listOf(
-        "Hat",
-        "Hair",
-        "Sunglasses",
-        "Upper-clothes",
-        "Skirt",
-        "Pants",
-        "Dress",
-        "Belt",
-        "Left-shoe",
-        "Right-shoe",
-        BODY_FACE_LABEL,
-        "Left-leg",
-        "Right-leg",
-        "Left-arm",
-        "Right-arm",
-        "Bag",
-        "Scarf"
+        BODY_CLOTHING_LABEL,
+        BODY_SKIN_LABEL
     )
 
     // All supported labels across saved metadata formats and settings.
@@ -124,23 +133,8 @@ object DetectionConfig {
         "Feet" to "脚部",
         "Nipple" to "乳头",
         "Pussy" to "阴部",
-        "Hat" to "帽子",
-        "Hair" to "头发",
-        "Sunglasses" to "墨镜",
-        "Upper-clothes" to "上衣",
-        "Skirt" to "裙子",
-        "Pants" to "裤子",
-        "Dress" to "连衣裙",
-        "Belt" to "腰带",
-        "Left-shoe" to "左鞋",
-        "Right-shoe" to "右鞋",
-        BODY_FACE_LABEL to "面部",
-        "Left-leg" to "左腿",
-        "Right-leg" to "右腿",
-        "Left-arm" to "左臂",
-        "Right-arm" to "右臂",
-        "Bag" to "包",
-        "Scarf" to "围巾",
+        BODY_CLOTHING_LABEL to "衣物",
+        BODY_SKIN_LABEL to "皮肤",
         EYE_REGION_LABEL to "眼睛"
     )
 
@@ -225,8 +219,16 @@ object DetectionConfig {
         return FACE_LABELS.contains(label)
     }
 
+    fun mapRawBodyLabelToAggregateLabel(rawLabel: String): String? {
+        return when {
+            RAW_BODY_CLOTHING_LABELS.contains(rawLabel) -> BODY_CLOTHING_LABEL
+            RAW_BODY_SKIN_LABELS.contains(rawLabel) -> BODY_SKIN_LABEL
+            else -> null
+        }
+    }
+
     fun normalizeSegmentationLabel(label: String): String {
-        return if (label == LEGACY_BODY_FACE_LABEL) BODY_FACE_LABEL else label
+        return mapRawBodyLabelToAggregateLabel(label) ?: label
     }
 
     fun resolveProfileForLabel(
