@@ -17,6 +17,15 @@ import kotlin.math.roundToInt
 class BodyPartSegmentationRunner(
     context: Context
 ) : Closeable {
+    companion object {
+        // Use a higher seed threshold to avoid accidental merges across the whole body.
+        private const val MIN_COMPONENT_SEED_ALPHA = 96
+        // Keep softer boundary pixels once a confident region has been found, so edges stay less boxy.
+        private const val MIN_COMPONENT_FILL_ALPHA = 24
+        // Ignore tiny speckles created by interpolation noise.
+        private const val MIN_COMPONENT_PIXELS = 32
+    }
+
     private val appContext = context.applicationContext
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment()
     private val session: OrtSession
@@ -161,59 +170,134 @@ class BodyPartSegmentationRunner(
         width: Int,
         height: Int
     ): List<BodyPartMaskRegion> {
-        val aggregateMasks = LinkedHashMap<String, IntArray>()
-        val bounds = LinkedHashMap<String, IntArray>()
+        val visited = BooleanArray(labelMap.size)
+        val queue = IntArray(labelMap.size)
+        val componentPixels = IntArray(labelMap.size)
+        val regions = ArrayList<BodyPartMaskRegion>()
 
-        for (index in labelMap.indices) {
-            val labelId = labelMap[index]
+        for (startIndex in labelMap.indices) {
+            if (visited[startIndex]) continue
+
+            val labelId = labelMap[startIndex]
             if (labelId <= 0) continue
+
             val rawLabel = rawModelLabelForId(labelId) ?: continue
             val aggregateLabel = DetectionConfig.mapRawBodyLabelToAggregateLabel(rawLabel) ?: continue
-            val alpha = alphaMap[index].coerceIn(0, 255)
-            if (alpha <= 0) continue
+            if (alphaMap[startIndex] < MIN_COMPONENT_SEED_ALPHA) continue
 
-            val pixels = aggregateMasks.getOrPut(aggregateLabel) { IntArray(width * height) }
-            pixels[index] = maxOf(pixels[index], alpha)
+            var queueHead = 0
+            var queueTail = 0
+            var componentSize = 0
+            var minX = width
+            var minY = height
+            var maxX = -1
+            var maxY = -1
 
-            val x = index % width
-            val y = index / width
-            val currentBounds = bounds.getOrPut(aggregateLabel) { intArrayOf(width, height, -1, -1) }
-            if (x < currentBounds[0]) currentBounds[0] = x
-            if (y < currentBounds[1]) currentBounds[1] = y
-            if (x > currentBounds[2]) currentBounds[2] = x
-            if (y > currentBounds[3]) currentBounds[3] = y
-        }
+            visited[startIndex] = true
+            queue[queueTail++] = startIndex
 
-        return aggregateMasks.mapNotNull { (label, pixels) ->
-            val labelBounds = bounds[label] ?: return@mapNotNull null
-            val minX = labelBounds[0]
-            val minY = labelBounds[1]
-            val maxX = labelBounds[2]
-            val maxY = labelBounds[3]
-            if (maxX < minX || maxY < minY) return@mapNotNull null
+            while (queueHead < queueTail) {
+                val index = queue[queueHead++]
+                if (labelMap[index] != labelId || alphaMap[index] < MIN_COMPONENT_FILL_ALPHA) continue
+
+                componentPixels[componentSize++] = index
+                val x = index % width
+                val y = index / width
+                if (x < minX) minX = x
+                if (y < minY) minY = y
+                if (x > maxX) maxX = x
+                if (y > maxY) maxY = y
+
+                if (x > 0) {
+                    val neighbor = index - 1
+                    if (!visited[neighbor]) {
+                        visited[neighbor] = true
+                        queue[queueTail++] = neighbor
+                    }
+                }
+                if (x + 1 < width) {
+                    val neighbor = index + 1
+                    if (!visited[neighbor]) {
+                        visited[neighbor] = true
+                        queue[queueTail++] = neighbor
+                    }
+                }
+                if (y > 0) {
+                    val neighbor = index - width
+                    if (!visited[neighbor]) {
+                        visited[neighbor] = true
+                        queue[queueTail++] = neighbor
+                    }
+                }
+                if (y + 1 < height) {
+                    val neighbor = index + width
+                    if (!visited[neighbor]) {
+                        visited[neighbor] = true
+                        queue[queueTail++] = neighbor
+                    }
+                }
+            }
+
+            if (componentSize < MIN_COMPONENT_PIXELS || maxX < minX || maxY < minY) {
+                continue
+            }
 
             val boxWidth = maxX - minX + 1
             val boxHeight = maxY - minY + 1
+            val croppedAlpha = IntArray(boxWidth * boxHeight)
+            for (i in 0 until componentSize) {
+                val index = componentPixels[i]
+                val x = index % width
+                val y = index / width
+                val alpha = alphaMap[index].coerceIn(0, 255)
+                croppedAlpha[(y - minY) * boxWidth + (x - minX)] = alpha
+            }
+            featherMaskAlpha(croppedAlpha, boxWidth, boxHeight)
             val croppedPixels = IntArray(boxWidth * boxHeight)
-            for (y in minY..maxY) {
-                val srcOffset = y * width
-                val dstOffset = (y - minY) * boxWidth
-                for (x in minX..maxX) {
-                    val alpha = pixels[srcOffset + x]
-                    if (alpha > 0) {
-                        croppedPixels[dstOffset + (x - minX)] = Color.argb(alpha, 255, 255, 255)
-                    }
+            for (i in croppedAlpha.indices) {
+                val alpha = croppedAlpha[i].coerceIn(0, 255)
+                if (alpha > 0) {
+                    croppedPixels[i] = Color.argb(alpha, 255, 255, 255)
                 }
             }
 
             val mask = Bitmap.createBitmap(boxWidth, boxHeight, Bitmap.Config.ALPHA_8).apply {
                 setPixels(croppedPixels, 0, boxWidth, 0, 0, boxWidth, boxHeight)
             }
-            BodyPartMaskRegion(
-                label = label,
+            regions += BodyPartMaskRegion(
+                label = aggregateLabel,
                 box = Rect(minX, minY, maxX + 1, maxY + 1),
                 maskAlphaBitmap = mask
             )
+        }
+
+        return regions
+    }
+
+    private fun featherMaskAlpha(alpha: IntArray, width: Int, height: Int) {
+        if (width <= 2 || height <= 2) return
+        val original = alpha.copyOf()
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val index = y * width + x
+                val center = original[index]
+                if (center <= 0) continue
+                var sum = center * 4
+                var weight = 4
+                for (dy in -1..1) {
+                    for (dx in -1..1) {
+                        if (dx == 0 && dy == 0) continue
+                        val nx = x + dx
+                        val ny = y + dy
+                        if (nx !in 0 until width || ny !in 0 until height) continue
+                        val neighbor = original[ny * width + nx]
+                        if (neighbor <= 0) continue
+                        sum += neighbor
+                        weight += 1
+                    }
+                }
+                alpha[index] = (sum / weight).coerceIn(0, 255)
+            }
         }
     }
 

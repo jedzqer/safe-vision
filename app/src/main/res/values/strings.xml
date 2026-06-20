@@ -296,7 +296,7 @@
     <string name="settings_anime_label_effects_title">动漫标签处理</string>
     <string name="settings_anime_label_effects_hint">查看带有动漫标签格式的 JSON 时，将使用这里的标签效果配置</string>
     <string name="settings_body_label_effects_title">人体双标签分割处理</string>
-    <string name="settings_body_label_effects_hint">人体分割结果会合并为衣物和皮肤两个标签，并使用这里的标签效果配置</string>
+    <string name="settings_body_label_effects_hint">人体分割会输出多个独立区域，并统一归类为衣物和皮肤两个标签，使用这里的标签效果配置</string>
     <string name="settings_label_dialog_title">标签设置：%1$s</string>
     <string name="settings_label_enabled">启用遮挡</string>
     <string name="settings_label_reverse">反向遮挡</string>

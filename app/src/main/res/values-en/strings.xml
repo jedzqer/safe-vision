@@ -296,7 +296,7 @@
     <string name="settings_anime_label_effects_title">Anime Label Handling</string>
     <string name="settings_anime_label_effects_hint">When viewing JSON with anime label format, these label effect settings will be used</string>
     <string name="settings_body_label_effects_title">Two-Label Body Segmentation</string>
-    <string name="settings_body_label_effects_hint">Body segmentation results are merged into Clothing and Skin labels and use the label effects configured here</string>
+    <string name="settings_body_label_effects_hint">Body segmentation outputs multiple separate regions, grouped under Clothing and Skin labels that use the effects configured here</string>
     <string name="settings_label_dialog_title">Label Settings: %1$s</string>
     <string name="settings_label_enabled">Enable Mask</string>
     <string name="settings_label_reverse">Reverse Mask</string>

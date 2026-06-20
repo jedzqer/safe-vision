@@ -262,7 +262,7 @@
     <string name="settings_anime_label_effects_title">애니메이션 라벨 처리</string>
     <string name="settings_anime_label_effects_hint">애니메이션 라벨 형식의 JSON을 볼 때 이 라벨 효과 설정이 사용됩니다</string>
     <string name="settings_body_label_effects_title">2라벨 신체 분할 처리</string>
-    <string name="settings_body_label_effects_hint">신체 분할 결과는 의복과 피부 두 라벨로 합쳐지며, 여기서 설정한 라벨 효과를 사용합니다</string>
+    <string name="settings_body_label_effects_hint">신체 분할은 여러 개의 독립 영역을 출력하고, 이를 의복과 피부 두 라벨로 묶어 여기서 설정한 효과를 사용합니다</string>
     <string name="settings_label_dialog_title">라벨 설정: %1$s</string>
     <string name="settings_label_enabled">마스크 사용</string>
     <string name="settings_label_reverse">역방향 마스크</string>

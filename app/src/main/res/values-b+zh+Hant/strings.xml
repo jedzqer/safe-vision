@@ -262,7 +262,7 @@
     <string name="settings_anime_label_effects_title">動漫標籤處理</string>
     <string name="settings_anime_label_effects_hint">查看帶有動漫標籤格式的 JSON 時，將使用這裡的標籤效果設定</string>
     <string name="settings_body_label_effects_title">人體雙標籤分割處理</string>
-    <string name="settings_body_label_effects_hint">人體分割結果會合併為衣物與皮膚兩個標籤，並使用這裡的標籤效果設定</string>
+    <string name="settings_body_label_effects_hint">人體分割會輸出多個獨立區域，並統一歸類為衣物與皮膚兩個標籤，使用這裡的標籤效果設定</string>
     <string name="settings_label_dialog_title">標籤設定：%1$s</string>
     <string name="settings_label_enabled">啟用遮罩</string>
     <string name="settings_label_reverse">反向遮罩</string>

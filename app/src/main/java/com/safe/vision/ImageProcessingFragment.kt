@@ -919,7 +919,7 @@ class ImageProcessingFragment : Fragment() {
                     DebugLogManager.addLog("图片处理", "元数据已保存到: $targetDir/${saveResult.metadataFile.name}")
                 }
                 
-                updateStatus(detections, saveResult)
+                updateStatus(detections, bodySegmentations, saveResult)
             } catch (e: Exception) {
                 e.printStackTrace()
                 DebugLogManager.addLog("图片处理", "处理失败: ${e.message}")
@@ -945,9 +945,11 @@ class ImageProcessingFragment : Fragment() {
 
     private fun updateStatus(
         detections: List<YoloOnnxRunner.Detection>,
+        segmentations: List<BodyPartMaskRegion>,
         saveResult: SaveResult
     ) {
-        if (detections.isEmpty()) {
+        val totalDetections = detections.size + segmentations.size
+        if (totalDetections == 0) {
             val message = getString(R.string.status_no_detection, saveResult.imageFile.name)
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
             return
@@ -955,7 +957,7 @@ class ImageProcessingFragment : Fragment() {
 
         val message = getString(
             R.string.status_detection_saved,
-            detections.size,
+            totalDetections,
             saveResult.imageFile.name,
             saveResult.metadataFile?.name ?: "-"
         )
