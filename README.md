@@ -53,7 +53,7 @@ SafeVision/
 │       ├── res/
 │       └── AndroidManifest.xml
 ├── assets/
-│   ├── 320n.onnx
+│   ├── yolo26n.onnx
 │   ├── 320n-anime.onnx
 │   ├── 320n-anime.onnx.data
 │   └── Default-stickers.png

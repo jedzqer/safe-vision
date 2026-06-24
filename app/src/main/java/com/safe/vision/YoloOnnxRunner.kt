@@ -181,8 +181,20 @@ class YoloOnnxRunner(
     }
 
     private fun postProcess(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
-        val detections = mutableListOf<DetectionCandidate>()
         if (raw.isEmpty()) return emptyList()
+        return if (isEndToEndDetections(raw)) {
+            postProcessEndToEnd(raw, meta)
+        } else {
+            postProcessLegacy(raw, meta)
+        }
+    }
+
+    private fun isEndToEndDetections(raw: Array<FloatArray>): Boolean {
+        return raw.firstOrNull()?.size == 6
+    }
+
+    private fun postProcessLegacy(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
+        val detections = mutableListOf<DetectionCandidate>()
         val attrs = raw.size
         val rows = raw[0].size
 
@@ -236,6 +248,40 @@ class YoloOnnxRunner(
                 box = it.rect
             )
         }
+    }
+
+    private fun postProcessEndToEnd(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
+        val detections = mutableListOf<Detection>()
+        raw.forEach { prediction ->
+            if (prediction.size < 6) return@forEach
+
+            val score = prediction[4]
+            if (!score.isFinite() || score < DetectionConfig.SCORE_THRESHOLD) return@forEach
+
+            val classId = prediction[5].toInt()
+            if (classId !in variant.outputLabels.indices) return@forEach
+
+            val left = scaleFromModelSpace(prediction[0], meta.squareSize, meta.originalWidth)
+            val top = scaleFromModelSpace(prediction[1], meta.squareSize, meta.originalHeight)
+            val right = scaleFromModelSpace(prediction[2], meta.squareSize, meta.originalWidth)
+            val bottom = scaleFromModelSpace(prediction[3], meta.squareSize, meta.originalHeight)
+            if (!left.isFinite() || !top.isFinite() || !right.isFinite() || !bottom.isFinite()) return@forEach
+            if (right <= left || bottom <= top) return@forEach
+
+            detections.add(
+                Detection(
+                    className = variant.outputLabels[classId],
+                    score = score,
+                    box = RectF(left, top, right, bottom)
+                )
+            )
+        }
+        return detections
+    }
+
+    private fun scaleFromModelSpace(value: Float, squareSize: Int, originalSize: Int): Float {
+        val scaled = value * squareSize.toFloat() / modelInputSize.toFloat()
+        return scaled.coerceIn(0f, originalSize.toFloat())
     }
 
     private fun createSessionWithFallback(modelPath: String): Pair<OrtSession, String> {

@@ -13,10 +13,10 @@ enum class DetectionModelVariant(
     STANDARD(
         prefValue = "standard",
         displayName = "标准模型",
-        modelFileName = "320n.onnx",
+        modelFileName = "yolo26n.onnx",
         dataFileName = null,
-        optimizedFileName = "320n_optimized.onnx",
-        runtimeLabel = "320n",
+        optimizedFileName = "yolo26n_optimized.onnx",
+        runtimeLabel = "yolo26n",
         inputSize = 320,
         outputLabels = DetectionConfig.STANDARD_LABELS
     ),

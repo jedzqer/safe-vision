@@ -55,7 +55,7 @@ safe-app/
 │       ├── res/
 │       └── assets/
 ├── assets/
-│   ├── 320n.onnx
+│   ├── yolo26n.onnx
 │   ├── 320n-anime.onnx
 │   ├── 320n-anime.onnx.data
 │   ├── Default-stickers.png
