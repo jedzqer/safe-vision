@@ -117,6 +117,7 @@ object DetectionConfig {
 
     const val SCORE_THRESHOLD = 0.2f
     const val NMS_THRESHOLD = 0.45f
+    const val END_TO_END_DUPLICATE_IOU_THRESHOLD = 0.9f
     private const val CPU_THREAD_DIVISOR = 2
 
     object FaceLandmark {

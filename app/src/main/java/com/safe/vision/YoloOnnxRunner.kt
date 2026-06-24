@@ -278,7 +278,7 @@ class YoloOnnxRunner(
                 )
             )
         }
-        return detections
+        return deduplicateHighOverlapEndToEndDetections(detections)
     }
 
     private fun scaleFromModelSpace(value: Float, squareSize: Int, originalSize: Int): Float {
@@ -463,6 +463,31 @@ class YoloOnnxRunner(
                 }
             }
             if (shouldSelect) selected.add(candidate)
+        }
+        return selected
+    }
+
+    private fun deduplicateHighOverlapEndToEndDetections(detections: List<Detection>): List<Detection> {
+        if (detections.size < 2) return detections
+        val selected = mutableListOf<Detection>()
+
+        for (candidate in detections.sortedByDescending { it.score }) {
+            var shouldSelect = true
+            for (existing in selected) {
+                if (candidate.className != existing.className) continue
+                if (iou(candidate.box, existing.box) > DetectionConfig.END_TO_END_DUPLICATE_IOU_THRESHOLD) {
+                    shouldSelect = false
+                    break
+                }
+            }
+            if (shouldSelect) selected.add(candidate)
+        }
+
+        if (selected.size != detections.size) {
+            DebugLogManager.addLog(
+                "模型检测",
+                "端到端结果高重合去重: ${detections.size} -> ${selected.size}"
+            )
         }
         return selected
     }
