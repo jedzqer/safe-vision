@@ -34,7 +34,7 @@ internal class ScreenOverlayWindowHost(
 
     private var maskOverlayView: ScreenMaskOverlayView? = null
     private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
-    private var activeFrameBitmap: android.graphics.Bitmap? = null
+    private var activeOverlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame? = null
     private var renderGeneration: Long = 0L
 
     // 采集面被降分辨率后，遮挡坐标处于采集像素空间，叠加到屏幕时按此比例放大还原。
@@ -89,7 +89,7 @@ internal class ScreenOverlayWindowHost(
         metrics: OverlayMetrics
     ) {
         val generation = ++renderGeneration
-        swapActiveFrameBitmap(frame.sourceBitmap)
+        val previousFrame = replaceActiveOverlayFrame(frame)
         updateCaptureScale(metrics, frame.sourceBitmap)
         if (maskOverlayView == null) {
             maskOverlayView = createOverlayView()
@@ -98,6 +98,10 @@ internal class ScreenOverlayWindowHost(
             } catch (e: WindowManager.BadTokenException) {
                 DebugLogManager.addLog("屏幕遮挡", "addView 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
                 maskOverlayView = null
+                activeOverlayFrame = previousFrame
+                if (previousFrame !== frame) {
+                    frame.release()
+                }
                 return
             }
         } else {
@@ -107,6 +111,10 @@ internal class ScreenOverlayWindowHost(
                 DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
                 runCatching { windowManager.removeView(maskOverlayView) }
                 maskOverlayView = null
+                activeOverlayFrame = previousFrame
+                if (previousFrame !== frame) {
+                    frame.release()
+                }
                 return
             }
         }
@@ -114,6 +122,7 @@ internal class ScreenOverlayWindowHost(
             bindFullscreenFrame(view, frame, metrics, generation)
             view.visibility = View.VISIBLE
         }
+        releaseOverlayFrame(previousFrame, frame)
     }
 
     fun showRegionOverlays(
@@ -121,7 +130,7 @@ internal class ScreenOverlayWindowHost(
         metrics: OverlayMetrics
     ) {
         val generation = ++renderGeneration
-        swapActiveFrameBitmap(frame.sourceBitmap)
+        val previousFrame = replaceActiveOverlayFrame(frame)
         updateCaptureScale(metrics, frame.sourceBitmap)
         markAllRegionSlotsUnused()
 
@@ -138,33 +147,32 @@ internal class ScreenOverlayWindowHost(
                 return@forEach
             }
             slot.inUse = true
-            slot.view.alpha = 0f
-            slot.view.visibility = View.INVISIBLE
-            updateRegionLayout(slot.layoutParams, safeRect, metrics)
-            try {
-                windowManager.updateViewLayout(slot.view, slot.layoutParams)
-            } catch (e: WindowManager.BadTokenException) {
-                DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 区域遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
-                runCatching { windowManager.removeView(slot.view) }
-                slot.attached = false
-                slot.inUse = false
-                return@forEach
+            if (updateRegionLayout(slot.layoutParams, safeRect, metrics)) {
+                try {
+                    windowManager.updateViewLayout(slot.view, slot.layoutParams)
+                } catch (e: WindowManager.BadTokenException) {
+                    DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 区域遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
+                    runCatching { windowManager.removeView(slot.view) }
+                    slot.attached = false
+                    slot.inUse = false
+                    return@forEach
+                }
             }
             bindRegionTask(slot.view, frame.sourceBitmap, safeTask, safeRect, metrics, generation)
-            slot.view.alpha = 1f
             slot.view.visibility = View.VISIBLE
             slot.label = safeTask.label
             slot.lastRegion.set(safeRect)
         }
 
         recycleUnusedRegionSlots()
+        releaseOverlayFrame(previousFrame, frame)
     }
 
     fun clearMaskOverlays() {
         renderGeneration++
         clearFullscreenOverlay()
         clearRegionOverlays()
-        releaseActiveFrameBitmap()
+        releaseActiveOverlayFrame()
     }
 
     fun clearRegionOverlays() {
@@ -191,18 +199,29 @@ internal class ScreenOverlayWindowHost(
         }
         maskOverlayView = null
         maskRegionOverlaySlots.clear()
-        releaseActiveFrameBitmap()
+        releaseActiveOverlayFrame()
     }
 
-    private fun swapActiveFrameBitmap(bitmap: android.graphics.Bitmap) {
-        if (activeFrameBitmap === bitmap) return
-        releaseActiveFrameBitmap()
-        activeFrameBitmap = bitmap
+    private fun replaceActiveOverlayFrame(
+        frame: ScreenPrivacyMaskRenderer.OverlayFrame
+    ): ScreenPrivacyMaskRenderer.OverlayFrame? {
+        if (activeOverlayFrame === frame) return null
+        val previousFrame = activeOverlayFrame
+        activeOverlayFrame = frame
+        return previousFrame
     }
 
-    private fun releaseActiveFrameBitmap() {
-        activeFrameBitmap?.takeIf { !it.isRecycled }?.recycle()
-        activeFrameBitmap = null
+    private fun releaseOverlayFrame(
+        previousFrame: ScreenPrivacyMaskRenderer.OverlayFrame?,
+        currentFrame: ScreenPrivacyMaskRenderer.OverlayFrame
+    ) {
+        if (previousFrame == null || previousFrame === currentFrame) return
+        previousFrame.release()
+    }
+
+    private fun releaseActiveOverlayFrame() {
+        activeOverlayFrame?.release()
+        activeOverlayFrame = null
     }
 
     private fun takeBestSlot(
@@ -318,12 +337,25 @@ internal class ScreenOverlayWindowHost(
         layoutParams: WindowManager.LayoutParams,
         region: Rect,
         metrics: OverlayMetrics
-    ) {
+    ): Boolean {
         // region 处于采集像素空间，乘以采集->屏幕比例还原为屏幕像素，再减去内容偏移。
-        layoutParams.width = (region.width() * captureScaleX).roundToInt().coerceAtLeast(1)
-        layoutParams.height = (region.height() * captureScaleY).roundToInt().coerceAtLeast(1)
-        layoutParams.x = (region.left * captureScaleX).roundToInt() - metrics.contentOffsetX
-        layoutParams.y = (region.top * captureScaleY).roundToInt() - metrics.contentOffsetY
+        val width = (region.width() * captureScaleX).roundToInt().coerceAtLeast(1)
+        val height = (region.height() * captureScaleY).roundToInt().coerceAtLeast(1)
+        val x = (region.left * captureScaleX).roundToInt() - metrics.contentOffsetX
+        val y = (region.top * captureScaleY).roundToInt() - metrics.contentOffsetY
+        if (
+            layoutParams.width == width &&
+            layoutParams.height == height &&
+            layoutParams.x == x &&
+            layoutParams.y == y
+        ) {
+            return false
+        }
+        layoutParams.width = width
+        layoutParams.height = height
+        layoutParams.x = x
+        layoutParams.y = y
+        return true
     }
 
     private fun bindFullscreenFrame(

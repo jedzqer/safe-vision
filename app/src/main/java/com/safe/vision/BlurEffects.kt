@@ -333,6 +333,32 @@ object BlurEffects {
         canvas.drawRect(rect, paint)
     }
 
+    fun createMosaicBitmap(source: Bitmap, blockSize: Int = 15): Bitmap? {
+        if (source.width <= 0 || source.height <= 0) return null
+        val safeBlockSize = blockSize.coerceAtLeast(1)
+        val mosaic = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val mosaicCanvas = Canvas(mosaic)
+        val paint = Paint()
+        val pixelCount = source.width * source.height
+        val pixels = IntArray(pixelCount)
+        source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
+
+        for (x in 0 until source.width step safeBlockSize) {
+            for (y in 0 until source.height step safeBlockSize) {
+                val pixel = pixels[y * source.width + x]
+                val block = Rect(
+                    x,
+                    y,
+                    (x + safeBlockSize).coerceAtMost(source.width),
+                    (y + safeBlockSize).coerceAtMost(source.height)
+                )
+                paint.color = pixel or (0xff shl 24)
+                mosaicCanvas.drawRect(block, paint)
+            }
+        }
+        return mosaic
+    }
+
     fun drawMosaic(canvas: Canvas, source: Bitmap, rect: Rect, blockSize: Int = 15) {
         val safeRect = clampRect(rect, source.width, source.height)
         if (safeRect.width() <= 0 || safeRect.height() <= 0) return
@@ -345,32 +371,23 @@ object BlurEffects {
             safeRect.height()
         )
 
-        val mosaic = Bitmap.createBitmap(region.width, region.height, Bitmap.Config.ARGB_8888)
         try {
-            val mosaicCanvas = Canvas(mosaic)
-            val paint = Paint()
-            val pixelCount = region.width * region.height
-            val pixels = IntArray(pixelCount)
-            region.getPixels(pixels, 0, region.width, 0, 0, region.width, region.height)
-
-            for (x in 0 until region.width step blockSize) {
-                for (y in 0 until region.height step blockSize) {
-                    val pixel = pixels[y * region.width + x]
-                    val block = Rect(
-                        x,
-                        y,
-                        (x + blockSize).coerceAtMost(region.width),
-                        (y + blockSize).coerceAtMost(region.height)
-                    )
-                    paint.color = pixel or (0xff shl 24)
-                    mosaicCanvas.drawRect(block, paint)
-                }
+            val mosaic = createMosaicBitmap(region, blockSize) ?: return
+            try {
+                canvas.drawBitmap(mosaic, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+            } finally {
+                if (!mosaic.isRecycled) mosaic.recycle()
             }
-
-            canvas.drawBitmap(mosaic, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
         } finally {
             if (!region.isRecycled && region !== source) region.recycle()
-            if (!mosaic.isRecycled) mosaic.recycle()
+        }
+    }
+
+    fun createGaussianBitmap(source: Bitmap, radius: Int = 12): Bitmap {
+        return if (radius < 1) {
+            source.copy(Bitmap.Config.ARGB_8888, false)
+        } else {
+            gaussianBlur(source, radius)
         }
     }
 
@@ -386,7 +403,7 @@ object BlurEffects {
             safeRect.height()
         )
         val blurred = try {
-            gaussianBlur(region, radius)
+            createGaussianBitmap(region, radius)
         } finally {
             if (!region.isRecycled && region !== source) region.recycle()
         }
@@ -443,22 +460,12 @@ object BlurEffects {
         }
     }
 
-    fun drawSobelEdge(canvas: Canvas, source: Bitmap, rect: Rect, scale: Float = 1f) {
-        val safeRect = clampRect(rect, source.width, source.height)
-        if (safeRect.width() <= 1 || safeRect.height() <= 1) return
-
-        val region = Bitmap.createBitmap(
-            source,
-            safeRect.left,
-            safeRect.top,
-            safeRect.width(),
-            safeRect.height()
-        )
-        val width = region.width
-        val height = region.height
+    fun createSobelBitmap(source: Bitmap, scale: Float = 1f): Bitmap? {
+        val width = source.width
+        val height = source.height
+        if (width <= 1 || height <= 1) return null
         val pixels = IntArray(width * height)
-        region.getPixels(pixels, 0, width, 0, 0, width, height)
-        if (!region.isRecycled && region !== source) region.recycle()
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
 
         val gray = IntArray(width * height) { index ->
             val color = pixels[index]
@@ -491,7 +498,7 @@ object BlurEffects {
                 }
             }
         }
-        if (maxMag <= 0f) return
+        if (maxMag <= 0f) return null
 
         val factor = (255f / maxMag) * scale.coerceAtLeast(0f)
         for (i in magnitudes.indices) {
@@ -499,12 +506,31 @@ object BlurEffects {
             pixels[i] = Color.rgb(edge, edge, edge)
         }
 
-        val sobelBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            setPixels(pixels, 0, width, 0, 0, width, height)
+        }
+    }
+
+    fun drawSobelEdge(canvas: Canvas, source: Bitmap, rect: Rect, scale: Float = 1f) {
+        val safeRect = clampRect(rect, source.width, source.height)
+        if (safeRect.width() <= 1 || safeRect.height() <= 1) return
+
+        val region = Bitmap.createBitmap(
+            source,
+            safeRect.left,
+            safeRect.top,
+            safeRect.width(),
+            safeRect.height()
+        )
         try {
-            sobelBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-            canvas.drawBitmap(sobelBitmap, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+            val sobelBitmap = createSobelBitmap(region, scale) ?: return
+            try {
+                canvas.drawBitmap(sobelBitmap, safeRect.left.toFloat(), safeRect.top.toFloat(), null)
+            } finally {
+                if (!sobelBitmap.isRecycled) sobelBitmap.recycle()
+            }
         } finally {
-            if (!sobelBitmap.isRecycled) sobelBitmap.recycle()
+            if (!region.isRecycled && region !== source) region.recycle()
         }
     }
 

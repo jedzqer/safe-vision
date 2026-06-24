@@ -332,14 +332,14 @@ class ScreenDetectionService : Service() {
             detectionWindow.clear()
             overlayVisible = false
             lastPositiveTimeMs = 0L
-            frame?.sourceBitmap?.recycle()
+            frame?.release()
             return
         }
 
         if (!isOverlayReadyForRendering()) {
             ScreenOverlayController.clearMaskOverlays(overlayMode)
             overlayVisible = false
-            frame?.sourceBitmap?.recycle()
+            frame?.release()
             return
         }
 
@@ -375,7 +375,7 @@ class ScreenDetectionService : Service() {
                 ScreenOverlayController.clearMaskOverlays(overlayMode)
                 overlayVisible = false
             }
-            frame?.sourceBitmap?.recycle()
+            frame?.release()
             return
         }
 
@@ -384,7 +384,10 @@ class ScreenDetectionService : Service() {
 
         overlayVisible = true
 
-        if (frame.requiresFullscreenOverlay || frame.drawTasks.isEmpty()) {
+        val preferFullscreenOverlay =
+            overlayMode == ScreenOverlayMode.ACCESSIBILITY && frame.preRenderedMaskBitmap != null
+
+        if (frame.requiresFullscreenOverlay || frame.drawTasks.isEmpty() || preferFullscreenOverlay) {
             val shown = ScreenOverlayController.showFullscreenOverlay(
                 applicationContext,
                 frame,
@@ -392,7 +395,7 @@ class ScreenDetectionService : Service() {
                 overlayMode
             )
             if (!shown) {
-                frame.sourceBitmap.recycle()
+                frame.release()
             }
             ScreenOverlayController.clearRegionOverlays(overlayMode)
             return
@@ -406,7 +409,7 @@ class ScreenDetectionService : Service() {
             overlayMode
         )
         if (!shown) {
-            frame.sourceBitmap.recycle()
+            frame.release()
         }
     }
 

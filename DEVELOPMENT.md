@@ -133,7 +133,7 @@ safe-app/
 - `ScreenOverlayController.kt`：无障碍遮挡 / 普通悬浮窗遮挡调度
 - `ScreenOverlayWindowHost.kt`：`WindowManager` 悬浮窗宿主
 - `ScreenMaskOverlayView.kt`：屏幕遮挡绘制 View
-- `ScreenPrivacyMaskRenderer.kt`：屏幕遮挡渲染逻辑
+- `ScreenPrivacyMaskRenderer.kt`：屏幕遮挡渲染逻辑；实时屏幕检测下会在后台线程预渲染区域补丁或整张透明遮挡位图，尽量避免在 `View.onDraw()` 中现场做马赛克/高斯等重操作
 - `ScreenOverlayMode.kt`：屏幕遮挡模式定义
 
 **屏幕捕获内容可见性**：当用户切换应用时，系统通过 `MediaProjection.Callback.onCapturedContentVisibilityChanged` 通知捕获内容可见性变化。`ScreenDetectionService` 侦听该回调：内容不可见时暂停遮挡显示并清除遮挡层，内容重新可见时恢复遮挡。该机制依赖 `isScreenLossAutoPauseEnabled` 配置项（`AppSettingsManager`），仅在 Android 14+ 生效。

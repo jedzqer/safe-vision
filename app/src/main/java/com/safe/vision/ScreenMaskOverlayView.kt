@@ -24,6 +24,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     }
 
     private var sourceBitmap: Bitmap? = null
+    private var preRenderedMaskBitmap: Bitmap? = null
     private var drawTasks: List<ScreenPrivacyMaskRenderer.DrawTask> = emptyList()
     private var singleDrawTask: ScreenPrivacyMaskRenderer.DrawTask? = null
     private var reverseMode: Int? = null
@@ -38,26 +39,40 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val bitmap = sourceBitmap?.takeIf { !it.isRecycled } ?: return
+        val renderedOverlay = preRenderedMaskBitmap?.takeIf { !it.isRecycled }
+        val bitmap = sourceBitmap?.takeIf { !it.isRecycled }
+        val localSingleTask = singleDrawTask
+        val hasRenderedTask = localSingleTask?.renderedBitmap?.takeIf { !it.isRecycled } != null ||
+            drawTasks.any { it.renderedBitmap?.isRecycled == false }
+        val hasLiveTask = localSingleTask != null || drawTasks.isNotEmpty()
+        if (renderedOverlay != null) {
+            canvas.save()
+            canvas.translate(-windowOriginX, -windowOriginY)
+            canvas.scale(scaleX, scaleY)
+            canvas.drawBitmap(renderedOverlay, 0f, 0f, null)
+            canvas.restore()
+            if (!hasLiveTask) return
+        }
+
         val localReverseMode = reverseMode
+        if (bitmap == null && !hasRenderedTask) return
 
         canvas.save()
         canvas.translate(-windowOriginX, -windowOriginY)
         canvas.scale(scaleX, scaleY)
-        if (localReverseMode != null && reversePreRender) {
+        if (renderedOverlay == null && bitmap != null && localReverseMode != null && reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
         val outlineShapes = mutableListOf<BlurEffects.OutlineShape>()
-        val localSingleTask = singleDrawTask
         if (localSingleTask != null) {
             drawTask(canvas, bitmap, localSingleTask)?.let { outlineShapes.add(it) }
         } else {
             drawTasks.forEach { drawTask(canvas, bitmap, it)?.let { outlineShapes.add(it) } }
         }
-        if (localReverseMode != null && !reversePreRender) {
+        if (renderedOverlay == null && bitmap != null && localReverseMode != null && !reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
-        if (localReverseMode != null) {
+        if (renderedOverlay == null && bitmap != null && localReverseMode != null) {
             outlineShapes.addAll(collectReverseOutlineShapes())
         }
         if (outlineShapes.isNotEmpty()) {
@@ -75,6 +90,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     ) {
         val changed = updateState(
             bitmap = frame?.sourceBitmap,
+            preRenderedMaskBitmap = frame?.preRenderedMaskBitmap,
             tasks = frame?.drawTasks.orEmpty(),
             singleTask = null,
             reverseMode = frame?.reverseMode,
@@ -99,6 +115,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     ) {
         val changed = updateState(
             bitmap = bitmap,
+            preRenderedMaskBitmap = null,
             tasks = emptyList(),
             singleTask = task,
             reverseMode = null,
@@ -116,6 +133,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
     fun release(shouldInvalidate: Boolean = true) {
         val changed = updateState(
             bitmap = null,
+            preRenderedMaskBitmap = null,
             tasks = emptyList(),
             singleTask = null,
             reverseMode = null,
@@ -132,6 +150,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
     private fun updateState(
         bitmap: Bitmap?,
+        preRenderedMaskBitmap: Bitmap?,
         tasks: List<ScreenPrivacyMaskRenderer.DrawTask>,
         singleTask: ScreenPrivacyMaskRenderer.DrawTask?,
         reverseMode: Int?,
@@ -146,6 +165,10 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         var changed = false
         if (sourceBitmap !== bitmap) {
             sourceBitmap = bitmap
+            changed = true
+        }
+        if (this.preRenderedMaskBitmap !== preRenderedMaskBitmap) {
+            this.preRenderedMaskBitmap = preRenderedMaskBitmap
             changed = true
         }
         if (drawTasks !== tasks) {
@@ -187,18 +210,28 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
 
     private fun drawTask(
         canvas: Canvas,
-        bitmap: Bitmap,
+        bitmap: Bitmap?,
         task: ScreenPrivacyMaskRenderer.DrawTask
     ): BlurEffects.OutlineShape? {
+        task.renderedBitmap?.takeIf { !it.isRecycled }?.let { renderedBitmap ->
+            canvas.drawBitmap(
+                renderedBitmap,
+                task.drawRect.left.toFloat(),
+                task.drawRect.top.toFloat(),
+                null
+            )
+            return null
+        }
+        val safeBitmap = bitmap ?: return null
         var outlineShape: BlurEffects.OutlineShape? = null
         if (task.allowCircular) {
             val circleBounds = BlurEffects.circumscribedCircleBounds(
                 task.drawRect,
-                bitmap.width,
-                bitmap.height
+                safeBitmap.width,
+                safeBitmap.height
             )
             BlurEffects.drawWithCircularClip(canvas, task.drawRect) {
-                applyEffect(canvas, bitmap, task.renderMode, circleBounds, task)
+                applyEffect(canvas, safeBitmap, task.renderMode, circleBounds, task)
             }
             if (task.drawOutline) {
                 outlineShape = BlurEffects.OutlineShape.CircleShape(task.drawRect)
@@ -209,10 +242,10 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         if (task.usesEyeStrip && task.eyePath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
             val checkpoint = canvas.save()
             canvas.clipPath(task.eyePath)
-            applyEffect(canvas, bitmap, task.renderMode, task.drawRect, task)
+            applyEffect(canvas, safeBitmap, task.renderMode, task.drawRect, task)
             canvas.restoreToCount(checkpoint)
         } else {
-            applyEffect(canvas, bitmap, task.renderMode, task.drawRect, task)
+            applyEffect(canvas, safeBitmap, task.renderMode, task.drawRect, task)
         }
         if (task.drawOutline) {
             outlineShape = if (task.usesEyeStrip && task.eyePath != null) {
