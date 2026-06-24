@@ -317,15 +317,20 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         val animeMaskScale: Float,
         val stickerUri: String?,
         val animeStickerUri: String?,
-        val labelStickerUris: Map<String, String>,
-        val labelMaskScales: Map<String, Float>,
-        val blockedLabels: List<String>,
-        val labelEffectOverrides: Map<String, Int>,
-        val reverseLabels: List<String>,
-        val maskOutlineLabels: List<String>,
+        val standardLabelState: PresetLabelState,
+        val animeLabelState: PresetLabelState,
         val reversePreRenderEnabled: Boolean,
         val accessibilityEmptyReverseFullscreenEnabled: Boolean,
         val reverseLabelMissFullscreenEnabled: Boolean
+    )
+
+    data class PresetLabelState(
+        val blockedLabels: List<String>,
+        val labelStickerUris: Map<String, String>,
+        val labelMaskScales: Map<String, Float>,
+        val labelEffectOverrides: Map<String, Int>,
+        val reverseLabels: List<String>,
+        val maskOutlineLabels: List<String>
     )
 
     data class ImportResult(
@@ -668,30 +673,8 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             animeMaskScale = getAnimeMaskScale(),
             stickerUri = getStickerUri(),
             animeStickerUri = getAnimeStickerUri(),
-            labelStickerUris = mergeLabelMaps(
-                getLabelStickerUris(DetectionConfig.LabelProfile.STANDARD),
-                getLabelStickerUris(DetectionConfig.LabelProfile.ANIME)
-            ),
-            labelMaskScales = mergeLabelMaps(
-                getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.STANDARD),
-                getLabelMaskScaleOverrides(DetectionConfig.LabelProfile.ANIME)
-            ),
-            blockedLabels = mergeLabelLists(
-                getBlockedLabels(DetectionConfig.LabelProfile.STANDARD),
-                getBlockedLabels(DetectionConfig.LabelProfile.ANIME)
-            ),
-            labelEffectOverrides = mergeLabelMaps(
-                getLabelEffectOverrides(DetectionConfig.LabelProfile.STANDARD),
-                getLabelEffectOverrides(DetectionConfig.LabelProfile.ANIME)
-            ),
-            reverseLabels = mergeLabelLists(
-                getReverseLabels(DetectionConfig.LabelProfile.STANDARD),
-                getReverseLabels(DetectionConfig.LabelProfile.ANIME)
-            ),
-            maskOutlineLabels = mergeLabelLists(
-                getMaskOutlineLabels(DetectionConfig.LabelProfile.STANDARD),
-                getMaskOutlineLabels(DetectionConfig.LabelProfile.ANIME)
-            ),
+            standardLabelState = captureLabelState(DetectionConfig.LabelProfile.STANDARD),
+            animeLabelState = captureLabelState(DetectionConfig.LabelProfile.ANIME),
             reversePreRenderEnabled = isReversePreRenderEnabled(),
             accessibilityEmptyReverseFullscreenEnabled = isAccessibilityEmptyReverseFullscreenEnabled(),
             reverseLabelMissFullscreenEnabled = isReverseLabelMissFullscreenEnabled()
@@ -699,11 +682,6 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun applySnapshot(preset: PrivacyPreset) {
-        val standardBlocked = filterLabelsForProfile(preset.blockedLabels, DetectionConfig.LabelProfile.STANDARD)
-        val animeBlocked = filterLabelsForProfile(preset.blockedLabels, DetectionConfig.LabelProfile.ANIME)
-        val standardReverse = filterLabelsForProfile(preset.reverseLabels, DetectionConfig.LabelProfile.STANDARD)
-        val animeReverse = filterLabelsForProfile(preset.reverseLabels, DetectionConfig.LabelProfile.ANIME)
-
         setBlurMode(DetectionConfig.LabelProfile.STANDARD, preset.blurMode)
         setBlurMode(DetectionConfig.LabelProfile.ANIME, preset.animeBlurMode)
         setCircularMaskEnabled(preset.circularMaskEnabled)
@@ -716,39 +694,39 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         setAnimeStickerUri(preset.animeStickerUri)
         writeLabelStickerUris(
             DetectionConfig.LabelProfile.STANDARD,
-            filterMapForProfile(preset.labelStickerUris, DetectionConfig.LabelProfile.STANDARD)
+            preset.standardLabelState.labelStickerUris
         )
         writeLabelStickerUris(
             DetectionConfig.LabelProfile.ANIME,
-            filterMapForProfile(preset.labelStickerUris, DetectionConfig.LabelProfile.ANIME)
+            preset.animeLabelState.labelStickerUris
         )
         writeLabelMaskScales(
             DetectionConfig.LabelProfile.STANDARD,
-            filterMapForProfile(preset.labelMaskScales, DetectionConfig.LabelProfile.STANDARD)
+            preset.standardLabelState.labelMaskScales
         )
         writeLabelMaskScales(
             DetectionConfig.LabelProfile.ANIME,
-            filterMapForProfile(preset.labelMaskScales, DetectionConfig.LabelProfile.ANIME)
+            preset.animeLabelState.labelMaskScales
         )
-        writeStoredBlockedLabels(DetectionConfig.LabelProfile.STANDARD, standardBlocked)
-        writeStoredBlockedLabels(DetectionConfig.LabelProfile.ANIME, animeBlocked)
+        writeStoredBlockedLabels(DetectionConfig.LabelProfile.STANDARD, preset.standardLabelState.blockedLabels)
+        writeStoredBlockedLabels(DetectionConfig.LabelProfile.ANIME, preset.animeLabelState.blockedLabels)
         writeLabelEffectOverrides(
             DetectionConfig.LabelProfile.STANDARD,
-            filterMapForProfile(preset.labelEffectOverrides, DetectionConfig.LabelProfile.STANDARD)
+            preset.standardLabelState.labelEffectOverrides
         )
         writeLabelEffectOverrides(
             DetectionConfig.LabelProfile.ANIME,
-            filterMapForProfile(preset.labelEffectOverrides, DetectionConfig.LabelProfile.ANIME)
+            preset.animeLabelState.labelEffectOverrides
         )
-        setReverseLabels(DetectionConfig.LabelProfile.STANDARD, standardReverse)
-        setReverseLabels(DetectionConfig.LabelProfile.ANIME, animeReverse)
+        setReverseLabels(DetectionConfig.LabelProfile.STANDARD, preset.standardLabelState.reverseLabels)
+        setReverseLabels(DetectionConfig.LabelProfile.ANIME, preset.animeLabelState.reverseLabels)
         setMaskOutlineLabels(
             DetectionConfig.LabelProfile.STANDARD,
-            filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.STANDARD)
+            preset.standardLabelState.maskOutlineLabels
         )
         setMaskOutlineLabels(
             DetectionConfig.LabelProfile.ANIME,
-            filterLabelsForProfile(preset.maskOutlineLabels, DetectionConfig.LabelProfile.ANIME)
+            preset.animeLabelState.maskOutlineLabels
         )
         setReversePreRenderEnabled(preset.reversePreRenderEnabled)
         setAccessibilityEmptyReverseFullscreenEnabled(preset.accessibilityEmptyReverseFullscreenEnabled)
@@ -781,18 +759,24 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         if (!isValidBlurMode(animeBlurMode)) return null
         val stickerUri = obj.opt("stickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         val animeStickerUri = obj.opt("animeStickerUri")?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: stickerUri
+        val profileLabelStates = obj.optJSONObject("profileLabelStates")
         val legacyEyeModeLabels = parseFaceLabelList(obj.optJSONArray("eyeModeLabels"))
-        val blockedLabels = parseLabelList(
-            obj.optJSONArray("blockedLabels"),
-            includeLocked = true,
-            default = emptyList()
-        ).let { parsed ->
-            if (legacyEyeModeLabels.isEmpty()) {
-                parsed
-            } else {
-                LinkedHashSet(parsed).apply { add(DetectionConfig.EYE_REGION_LABEL) }.toList()
-            }
-        }
+        val standardLabelState =
+            profileLabelStates?.optJSONObject(DetectionConfig.LabelProfile.STANDARD.formatKey)?.let {
+                parsePresetLabelState(DetectionConfig.LabelProfile.STANDARD, it)
+            } ?: parseLegacyPresetLabelState(
+                profile = DetectionConfig.LabelProfile.STANDARD,
+                obj = obj,
+                legacyEyeModeLabels = legacyEyeModeLabels
+            )
+        val animeLabelState =
+            profileLabelStates?.optJSONObject(DetectionConfig.LabelProfile.ANIME.formatKey)?.let {
+                parsePresetLabelState(DetectionConfig.LabelProfile.ANIME, it)
+            } ?: parseLegacyPresetLabelState(
+                profile = DetectionConfig.LabelProfile.ANIME,
+                obj = obj,
+                legacyEyeModeLabels = legacyEyeModeLabels
+            )
         return PrivacyPreset(
             name = name,
             blurMode = blurMode,
@@ -807,12 +791,8 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 .coerceIn(MASK_SCALE_MIN, MASK_SCALE_MAX),
             stickerUri = stickerUri,
             animeStickerUri = animeStickerUri,
-            labelStickerUris = parseLabelStickerUris(obj.optJSONObject("labelStickerUris")),
-            labelMaskScales = parseScaleOverrides(obj.optJSONObject("labelMaskScales")),
-            blockedLabels = blockedLabels,
-            labelEffectOverrides = parseOverrides(obj.optJSONObject("labelEffectOverrides")),
-            reverseLabels = parseLabelList(obj.optJSONArray("reverseLabels"), includeLocked = false, default = emptyList()),
-            maskOutlineLabels = parseLabelList(obj.optJSONArray("maskOutlineLabels"), includeLocked = true, default = DetectionConfig.LABELS),
+            standardLabelState = standardLabelState,
+            animeLabelState = animeLabelState,
             reversePreRenderEnabled = obj.optBoolean("reversePreRenderEnabled", true),
             accessibilityEmptyReverseFullscreenEnabled = obj.optBoolean(
                 "accessibilityEmptyReverseFullscreenEnabled",
@@ -846,6 +826,90 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             if (DetectionConfig.FACE_LABELS.contains(label)) out.add(label)
         }
         return if (out.isEmpty()) default else out.toList()
+    }
+
+    private fun captureLabelState(profile: DetectionConfig.LabelProfile): PresetLabelState {
+        return PresetLabelState(
+            blockedLabels = getBlockedLabels(profile),
+            labelStickerUris = getLabelStickerUris(profile),
+            labelMaskScales = getLabelMaskScaleOverrides(profile),
+            labelEffectOverrides = getLabelEffectOverrides(profile),
+            reverseLabels = getReverseLabels(profile),
+            maskOutlineLabels = getMaskOutlineLabels(profile)
+        )
+    }
+
+    private fun parsePresetLabelState(
+        profile: DetectionConfig.LabelProfile,
+        obj: JSONObject
+    ): PresetLabelState {
+        return PresetLabelState(
+            blockedLabels = filterLabelsForProfile(
+                parseLabelList(obj.optJSONArray("blockedLabels"), includeLocked = true, default = emptyList()),
+                profile
+            ),
+            labelStickerUris = filterMapForProfile(
+                parseLabelStickerUris(obj.optJSONObject("labelStickerUris")),
+                profile
+            ),
+            labelMaskScales = filterMapForProfile(
+                parseScaleOverrides(obj.optJSONObject("labelMaskScales")),
+                profile
+            ),
+            labelEffectOverrides = filterMapForProfile(
+                parseOverrides(obj.optJSONObject("labelEffectOverrides")),
+                profile
+            ),
+            reverseLabels = filterLabelsForProfile(
+                parseLabelList(obj.optJSONArray("reverseLabels"), includeLocked = false, default = emptyList()),
+                profile
+            ),
+            maskOutlineLabels = filterLabelsForProfile(
+                parseLabelList(obj.optJSONArray("maskOutlineLabels"), includeLocked = true, default = DetectionConfig.getLabels(profile)),
+                profile
+            )
+        )
+    }
+
+    private fun parseLegacyPresetLabelState(
+        profile: DetectionConfig.LabelProfile,
+        obj: JSONObject,
+        legacyEyeModeLabels: List<String>
+    ): PresetLabelState {
+        val blockedLabels = parseLabelList(
+            obj.optJSONArray("blockedLabels"),
+            includeLocked = true,
+            default = emptyList()
+        ).let { parsed ->
+            if (legacyEyeModeLabels.isEmpty()) {
+                parsed
+            } else {
+                LinkedHashSet(parsed).apply { add(DetectionConfig.EYE_REGION_LABEL) }.toList()
+            }
+        }
+        return PresetLabelState(
+            blockedLabels = filterLabelsForProfile(blockedLabels, profile),
+            labelStickerUris = filterMapForProfile(
+                parseLabelStickerUris(obj.optJSONObject("labelStickerUris")),
+                profile
+            ),
+            labelMaskScales = filterMapForProfile(
+                parseScaleOverrides(obj.optJSONObject("labelMaskScales")),
+                profile
+            ),
+            labelEffectOverrides = filterMapForProfile(
+                parseOverrides(obj.optJSONObject("labelEffectOverrides")),
+                profile
+            ),
+            reverseLabels = filterLabelsForProfile(
+                parseLabelList(obj.optJSONArray("reverseLabels"), includeLocked = false, default = emptyList()),
+                profile
+            ),
+            maskOutlineLabels = filterLabelsForProfile(
+                parseLabelList(obj.optJSONArray("maskOutlineLabels"), includeLocked = true, default = DetectionConfig.LABELS),
+                profile
+            )
+        )
     }
 
     fun migrateLegacyEyeModeSettings() {
@@ -915,11 +979,35 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     private fun serializePreset(preset: PrivacyPreset): JSONObject {
-        val blocked = JSONArray().apply { preset.blockedLabels.forEach { put(it) } }
-        val reverse = JSONArray().apply { preset.reverseLabels.forEach { put(it) } }
-        val outline = JSONArray().apply { preset.maskOutlineLabels.forEach { put(it) } }
+        val mergedBlocked = mergeLabelLists(
+            preset.standardLabelState.blockedLabels,
+            preset.animeLabelState.blockedLabels
+        )
+        val mergedReverse = mergeLabelLists(
+            preset.standardLabelState.reverseLabels,
+            preset.animeLabelState.reverseLabels
+        )
+        val mergedOutline = mergeLabelLists(
+            preset.standardLabelState.maskOutlineLabels,
+            preset.animeLabelState.maskOutlineLabels
+        )
+        val mergedOverrides = mergeLabelMaps(
+            preset.standardLabelState.labelEffectOverrides,
+            preset.animeLabelState.labelEffectOverrides
+        )
+        val mergedStickerUris = mergeLabelMaps(
+            preset.standardLabelState.labelStickerUris,
+            preset.animeLabelState.labelStickerUris
+        )
+        val mergedMaskScales = mergeLabelMaps(
+            preset.standardLabelState.labelMaskScales,
+            preset.animeLabelState.labelMaskScales
+        )
+        val blocked = JSONArray().apply { mergedBlocked.forEach { put(it) } }
+        val reverse = JSONArray().apply { mergedReverse.forEach { put(it) } }
+        val outline = JSONArray().apply { mergedOutline.forEach { put(it) } }
         val overrides = JSONObject().apply {
-            preset.labelEffectOverrides.forEach { (label, mode) -> put(label, mode) }
+            mergedOverrides.forEach { (label, mode) -> put(label, mode) }
         }
         return JSONObject()
             .put("blurMode", preset.blurMode)
@@ -933,15 +1021,25 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             .put("stickerUri", preset.stickerUri)
             .put("animeStickerUri", preset.animeStickerUri)
             .put("labelStickerUris", JSONObject().apply {
-                preset.labelStickerUris.forEach { (label, uri) -> put(label, uri) }
+                mergedStickerUris.forEach { (label, uri) -> put(label, uri) }
             })
             .put("labelMaskScales", JSONObject().apply {
-                preset.labelMaskScales.forEach { (label, scale) -> put(label, scale.toDouble()) }
+                mergedMaskScales.forEach { (label, scale) -> put(label, scale.toDouble()) }
             })
             .put("blockedLabels", blocked)
             .put("labelEffectOverrides", overrides)
             .put("reverseLabels", reverse)
             .put("maskOutlineLabels", outline)
+            .put("profileLabelStates", JSONObject().apply {
+                put(
+                    DetectionConfig.LabelProfile.STANDARD.formatKey,
+                    serializePresetLabelState(preset.standardLabelState)
+                )
+                put(
+                    DetectionConfig.LabelProfile.ANIME.formatKey,
+                    serializePresetLabelState(preset.animeLabelState)
+                )
+            })
             .put("reversePreRenderEnabled", preset.reversePreRenderEnabled)
             .put(
                 "accessibilityEmptyReverseFullscreenEnabled",
@@ -951,6 +1049,22 @@ class PrivacySettingsManager private constructor(private val context: Context) {
                 "reverseLabelMissFullscreenEnabled",
                 preset.reverseLabelMissFullscreenEnabled
             )
+    }
+
+    private fun serializePresetLabelState(state: PresetLabelState): JSONObject {
+        return JSONObject()
+            .put("blockedLabels", JSONArray().apply { state.blockedLabels.forEach { put(it) } })
+            .put("labelStickerUris", JSONObject().apply {
+                state.labelStickerUris.forEach { (label, uri) -> put(label, uri) }
+            })
+            .put("labelMaskScales", JSONObject().apply {
+                state.labelMaskScales.forEach { (label, scale) -> put(label, scale.toDouble()) }
+            })
+            .put("labelEffectOverrides", JSONObject().apply {
+                state.labelEffectOverrides.forEach { (label, mode) -> put(label, mode) }
+            })
+            .put("reverseLabels", JSONArray().apply { state.reverseLabels.forEach { put(it) } })
+            .put("maskOutlineLabels", JSONArray().apply { state.maskOutlineLabels.forEach { put(it) } })
     }
 
     private fun <T> mergeLabelMaps(vararg maps: Map<String, T>): Map<String, T> {

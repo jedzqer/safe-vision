@@ -35,6 +35,7 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_SCREEN_DETECTION_INTERVAL_SECONDS = "screen_detection_interval_seconds"
         private const val KEY_SCREEN_DETECTION_USE_SYSTEM_ALERT_WINDOW = "screen_detection_use_system_alert_window"
         private const val KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED = "screen_loss_auto_pause_enabled"
+        private const val KEY_METADATA_REPAIR_VERSION = "metadata_repair_version"
 
         private const val DEFAULT_SCREEN_DETECTION_INTERVAL_SECONDS = 0.5f
         private const val MIN_SCREEN_DETECTION_INTERVAL_SECONDS = 0.01f
@@ -176,6 +177,16 @@ class AppSettingsManager private constructor(context: Context) {
     fun setScreenLossAutoPauseEnabled(enabled: Boolean) {
         sharedPreferences.edit()
             .putBoolean(KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getMetadataRepairVersion(): Int {
+        return sharedPreferences.getInt(KEY_METADATA_REPAIR_VERSION, 0)
+    }
+
+    fun setMetadataRepairVersion(version: Int) {
+        sharedPreferences.edit()
+            .putInt(KEY_METADATA_REPAIR_VERSION, version.coerceAtLeast(0))
             .apply()
     }
 

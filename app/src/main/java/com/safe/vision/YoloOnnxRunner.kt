@@ -425,7 +425,8 @@ class YoloOnnxRunner(
         val box: RectF,
         val leftEye: PointF? = null,
         val rightEye: PointF? = null,
-        val eyeBar: RectF? = null
+        val eyeBar: RectF? = null,
+        val isDerivedEyeRegion: Boolean = false
     )
 
     private data class DetectionCandidate(
@@ -477,7 +478,8 @@ class YoloOnnxRunner(
                     detection.copy(
                         className = DetectionConfig.EYE_REGION_LABEL,
                         box = eyeRect,
-                        eyeBar = eyeRect
+                        eyeBar = eyeRect,
+                        isDerivedEyeRegion = true
                     )
                 )
             }

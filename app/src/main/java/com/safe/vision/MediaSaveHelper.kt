@@ -50,8 +50,16 @@ object MediaSaveHelper {
     }
 
     private fun buildMetadataJson(detections: List<YoloOnnxRunner.Detection>): String {
+        val candidateDetections = detections.filterNot { detection ->
+            DetectionConfig.isEyeRegionLabel(detection.className) && detection.isDerivedEyeRegion
+        }
+        val profile = DetectionConfig.inferProfile(candidateDetections.map { it.className })
+        val allowedLabels = DetectionConfig.getPersistedLabels(profile)
+        val persistedDetections = candidateDetections.filter { detection ->
+            allowedLabels.contains(detection.className)
+        }
         val array = JSONArray()
-        YoloOnnxRunner.withDerivedEyeRegionDetections(detections).forEach { detection ->
+        persistedDetections.forEach { detection ->
             val box = detection.box
             val obj = JSONObject().apply {
                 put("class", detection.className)
@@ -97,7 +105,6 @@ object MediaSaveHelper {
             }
             array.put(obj)
         }
-        val profile = DetectionConfig.inferProfile(detections.map { it.className })
         return DetectionMetadataFormat.build(array, profile)
     }
 

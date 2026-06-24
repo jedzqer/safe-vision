@@ -169,6 +169,14 @@ object DetectionConfig {
         }
     }
 
+    fun getPersistedLabels(profile: LabelProfile): Set<String> {
+        return when (profile) {
+            LabelProfile.STANDARD -> STANDARD_LABELS.toSet()
+            LabelProfile.ANIME -> ANIME_LABELS.toSet()
+            LabelProfile.MIXED -> (STANDARD_LABELS + ANIME_LABELS).toSet()
+        }
+    }
+
     fun getDisplayName(label: String): String {
         return LABEL_DISPLAY_NAMES[label] ?: label
     }

@@ -15,7 +15,8 @@ data class EditableDetection(
     val score: Float? = null,
     val eyes: Pair<PointF, PointF>? = null,
     val eyeBar: RectF? = null,
-    val eyeBarRotationDegrees: Float? = null
+    val eyeBarRotationDegrees: Float? = null,
+    val isDerivedEyeRegion: Boolean = false
 )
 
 object DetectionMetadataIo {
@@ -88,7 +89,8 @@ object DetectionMetadataIo {
                     score = item.score,
                     eyes = item.eyes,
                     eyeBar = eyeRect,
-                    eyeBarRotationDegrees = item.eyeBarRotationDegrees
+                    eyeBarRotationDegrees = item.eyeBarRotationDegrees,
+                    isDerivedEyeRegion = true
                 )
             )
         }
@@ -96,8 +98,16 @@ object DetectionMetadataIo {
     }
 
     fun write(file: File, items: List<EditableDetection>) {
+        val candidateItems = items.filterNot { item ->
+            DetectionConfig.isEyeRegionLabel(item.label) && item.isDerivedEyeRegion
+        }
+        val profile = DetectionConfig.inferProfile(candidateItems.map { it.label })
+        val allowedLabels = DetectionConfig.getPersistedLabels(profile)
+        val persistedItems = candidateItems.filter { item ->
+            allowedLabels.contains(item.label)
+        }
         val arr = JSONArray()
-        items.forEach { rawItem ->
+        persistedItems.forEach { rawItem ->
             val item = normalizeForWrite(rawItem)
             val clampedW = item.rect.width().coerceAtLeast(1f)
             val clampedH = item.rect.height().coerceAtLeast(1f)
@@ -149,7 +159,6 @@ object DetectionMetadataIo {
             }
             arr.put(obj)
         }
-        val profile = DetectionConfig.inferProfile(items.map { it.label })
         file.writeText(DetectionMetadataFormat.build(arr, profile), Charsets.UTF_8)
     }
 

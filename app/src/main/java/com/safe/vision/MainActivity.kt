@@ -11,11 +11,14 @@ import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -88,6 +91,9 @@ class MainActivity : AppCompatActivity() {
 
         handleIncomingShareIntent(intent)
         maybeShowFirstLaunchDialog()
+        lifecycleScope.launch(Dispatchers.IO) {
+            MetadataRepairManager.getInstance(applicationContext).repairIfNeeded()
+        }
         window.decorView.post {
             ErrorReportManager.maybeShowPendingCrashDialog(this)
         }
