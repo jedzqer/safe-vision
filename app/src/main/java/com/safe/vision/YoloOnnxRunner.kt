@@ -13,7 +13,6 @@ import android.graphics.RectF
 import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
-import java.security.MessageDigest
 import kotlin.math.max
 import kotlin.math.min
 
@@ -315,8 +314,7 @@ class YoloOnnxRunner(
 
     private fun ensureModelFiles(context: Context): ResolvedModelFiles {
         val cacheRoot = File(context.cacheDir, "onnx_models").apply { mkdirs() }
-        val fingerprint = buildModelFingerprint(context)
-        val modelDir = File(cacheRoot, "${modelConfig.label}_$fingerprint").apply { mkdirs() }
+        val modelDir = File(cacheRoot, modelConfig.label).apply { mkdirs() }
         val modelFile = File(modelDir, modelConfig.modelFileName)
         copyAssetIfNeeded(context, modelConfig.modelFileName, modelFile)
         val dataAsset = modelConfig.dataFileName
@@ -329,31 +327,6 @@ class YoloOnnxRunner(
             modelFile = modelFile,
             optimizedModelFile = File(modelDir, modelConfig.optimizedFileName)
         )
-    }
-
-    private fun buildModelFingerprint(context: Context): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        updateDigestWithAsset(context, digest, modelConfig.modelFileName)
-        modelConfig.dataFileName?.takeIf { it.isNotBlank() }?.let { dataAsset ->
-            updateDigestWithAsset(context, digest, dataAsset)
-        }
-        return digest.digest().toHexString().take(16)
-    }
-
-    private fun updateDigestWithAsset(
-        context: Context,
-        digest: MessageDigest,
-        assetName: String
-    ) {
-        digest.update(assetName.toByteArray(Charsets.UTF_8))
-        context.assets.open(assetName).use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read <= 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
     }
 
     private fun copyAssetIfNeeded(context: Context, assetName: String, targetFile: File) {
@@ -548,8 +521,6 @@ class YoloOnnxRunner(
     }
 
     companion object {
-        private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
-
         fun withDerivedEyeRegionDetections(detections: List<Detection>): List<Detection> {
             if (detections.isEmpty()) return detections
             if (detections.any { DetectionConfig.isEyeRegionLabel(it.className) }) return detections

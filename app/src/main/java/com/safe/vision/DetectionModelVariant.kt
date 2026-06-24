@@ -16,7 +16,7 @@ enum class DetectionModelVariant(
         modelFileName = "yolo26n.onnx",
         dataFileName = null,
         optimizedFileName = "yolo26n_optimized.onnx",
-        runtimeLabel = "yolo26n",
+        runtimeLabel = "26n-v1",
         inputSize = 320,
         outputLabels = DetectionConfig.STANDARD_LABELS
     ),

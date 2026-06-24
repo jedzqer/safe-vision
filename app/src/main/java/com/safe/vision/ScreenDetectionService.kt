@@ -212,7 +212,9 @@ class ScreenDetectionService : Service() {
                     .toLong()
                     .coerceIn(10L, 1000L)
                 if (yoloRunner == null || currentVariant != variant) {
-                    yoloRunner = YoloOnnxRunner(applicationContext, variant)
+                    yoloRunner = withContext(Dispatchers.IO) {
+                        YoloModelProvider.getRunner(applicationContext, variant)
+                    }
                     currentVariant = variant
                 }
                 captureVisibilityMonitoringEnabled = appSettings.isScreenLossAutoPauseEnabled() &&
@@ -467,7 +469,6 @@ class ScreenDetectionService : Service() {
         runCatching { mediaProjection?.stop() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "停止 MediaProjection 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         mediaProjection = null
-        runCatching { yoloRunner?.close() }
         yoloRunner = null
         currentVariant = null
         overlayMetrics = null
