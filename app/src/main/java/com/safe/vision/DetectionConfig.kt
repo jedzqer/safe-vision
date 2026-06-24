@@ -127,15 +127,17 @@ object DetectionConfig {
     }
 
     object VideoProcessing {
-        const val MIN_SKIP_STRIDE = 3
-        const val TARGET_BITRATE_FACTOR = 0.12f
+        const val MIN_SKIP_STRIDE = 1
+        const val TARGET_BITRATE_FACTOR = 0.18f
+        const val MIN_TARGET_BITRATE = 3_000_000
+        const val MAX_TARGET_BITRATE = 30_000_000
         const val MAX_PRIMARY_FRAME_RATE = 30
         const val FALLBACK_FRAME_RATE_HIGH = 24
         const val FALLBACK_FRAME_RATE_LOW = 20
-        const val FALLBACK_BITRATE_RATIO_HIGH = 0.7f
-        const val FALLBACK_BITRATE_RATIO_LOW = 0.5f
-        const val FALLBACK_MIN_BITRATE_HIGH = 1_500_000
-        const val FALLBACK_MIN_BITRATE_LOW = 1_000_000
+        const val FALLBACK_BITRATE_RATIO_HIGH = 0.85f
+        const val FALLBACK_BITRATE_RATIO_LOW = 0.7f
+        const val FALLBACK_MIN_BITRATE_HIGH = 2_500_000
+        const val FALLBACK_MIN_BITRATE_LOW = 2_000_000
     }
 
     fun defaultCpuThreadCount(): Int {

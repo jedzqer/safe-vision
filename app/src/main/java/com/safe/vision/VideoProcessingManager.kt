@@ -246,11 +246,15 @@ class VideoProcessingManager private constructor(private val context: Context) {
             ).roundToInt()
             val initialProfile = EncoderProfile(
                 frameRate = frameRate.roundToInt().coerceIn(1, DetectionConfig.VideoProcessing.MAX_PRIMARY_FRAME_RATE),
-                bitrate = bitrateByFormula.coerceIn(2_000_000, 20_000_000)
+                bitrate = bitrateByFormula.coerceIn(
+                    DetectionConfig.VideoProcessing.MIN_TARGET_BITRATE,
+                    DetectionConfig.VideoProcessing.MAX_TARGET_BITRATE
+                )
             )
             var videoEncoder: MediaCodec? = null
             var encoderInputSurface: android.view.Surface? = null
             var configuredProfile: EncoderProfile? = null
+            var configuredBitrateMode: Int? = null
             var width = requestedWidth
             var height = requestedHeight
             val fallbackProfiles = listOf(
@@ -275,8 +279,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 val attemptNo = attemptIndex + 1
                 val probeEncoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
                 val codecInfo = probeEncoder.codecInfo
-                val caps = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC).videoCapabilities
+                val codecCapabilities = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+                val caps = codecCapabilities.videoCapabilities
                     ?: throw IllegalStateException("编码器不支持视频能力查询: ${codecInfo.name}")
+                val bitrateMode = resolveBitrateMode(codecCapabilities.encoderCapabilities)
                 val (resolvedWidth, resolvedHeight) = VideoCodecUtils.resolveSupportedSize(
                     capabilities = caps,
                     requestedWidth = requestedWidth,
@@ -298,10 +304,13 @@ class VideoProcessingManager private constructor(private val context: Context) {
                     setInteger(MediaFormat.KEY_BIT_RATE, profile.bitrate)
                     setInteger(MediaFormat.KEY_FRAME_RATE, profile.frameRate)
                     setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+                    if (bitrateMode != null) {
+                        setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode)
+                    }
                 }
                 DebugLogManager.addLog(
                     "视频处理",
-                    "$sessionTag [ENCODER] 尝试#$attemptNo codec=${codecInfo.name} size=${resolvedWidth}x${resolvedHeight} color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)} bitrate=${profile.bitrate} fps=${profile.frameRate} gop=1"
+                    "$sessionTag [ENCODER] 尝试#$attemptNo codec=${codecInfo.name} size=${resolvedWidth}x${resolvedHeight} color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)} bitrate=${profile.bitrate} fps=${profile.frameRate} gop=1 bitrateMode=${bitrateModeToString(bitrateMode)}"
                 )
                 try {
                     encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -309,6 +318,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                     encoder.start()
                     videoEncoder = encoder
                     configuredProfile = profile
+                    configuredBitrateMode = bitrateMode
                     width = resolvedWidth
                     height = resolvedHeight
                     break
@@ -334,7 +344,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
             val activeProfile = configuredProfile ?: initialProfile
             DebugLogManager.addLog(
                 "视频处理",
-                "$sessionTag [ENCODER] 已启用 size=${width}x${height}, color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)}, bitrate=${activeProfile.bitrate}, fps=${activeProfile.frameRate}, gop=1"
+                "$sessionTag [ENCODER] 已启用 size=${width}x${height}, color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)}, bitrate=${activeProfile.bitrate}, fps=${activeProfile.frameRate}, gop=1 bitrateMode=${bitrateModeToString(configuredBitrateMode)}"
             )
 
             val muxer = android.media.MediaMuxer(tempOutputFile.absolutePath, android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -693,6 +703,29 @@ class VideoProcessingManager private constructor(private val context: Context) {
             }
         }
         return executor.asCoroutineDispatcher()
+    }
+
+    private fun resolveBitrateMode(
+        encoderCapabilities: MediaCodecInfo.EncoderCapabilities?
+    ): Int? {
+        if (encoderCapabilities == null) return null
+        return when {
+            encoderCapabilities.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR) ->
+                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+            encoderCapabilities.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) ->
+                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+            else -> null
+        }
+    }
+
+    private fun bitrateModeToString(mode: Int?): String {
+        return when (mode) {
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR -> "VBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR -> "CBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ -> "CQ"
+            null -> "default"
+            else -> "unknown($mode)"
+        }
     }
 
     private fun closeStageDispatchers(vararg dispatchers: ExecutorCoroutineDispatcher) {
