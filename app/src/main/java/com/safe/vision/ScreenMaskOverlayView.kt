@@ -42,20 +42,26 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         val renderedOverlay = preRenderedMaskBitmap?.takeIf { !it.isRecycled }
         val bitmap = sourceBitmap?.takeIf { !it.isRecycled }
         val localSingleTask = singleDrawTask
-        val hasRenderedTask = localSingleTask?.renderedBitmap?.takeIf { !it.isRecycled } != null ||
-            drawTasks.any { it.renderedBitmap?.isRecycled == false }
-        val hasLiveTask = localSingleTask != null || drawTasks.isNotEmpty()
+        val allTasks = localSingleTask?.let { listOf(it) } ?: drawTasks
+        val captureSpaceTasks = allTasks.filterNot { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN }
+        val screenSpaceTasks = allTasks.filter { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN }
+        val hasRenderedTask = allTasks.any { it.renderedBitmap?.isRecycled == false }
+        val hasAnyTask = allTasks.isNotEmpty()
         if (renderedOverlay != null) {
             canvas.save()
             canvas.translate(-windowOriginX, -windowOriginY)
             canvas.scale(scaleX, scaleY)
             canvas.drawBitmap(renderedOverlay, 0f, 0f, null)
             canvas.restore()
-            if (!hasLiveTask) return
+            drawScreenSpaceTasks(canvas, screenSpaceTasks)
+            if (!hasAnyTask) return
         }
 
         val localReverseMode = reverseMode
-        if (bitmap == null && !hasRenderedTask) return
+        if (bitmap == null && !hasRenderedTask) {
+            drawScreenSpaceTasks(canvas, screenSpaceTasks)
+            return
+        }
 
         canvas.save()
         canvas.translate(-windowOriginX, -windowOriginY)
@@ -64,11 +70,7 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
         val outlineShapes = mutableListOf<BlurEffects.OutlineShape>()
-        if (localSingleTask != null) {
-            drawTask(canvas, bitmap, localSingleTask)?.let { outlineShapes.add(it) }
-        } else {
-            drawTasks.forEach { drawTask(canvas, bitmap, it)?.let { outlineShapes.add(it) } }
-        }
+        captureSpaceTasks.forEach { drawTask(canvas, bitmap, it)?.let { outlineShapes.add(it) } }
         if (renderedOverlay == null && bitmap != null && localReverseMode != null && !reversePreRender) {
             applyReverseMask(canvas, bitmap, localReverseMode)
         }
@@ -79,6 +81,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             BlurEffects.drawUnionOutline(canvas, outlineShapes)
         }
         canvas.restore()
+        if (renderedOverlay == null) {
+            drawScreenSpaceTasks(canvas, screenSpaceTasks)
+        }
     }
 
     fun bindFrame(
@@ -213,6 +218,9 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
         bitmap: Bitmap?,
         task: ScreenPrivacyMaskRenderer.DrawTask
     ): BlurEffects.OutlineShape? {
+        if (task.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN) {
+            return null
+        }
         task.renderedBitmap?.takeIf { !it.isRecycled }?.let { renderedBitmap ->
             canvas.drawBitmap(
                 renderedBitmap,
@@ -255,6 +263,18 @@ class ScreenMaskOverlayView @JvmOverloads constructor(
             }
         }
         return outlineShape
+    }
+
+    private fun drawScreenSpaceTasks(
+        canvas: Canvas,
+        tasks: List<ScreenPrivacyMaskRenderer.DrawTask>
+    ) {
+        tasks.forEach { task ->
+            val renderedBitmap = task.renderedBitmap?.takeIf { !it.isRecycled } ?: return@forEach
+            val left = task.drawRect.left * scaleX - windowOriginX
+            val top = task.drawRect.top * scaleY - windowOriginY
+            canvas.drawBitmap(renderedBitmap, left, top, null)
+        }
     }
 
     private fun applyEffect(

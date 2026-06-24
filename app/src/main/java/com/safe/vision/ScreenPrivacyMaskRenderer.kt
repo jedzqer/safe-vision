@@ -14,6 +14,11 @@ import kotlin.math.atan2
 import kotlin.math.roundToInt
 
 class ScreenPrivacyMaskRenderer(context: Context) {
+    enum class RenderedBitmapSpace {
+        CAPTURE,
+        SCREEN
+    }
+
     data class DrawTask(
         val label: String,
         val renderMode: Int,
@@ -23,7 +28,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val eyePath: Path?,
         val rotationDegrees: Float,
         val drawOutline: Boolean,
-        val renderedBitmap: Bitmap? = null
+        val renderedBitmap: Bitmap? = null,
+        val renderedBitmapSpace: RenderedBitmapSpace = RenderedBitmapSpace.CAPTURE
     ) {
         fun release() {
             renderedBitmap?.takeIf { !it.isRecycled }?.recycle()
@@ -66,7 +72,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
-    private fun shouldDrawTaskLive(task: DrawTask): Boolean {
+    private fun shouldPreRenderHdSticker(task: DrawTask): Boolean {
         return task.renderMode == PrivacySettingsManager.BLUR_MODE_STICKER
     }
 
@@ -87,7 +93,9 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         sourceBitmap: Bitmap,
         detections: List<YoloOnnxRunner.Detection>,
         labelProfile: DetectionConfig.LabelProfile,
-        overlayMode: ScreenOverlayMode
+        overlayMode: ScreenOverlayMode,
+        outputScaleX: Float = 1f,
+        outputScaleY: Float = 1f
     ): OverlayFrame? {
         val defaultBlurMode = privacySettings.getBlurMode(labelProfile)
         val labelOverrides = privacySettings.getLabelEffectOverrides(labelProfile)
@@ -312,8 +320,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
         val reversePreRender = privacySettings.isReversePreRenderEnabled()
 
-        val liveDrawTasks = sortedDrawTasks.filter(::shouldDrawTaskLive)
-        val preRenderedDrawTasks = sortedDrawTasks.filterNot(::shouldDrawTaskLive)
+        val hdStickerDrawTasks = sortedDrawTasks.filter(::shouldPreRenderHdSticker)
+        val preRenderedDrawTasks = sortedDrawTasks.filterNot(::shouldPreRenderHdSticker)
         val preRenderedMaskBitmap = if (overlayMode != ScreenOverlayMode.SYSTEM_ALERT_WINDOW || finalReverseMode != null) {
             renderFullscreenOverlayBitmap(
                 sourceBitmap = sourceBitmap,
@@ -328,14 +336,38 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
         val preparedDrawTasks = if (overlayMode == ScreenOverlayMode.SYSTEM_ALERT_WINDOW && finalReverseMode == null) {
             sortedDrawTasks.map { task ->
-                if (shouldDrawTaskLive(task)) {
-                    task
+                if (shouldPreRenderHdSticker(task)) {
+                    task.copy(
+                        renderedBitmap = renderTaskBitmap(
+                            sourceBitmap = sourceBitmap,
+                            task = task,
+                            includeOutline = false,
+                            outputScaleX = outputScaleX,
+                            outputScaleY = outputScaleY,
+                            outputSpace = RenderedBitmapSpace.SCREEN
+                        ),
+                        renderedBitmapSpace = RenderedBitmapSpace.SCREEN
+                    )
                 } else {
-                    task.copy(renderedBitmap = renderTaskBitmap(sourceBitmap, task, includeOutline = true))
+                    task.copy(
+                        renderedBitmap = renderTaskBitmap(sourceBitmap, task, includeOutline = true)
+                    )
                 }
             }
         } else if (preRenderedMaskBitmap != null) {
-            liveDrawTasks
+            hdStickerDrawTasks.map { task ->
+                task.copy(
+                    renderedBitmap = renderTaskBitmap(
+                        sourceBitmap = sourceBitmap,
+                        task = task,
+                        includeOutline = false,
+                        outputScaleX = outputScaleX,
+                        outputScaleY = outputScaleY,
+                        outputSpace = RenderedBitmapSpace.SCREEN
+                    ),
+                    renderedBitmapSpace = RenderedBitmapSpace.SCREEN
+                )
+            }
         } else {
             sortedDrawTasks
         }
@@ -398,15 +430,30 @@ class ScreenPrivacyMaskRenderer(context: Context) {
     private fun renderTaskBitmap(
         sourceBitmap: Bitmap,
         task: DrawTask,
-        includeOutline: Boolean
+        includeOutline: Boolean,
+        outputScaleX: Float = 1f,
+        outputScaleY: Float = 1f,
+        outputSpace: RenderedBitmapSpace = RenderedBitmapSpace.CAPTURE
     ): Bitmap? {
         val rect = task.drawRect
         if (rect.width() <= 0 || rect.height() <= 0) return null
-        val localRect = Rect(0, 0, rect.width(), rect.height())
-        val localEyePath = task.eyePath?.let { path ->
-            Path(path).apply {
-                offset(-rect.left.toFloat(), -rect.top.toFloat())
+        val width = when (outputSpace) {
+            RenderedBitmapSpace.CAPTURE -> rect.width()
+            RenderedBitmapSpace.SCREEN -> (rect.width() * outputScaleX).roundToInt().coerceAtLeast(1)
+        }
+        val height = when (outputSpace) {
+            RenderedBitmapSpace.CAPTURE -> rect.height()
+            RenderedBitmapSpace.SCREEN -> (rect.height() * outputScaleY).roundToInt().coerceAtLeast(1)
+        }
+        val localRect = Rect(0, 0, width, height)
+        val localEyePath = if (outputSpace == RenderedBitmapSpace.CAPTURE) {
+            task.eyePath?.let { path ->
+                Path(path).apply {
+                    offset(-rect.left.toFloat(), -rect.top.toFloat())
+                }
             }
+        } else {
+            null
         }
         val patch = Bitmap.createBitmap(localRect.width(), localRect.height(), Bitmap.Config.ARGB_8888)
         val canvas = Canvas(patch)

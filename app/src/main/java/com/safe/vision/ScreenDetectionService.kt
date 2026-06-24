@@ -289,7 +289,25 @@ class ScreenDetectionService : Service() {
                     overlayRenderer?.shouldRenderOverlay(detections, profile, overlayMode) == true
                 val overlayFrame = if (shouldRenderOverlay) {
                     val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    overlayRenderer?.render(overlayBitmap, detections, profile, overlayMode).also { frame ->
+                    val currentMetrics = overlayMetrics
+                    val outputScaleX = if (currentMetrics != null && overlayBitmap.width > 0) {
+                        currentMetrics.widthPixels.toFloat() / overlayBitmap.width.toFloat()
+                    } else {
+                        1f
+                    }
+                    val outputScaleY = if (currentMetrics != null && overlayBitmap.height > 0) {
+                        currentMetrics.heightPixels.toFloat() / overlayBitmap.height.toFloat()
+                    } else {
+                        1f
+                    }
+                    overlayRenderer?.render(
+                        overlayBitmap,
+                        detections,
+                        profile,
+                        overlayMode,
+                        outputScaleX,
+                        outputScaleY
+                    ).also { frame ->
                         if (frame == null && !overlayBitmap.isRecycled) {
                             overlayBitmap.recycle()
                         }
