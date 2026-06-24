@@ -103,6 +103,7 @@ class ScreenDetectionService : Service() {
     private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
     private var overlayVisible = false
     private var lastPositiveTimeMs: Long = 0L
+    private var overlayUnavailableLogged = false
 
     // 去抖：仅在状态文案变化时刷新通知/状态/日志，避免每帧抢主线程做 notify()
     private var lastPublishedStatus: String? = null
@@ -333,7 +334,15 @@ class ScreenDetectionService : Service() {
             return
         }
 
-        val metrics = overlayMetrics ?: return
+        if (!isOverlayReadyForRendering()) {
+            ScreenOverlayController.clearMaskOverlays(overlayMode)
+            overlayVisible = false
+            frame?.sourceBitmap?.recycle()
+            return
+        }
+
+        val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
+        overlayMetrics = metrics
         val hasDetection = frame != null
         val hideTimeoutMs = when (overlayMode) {
             ScreenOverlayMode.ACCESSIBILITY -> HIDE_TIMEOUT_ACCESSIBILITY_MS
@@ -399,6 +408,31 @@ class ScreenDetectionService : Service() {
         }
     }
 
+    private fun isOverlayReadyForRendering(): Boolean {
+        val ready = ScreenOverlayController.isOverlayReady(applicationContext, overlayMode)
+        if (ready) {
+            if (overlayUnavailableLogged) {
+                DebugLogManager.addLog("屏幕检测", "遮挡层已就绪，恢复显示屏幕遮挡")
+                overlayUnavailableLogged = false
+            }
+            return true
+        }
+
+        if (!overlayUnavailableLogged) {
+            val message = when {
+                !ScreenOverlayController.isOverlayPermissionGranted(applicationContext, overlayMode) ->
+                    "${overlayUnavailableMessage(overlayMode)}，已跳过本次遮挡渲染"
+                overlayMode == ScreenOverlayMode.ACCESSIBILITY ->
+                    "无障碍遮挡服务尚未连接，已继续检测；连接后将自动恢复屏幕遮挡"
+                else ->
+                    "${overlayUnavailableMessage(overlayMode)}，已跳过本次遮挡渲染"
+            }
+            DebugLogManager.addLog("屏幕检测", message, DebugLogManager.LogLevel.WARN)
+            overlayUnavailableLogged = true
+        }
+        return false
+    }
+
     private fun stopDetection(status: String, cancelJob: Boolean = true) {
         if (cancelJob) {
             detectionJob?.cancel()
@@ -416,6 +450,7 @@ class ScreenDetectionService : Service() {
         detectionWindow.clear()
         overlayVisible = false
         lastPositiveTimeMs = 0L
+        overlayUnavailableLogged = false
         lastPublishedStatus = null
         captureVisibilityMonitoringEnabled = false
         isCapturedContentVisible = true
@@ -463,7 +498,11 @@ class ScreenDetectionService : Service() {
                 return
             }
         }
-        error(overlayUnavailableMessage(overlayMode))
+        DebugLogManager.addLog(
+            "屏幕检测",
+            "无障碍遮挡服务连接超时，先继续启动检测；服务连接后会自动恢复屏幕遮挡",
+            DebugLogManager.LogLevel.WARN
+        )
     }
 
     private fun updateNotification(status: String) {

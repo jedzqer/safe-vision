@@ -13,6 +13,7 @@ import android.graphics.RectF
 import java.io.Closeable
 import java.io.File
 import java.nio.FloatBuffer
+import java.security.MessageDigest
 import kotlin.math.max
 import kotlin.math.min
 
@@ -39,8 +40,9 @@ class YoloOnnxRunner(
     private val inputName: String
     private val executionProvider: String
     private val inputArea = modelInputSize * modelInputSize
+    private val resolvedModelFiles = ensureModelFiles(context)
     private val optimizedModelPath: String =
-        File(context.cacheDir, modelConfig.optimizedFileName).absolutePath
+        resolvedModelFiles.optimizedModelFile.absolutePath
     private val cpuThreads = DetectionConfig.defaultCpuThreadCount()
     private val runLock = Any()
     private var resizedBitmap: Bitmap? = null
@@ -53,7 +55,7 @@ class YoloOnnxRunner(
     private var faceLandmarkInitAttempted = false
 
     init {
-        val modelFile = ensureModelFiles(context)
+        val modelFile = resolvedModelFiles.modelFile
         val (createdSession, provider) = createSessionWithFallback(modelFile.absolutePath)
         session = createdSession
         executionProvider = provider
@@ -285,19 +287,20 @@ class YoloOnnxRunner(
     }
 
     private fun createSessionWithFallback(modelPath: String): Pair<OrtSession, String> {
-        DebugLogManager.addLog("模型加载", "尝试使用 NNAPI/GPU 执行提供者")
+        DebugLogManager.addLog("模型加载", "尝试使用 NNAPI 硬件加速")
         try {
             val nnapiOptions = OrtSession.SessionOptions().apply {
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                 setIntraOpNumThreads(cpuThreads)
                 setInterOpNumThreads(1)
-                runCatching { setOptimizedModelFilePath(optimizedModelPath) }
+                // NNAPI may produce provider-specific compiled nodes. Those graphs cannot be
+                // serialized via setOptimizedModelFilePath, otherwise session creation fails.
                 addNnapi()
             }
             val nnapiSession = environment.createSession(modelPath, nnapiOptions)
-            return nnapiSession to "NNAPI/GPU"
+            return nnapiSession to "NNAPI"
         } catch (e: Exception) {
-            DebugLogManager.addLog("模型加载", "NNAPI/GPU 初始化失败，回退 CPU: ${e.message}")
+            DebugLogManager.addLog("模型加载", "NNAPI 初始化失败，回退 CPU: ${e.message}")
         }
 
         val cpuOptions = OrtSession.SessionOptions().apply {
@@ -310,23 +313,83 @@ class YoloOnnxRunner(
         return cpuSession to "CPU"
     }
 
-    private fun ensureModelFiles(context: Context): File {
-        val modelFile = File(context.cacheDir, modelConfig.modelFileName)
-        if (!modelFile.exists()) {
-            context.assets.open(modelConfig.modelFileName).use { input ->
-                modelFile.outputStream().use { output -> input.copyTo(output) }
-            }
-        }
+    private fun ensureModelFiles(context: Context): ResolvedModelFiles {
+        val cacheRoot = File(context.cacheDir, "onnx_models").apply { mkdirs() }
+        val fingerprint = buildModelFingerprint(context)
+        val modelDir = File(cacheRoot, "${modelConfig.label}_$fingerprint").apply { mkdirs() }
+        val modelFile = File(modelDir, modelConfig.modelFileName)
+        copyAssetIfNeeded(context, modelConfig.modelFileName, modelFile)
         val dataAsset = modelConfig.dataFileName
         if (!dataAsset.isNullOrBlank()) {
-            val dataFile = File(context.cacheDir, dataAsset)
-            if (!dataFile.exists()) {
-                context.assets.open(dataAsset).use { input ->
-                    dataFile.outputStream().use { output -> input.copyTo(output) }
-                }
+            copyAssetIfNeeded(context, dataAsset, File(modelDir, dataAsset))
+        }
+        cleanupStaleModelCaches(cacheRoot, modelDir.name)
+        cleanupLegacyFlatCacheFiles(context.cacheDir)
+        return ResolvedModelFiles(
+            modelFile = modelFile,
+            optimizedModelFile = File(modelDir, modelConfig.optimizedFileName)
+        )
+    }
+
+    private fun buildModelFingerprint(context: Context): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        updateDigestWithAsset(context, digest, modelConfig.modelFileName)
+        modelConfig.dataFileName?.takeIf { it.isNotBlank() }?.let { dataAsset ->
+            updateDigestWithAsset(context, digest, dataAsset)
+        }
+        return digest.digest().toHexString().take(16)
+    }
+
+    private fun updateDigestWithAsset(
+        context: Context,
+        digest: MessageDigest,
+        assetName: String
+    ) {
+        digest.update(assetName.toByteArray(Charsets.UTF_8))
+        context.assets.open(assetName).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
             }
         }
-        return modelFile
+    }
+
+    private fun copyAssetIfNeeded(context: Context, assetName: String, targetFile: File) {
+        if (targetFile.exists()) return
+        targetFile.parentFile?.mkdirs()
+        context.assets.open(assetName).use { input ->
+            targetFile.outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+
+    private fun cleanupStaleModelCaches(cacheRoot: File, activeDirName: String) {
+        val prefix = "${modelConfig.label}_"
+        cacheRoot.listFiles()?.forEach { dir ->
+            if (!dir.isDirectory || dir.name == activeDirName || !dir.name.startsWith(prefix)) return@forEach
+            runCatching { dir.deleteRecursively() }
+                .onFailure { e ->
+                    DebugLogManager.addLog(
+                        "模型加载",
+                        "清理旧模型缓存失败: ${dir.name} - ${e.message}",
+                        DebugLogManager.LogLevel.WARN
+                    )
+                }
+        }
+    }
+
+    private fun cleanupLegacyFlatCacheFiles(cacheDir: File) {
+        val legacyNames = buildList {
+            add(modelConfig.modelFileName)
+            add(modelConfig.optimizedFileName)
+            modelConfig.dataFileName?.takeIf { it.isNotBlank() }?.let(::add)
+        }
+        legacyNames.forEach { name ->
+            val file = File(cacheDir, name)
+            if (!file.exists()) return@forEach
+            runCatching { file.delete() }
+        }
     }
 
     private fun getFaceLandmarkRunner(): FaceLandmarkOnnxRunner? {
@@ -449,12 +512,19 @@ class YoloOnnxRunner(
         val label: String
     )
 
+    private data class ResolvedModelFiles(
+        val modelFile: File,
+        val optimizedModelFile: File
+    )
+
     override fun close() {
         runCatching { faceLandmarkRunner?.close() }
         runCatching { session.close() }
     }
 
     companion object {
+        private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
+
         fun withDerivedEyeRegionDetections(detections: List<Detection>): List<Detection> {
             if (detections.isEmpty()) return detections
             if (detections.any { DetectionConfig.isEyeRegionLabel(it.className) }) return detections
