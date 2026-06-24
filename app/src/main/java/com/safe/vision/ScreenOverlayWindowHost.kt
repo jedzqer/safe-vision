@@ -20,8 +20,7 @@ internal class ScreenOverlayWindowHost(
 ) {
     companion object {
         private const val MIN_SLOT_REUSE_DISTANCE_DP = 72f
-        private const val SLOT_REUSE_DISTANCE_MULTIPLIER = 1.5f
-        private const val MAX_POOLED_REGION_SLOTS = 12
+        private const val SLOT_REUSE_DISTANCE_MULTIPLIER = 0.75f
     }
 
     private data class RegionOverlaySlot(
@@ -170,14 +169,7 @@ internal class ScreenOverlayWindowHost(
 
     fun clearRegionOverlays() {
         renderGeneration++
-        maskRegionOverlaySlots.forEach { slot ->
-            slot.inUse = false
-            if (slot.attached) {
-                slot.view.visibility = View.INVISIBLE
-                slot.view.release(false)
-            }
-        }
-        trimRegionSlotPool(0)
+        removeAllRegionSlots()
     }
 
     fun clearFullscreenOverlay() {
@@ -264,31 +256,16 @@ internal class ScreenOverlayWindowHost(
     }
 
     private fun recycleUnusedRegionSlots() {
-        maskRegionOverlaySlots.forEach { slot ->
-            if (slot.inUse || !slot.attached) return@forEach
-            slot.view.visibility = View.INVISIBLE
-            slot.view.release(false)
-        }
-        trimRegionSlotPool(MAX_POOLED_REGION_SLOTS)
-    }
-
-    private fun trimRegionSlotPool(maxSlots: Int) {
-        if (maskRegionOverlaySlots.size <= maxSlots) return
         val iterator = maskRegionOverlaySlots.iterator()
-        while (maskRegionOverlaySlots.size > maxSlots && iterator.hasNext()) {
+        while (iterator.hasNext()) {
             val slot = iterator.next()
             if (slot.inUse || !slot.attached) continue
-            runCatching { windowManager.removeView(slot.view) }
-            slot.attached = false
+            removeRegionSlot(slot)
             iterator.remove()
         }
     }
 
     private fun obtainRegionSlot(metrics: OverlayMetrics): RegionOverlaySlot {
-        val slot = maskRegionOverlaySlots.firstOrNull { !it.inUse && !it.attached }
-        if (slot != null) {
-            return slot
-        }
         return RegionOverlaySlot(
             view = createOverlayView().apply {
                 visibility = View.INVISIBLE
@@ -306,6 +283,27 @@ internal class ScreenOverlayWindowHost(
             DebugLogManager.addLog("屏幕遮挡", "addView 区域遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
             slot.attached = false
         }
+    }
+
+    private fun removeAllRegionSlots() {
+        val iterator = maskRegionOverlaySlots.iterator()
+        while (iterator.hasNext()) {
+            val slot = iterator.next()
+            removeRegionSlot(slot)
+            iterator.remove()
+        }
+    }
+
+    private fun removeRegionSlot(slot: RegionOverlaySlot) {
+        slot.inUse = false
+        slot.view.visibility = View.INVISIBLE
+        slot.view.release(false)
+        if (slot.attached) {
+            runCatching { windowManager.removeView(slot.view) }
+            slot.attached = false
+        }
+        slot.label = ""
+        slot.lastRegion.setEmpty()
     }
 
     private fun clampTaskRect(region: Rect, width: Int, height: Int): Rect {
