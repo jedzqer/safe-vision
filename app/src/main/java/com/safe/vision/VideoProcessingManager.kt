@@ -363,6 +363,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
             )
 
             val bufferInfo = MediaCodec.BufferInfo()
+            var discardedFramesBeforeMuxer = 0
             val codecContext = "codec=${activeEncoder.codecInfo.name}, size=${width}x${height}, color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)}, bitrate=${activeProfile.bitrate}, fps=${activeProfile.frameRate}"
 
             fun codecStateFailure(step: String, cause: IllegalStateException): IllegalStateException {
@@ -417,6 +418,15 @@ class VideoProcessingManager private constructor(private val context: Context) {
                                 encodedData.position(bufferInfo.offset)
                                 encodedData.limit(bufferInfo.offset + bufferInfo.size)
                                 muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
+                            } else if (bufferInfo.size > 0 && (!muxerStarted || videoTrackIndex < 0)) {
+                                discardedFramesBeforeMuxer++
+                                if (discardedFramesBeforeMuxer == 1) {
+                                    DebugLogManager.addLog(
+                                        "视频处理",
+                                        "$sessionTag [ENCODER] muxer 启动前收到编码帧，已丢弃且不会补写",
+                                        DebugLogManager.LogLevel.WARN
+                                    )
+                                }
                             }
                             releaseOutputBufferSafe(outputIndex)
                             if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -590,6 +600,9 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 if (audioTrackIndex != -1 && muxerStarted) {
                     DebugLogManager.addLog("视频处理", "$sessionTag [MUXER] 补齐剩余音轨样本")
                     audioTrackCopier?.finish()
+                    val finalSamples = audioTrackCopier?.audioSamples ?: 0
+                    val audioMime = audioTrackCopier?.audioMime ?: "?"
+                    DebugLogManager.addLog("视频处理", "$sessionTag [MUXER] 音轨混流完成 mime=$audioMime，共写入 $finalSamples 个音频样本")
                 }
                 _progress.value = _progress.value.copy(percentage = 99)
                 if (muxerStarted && !muxerStopped) {
@@ -615,9 +628,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 }
                 completedSuccessfully = true
                 val durationCostMs = System.currentTimeMillis() - startAt
+                val audioSamples = audioTrackCopier?.audioSamples ?: -1
                 DebugLogManager.addLog(
                     "视频处理",
-                    "$sessionTag [SUMMARY] frames=${encodedFrameCount.get()} processed in ${durationCostMs}ms, detRuns=${detectionRunCount.get()}, detHits=${detectionHitCount.get()} -> ${outputFile.name}"
+                    "$sessionTag [SUMMARY] frames=${encodedFrameCount.get()} audioSamples=$audioSamples discardedBeforeMuxer=$discardedFramesBeforeMuxer processed in ${durationCostMs}ms, detRuns=${detectionRunCount.get()}, detHits=${detectionHitCount.get()} -> ${outputFile.name}"
                 )
             } finally {
                 closeStageDispatchers(

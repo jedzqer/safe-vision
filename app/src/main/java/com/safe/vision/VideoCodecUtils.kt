@@ -23,11 +23,15 @@ object VideoCodecUtils {
     class AudioTrackCopier private constructor(
         private val extractor: MediaExtractor,
         private val muxer: android.media.MediaMuxer,
-        val trackIndex: Int
+        val trackIndex: Int,
+        val audioMime: String
     ) : Closeable {
         private val buffer = ByteBuffer.allocate(1024 * 1024)
         private val info = MediaCodec.BufferInfo()
         private var finished = false
+        @Volatile
+        var audioSamples: Int = 0
+            private set
 
         fun copySamplesUpTo(maxPresentationTimeUs: Long) {
             copyInternal { sampleTimeUs -> sampleTimeUs <= maxPresentationTimeUs }
@@ -65,6 +69,7 @@ object VideoCodecUtils {
                 info.presentationTimeUs = sampleTimeUs
                 info.flags = extractor.sampleFlags
                 muxer.writeSampleData(trackIndex, buffer, info)
+                audioSamples++
                 extractor.advance()
             }
         }
@@ -78,20 +83,48 @@ object VideoCodecUtils {
                 val extractor = MediaExtractor()
                 try {
                     extractor.setDataSource(context, uri, null)
-                    for (i in 0 until extractor.trackCount) {
+                    val trackCount = extractor.trackCount
+                    DebugLogManager.addLog(
+                        "视频处理",
+                        "[AUDIO] 输入共有 $trackCount 个轨道"
+                    )
+                    for (i in 0 until trackCount) {
                         val format = extractor.getTrackFormat(i)
                         val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
                         if (mime.startsWith("audio/")) {
                             extractor.selectTrack(i)
-                            val trackIndex = muxer.addTrack(format)
-                            return AudioTrackCopier(extractor, muxer, trackIndex)
+                            DebugLogManager.addLog(
+                                "视频处理",
+                                "[AUDIO] 发现音轨#$i mime=$mime " +
+                                    "sampleRate=${if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE) else "?"} " +
+                                    "channels=${if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else "?"} " +
+                                    "bitrate=${if (format.containsKey(MediaFormat.KEY_BIT_RATE)) format.getInteger(MediaFormat.KEY_BIT_RATE) else "?"}"
+                            )
+                            try {
+                                val trackIndex = muxer.addTrack(format)
+                                return AudioTrackCopier(extractor, muxer, trackIndex, mime)
+                            } catch (e: Exception) {
+                                DebugLogManager.addLog(
+                                    "视频处理",
+                                    "[AUDIO] muxer.addTrack 失败 mime=$mime: ${e.message}，视频将无音频输出",
+                                    DebugLogManager.LogLevel.WARN
+                                )
+                                extractor.unselectTrack(i)
+                                continue
+                            }
                         }
                     }
                     extractor.release()
+                    DebugLogManager.addLog("视频处理", "[AUDIO] 未发现音轨，将输出纯视频")
                     return null
-                } catch (t: Throwable) {
+                } catch (e: Exception) {
+                    DebugLogManager.addLog(
+                        "视频处理",
+                        "[AUDIO] 音频提取器初始化失败: ${e.message}，将输出纯视频",
+                        DebugLogManager.LogLevel.WARN
+                    )
                     runCatching { extractor.release() }
-                    throw t
+                    return null
                 }
             }
         }
@@ -339,65 +372,6 @@ object VideoCodecUtils {
             MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar -> "YUV420PackedSemiPlanar(NV21)"
             MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible -> "YUV420Flexible"
             else -> "Unknown($format)"
-        }
-    }
-
-    fun addAudioTrackIfPresent(context: Context, muxer: android.media.MediaMuxer, uri: Uri): Int {
-        val extractor = MediaExtractor()
-        try {
-            extractor.setDataSource(context, uri, null)
-            for (i in 0 until extractor.trackCount) {
-                val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                if (mime.startsWith("audio/")) {
-                    extractor.selectTrack(i)
-                    return muxer.addTrack(format)
-                }
-            }
-            return -1
-        } finally {
-            extractor.release()
-        }
-    }
-
-    fun copyAudioToMuxer(context: Context, muxer: android.media.MediaMuxer, trackIndex: Int, uri: Uri) {
-        if (trackIndex == -1) return
-        val extractor = MediaExtractor()
-        try {
-            extractor.setDataSource(context, uri, null)
-            var audioTrack = -1
-            for (i in 0 until extractor.trackCount) {
-                val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                if (mime.startsWith("audio/")) {
-                    extractor.selectTrack(i)
-                    audioTrack = i
-                    break
-                }
-            }
-            if (audioTrack == -1) {
-                return
-            }
-
-            val buffer = ByteBuffer.allocate(1024 * 1024)
-            val info = MediaCodec.BufferInfo()
-            while (true) {
-                buffer.clear()
-                val sampleSize = extractor.readSampleData(buffer, 0)
-                if (sampleSize < 0) {
-                    break
-                }
-                buffer.position(0)
-                buffer.limit(sampleSize)
-                info.offset = 0
-                info.size = sampleSize
-                info.presentationTimeUs = extractor.sampleTime
-                info.flags = extractor.sampleFlags
-                muxer.writeSampleData(trackIndex, buffer, info)
-                extractor.advance()
-            }
-        } finally {
-            extractor.release()
         }
     }
 
