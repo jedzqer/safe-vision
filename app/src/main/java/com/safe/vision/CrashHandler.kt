@@ -37,10 +37,10 @@ object CrashHandler {
                 
             } catch (e: Exception) {
                 // 如果连崩溃处理都失败了，输出到System.err
-                System.err.println("=== 崩溃处理器失败 ===")
-                System.err.println("原始异常: ${exception.message}")
-                System.err.println("异常堆栈: ${exception.stackTraceToString()}")
-                System.err.println("处理异常时出错: ${e.message}")
+                System.err.println("=== Crash Handler Failure ===")
+                System.err.println("Original exception: ${exception.message}")
+                System.err.println("Exception stack trace: ${exception.stackTraceToString()}")
+                System.err.println("Error during handling: ${e.message}")
                 e.printStackTrace()
             } finally {
                 exitProcess(1)
@@ -59,34 +59,33 @@ object CrashHandler {
         
         return buildString {
             appendLine("${"=".repeat(60)}")
-            appendLine("Safe Vision 应用崩溃报告")
+            appendLine("Safe Vision Crash Report")
             appendLine("${"=".repeat(60)}")
-            appendLine("崩溃时间: $timestamp")
-            appendLine("应用版本: $versionName ($versionCode)")
-            appendLine("Android版本: ${android.os.Build.VERSION.RELEASE}")
-            appendLine("设备型号: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
-            appendLine("设备信息: $deviceInfo")
+            appendLine("Crash time: $timestamp")
+            appendLine("App version: $versionName ($versionCode)")
+            appendLine("Android version: ${android.os.Build.VERSION.RELEASE}")
+            appendLine("Device model: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+            appendLine("Device info: $deviceInfo")
             appendLine()
-            appendLine("线程信息:")
-            appendLine("  名称: ${thread.name}")
+            appendLine("Thread info:")
+            appendLine("  Name: ${thread.name}")
             appendLine("  ID: ${thread.threadId()}")
-            appendLine("  优先级: ${thread.priority}")
+            appendLine("  Priority: ${thread.priority}")
             appendLine()
-            appendLine("异常信息:")
-            appendLine("  类型: ${exception::class.java.simpleName}")
-            appendLine("  消息: ${exception.message}")
+            appendLine("Exception info:")
+            appendLine("  Type: ${exception::class.java.simpleName}")
+            appendLine("  Message: ${exception.message}")
             appendLine()
-            appendLine("堆栈跟踪:")
+            appendLine("Stack trace:")
             appendLine(exception.stackTraceToString())
             
-            // 添加原因异常
             var cause = exception.cause
             var level = 1
             while (cause != null && level < 5) {
                 appendLine()
-                appendLine("原因异常 $level:")
-                appendLine("  类型: ${cause::class.java.simpleName}")
-                appendLine("  消息: ${cause.message}")
+                appendLine("Caused by $level:")
+                appendLine("  Type: ${cause::class.java.simpleName}")
+                appendLine("  Message: ${cause.message}")
                 appendLine(cause.stackTraceToString())
                 cause = cause.cause
                 level++
@@ -98,11 +97,11 @@ object CrashHandler {
     
     private fun getDeviceInfo(): String {
         return buildString {
-            append("制造商: ${android.os.Build.MANUFACTURER}")
-            append(", 型号: ${android.os.Build.MODEL}")
-            append(", 产品: ${android.os.Build.PRODUCT}")
-            append(", 硬件: ${android.os.Build.HARDWARE}")
-            append(", 序列号: ${getDeviceSerial()}")
+            append("Manufacturer: ${android.os.Build.MANUFACTURER}")
+            append(", Model: ${android.os.Build.MODEL}")
+            append(", Product: ${android.os.Build.PRODUCT}")
+            append(", Hardware: ${android.os.Build.HARDWARE}")
+            append(", Serial: ${getDeviceSerial()}")
         }
     }
 

@@ -35,5 +35,13 @@ enum class DetectionModelVariant(
         fun fromPrefValue(value: String?): DetectionModelVariant {
             return entries.firstOrNull { it.prefValue == value } ?: STANDARD
         }
+
+        fun displayName(context: android.content.Context, variant: DetectionModelVariant): String {
+            val resId = when (variant) {
+                STANDARD -> R.string.model_name_standard
+                ANIME -> R.string.model_name_anime
+            }
+            return context.getString(resId)
+        }
     }
 }

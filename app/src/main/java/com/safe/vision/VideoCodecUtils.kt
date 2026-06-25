@@ -158,9 +158,9 @@ object VideoCodecUtils {
         )
 
         init {
-            require(eglDisplay != EGL14.EGL_NO_DISPLAY) { "无法获取EGL display" }
+            require(eglDisplay != EGL14.EGL_NO_DISPLAY) { "Cannot get EGL display" }
             val version = IntArray(2)
-            require(EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) { "EGL 初始化失败" }
+            require(EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) { "EGL initialization failed" }
             val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
             val numConfigs = IntArray(1)
             val attribList = intArrayOf(
@@ -172,15 +172,15 @@ object VideoCodecUtils {
                 EGL14.EGL_NONE
             )
             require(EGL14.eglChooseConfig(eglDisplay, attribList, 0, configs, 0, configs.size, numConfigs, 0)) {
-                "EGL 配置选择失败"
+                "EGL config selection failed"
             }
-            val eglConfig = configs[0] ?: error("未找到可用EGL配置")
+            val eglConfig = configs[0] ?: error("No available EGL config found")
             val contextAttribs = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE)
             eglContext = EGL14.eglCreateContext(eglDisplay, eglConfig, EGL14.EGL_NO_CONTEXT, contextAttribs, 0)
-            require(eglContext != EGL14.EGL_NO_CONTEXT) { "EGL context 创建失败" }
+            require(eglContext != EGL14.EGL_NO_CONTEXT) { "EGL context creation failed" }
             val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
             eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, eglConfig, inputSurface, surfaceAttribs, 0)
-            require(eglSurface != EGL14.EGL_NO_SURFACE) { "EGL surface 创建失败" }
+            require(eglSurface != EGL14.EGL_NO_SURFACE) { "EGL surface creation failed" }
             makeCurrent()
             program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
             positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
@@ -208,7 +208,7 @@ object VideoCodecUtils {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
             EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTimeUs * 1000L)
-            require(EGL14.eglSwapBuffers(eglDisplay, eglSurface)) { "eglSwapBuffers 失败" }
+            require(EGL14.eglSwapBuffers(eglDisplay, eglSurface)) { "eglSwapBuffers failed" }
         }
 
         override fun close() {
@@ -226,7 +226,7 @@ object VideoCodecUtils {
 
         private fun makeCurrent() {
             require(EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-                "eglMakeCurrent 失败: ${eglErrorString(EGL14.eglGetError())}"
+                "eglMakeCurrent failed: ${eglErrorString(EGL14.eglGetError())}"
             }
         }
 
@@ -234,7 +234,7 @@ object VideoCodecUtils {
             val textures = IntArray(1)
             GLES20.glGenTextures(1, textures, 0)
             val textureId = textures[0]
-            require(textureId != 0) { "纹理创建失败" }
+            require(textureId != 0) { "Texture creation failed" }
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
@@ -247,7 +247,7 @@ object VideoCodecUtils {
             val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, vertexShaderSource)
             val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderSource)
             val programId = GLES20.glCreateProgram()
-            require(programId != 0) { "GL program 创建失败" }
+            require(programId != 0) { "GL program creation failed" }
             GLES20.glAttachShader(programId, vertexShader)
             GLES20.glAttachShader(programId, fragmentShader)
             GLES20.glLinkProgram(programId)
@@ -256,7 +256,7 @@ object VideoCodecUtils {
             require(linkStatus[0] == GLES20.GL_TRUE) {
                 val message = GLES20.glGetProgramInfoLog(programId)
                 GLES20.glDeleteProgram(programId)
-                "GL program 链接失败: $message"
+                "GL program link failed: $message"
             }
             GLES20.glDeleteShader(vertexShader)
             GLES20.glDeleteShader(fragmentShader)
@@ -265,7 +265,7 @@ object VideoCodecUtils {
 
         private fun compileShader(type: Int, source: String): Int {
             val shader = GLES20.glCreateShader(type)
-            require(shader != 0) { "Shader 创建失败 type=$type" }
+            require(shader != 0) { "Shader creation failed type=$type" }
             GLES20.glShaderSource(shader, source)
             GLES20.glCompileShader(shader)
             val compileStatus = IntArray(1)
@@ -273,7 +273,7 @@ object VideoCodecUtils {
             require(compileStatus[0] == GLES20.GL_TRUE) {
                 val message = GLES20.glGetShaderInfoLog(shader)
                 GLES20.glDeleteShader(shader)
-                "Shader 编译失败: $message"
+                "Shader compilation failed: $message"
             }
             return shader
         }

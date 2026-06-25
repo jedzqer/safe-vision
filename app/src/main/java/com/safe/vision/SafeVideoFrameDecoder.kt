@@ -38,10 +38,10 @@ class SafeVideoFrameDecoder(
         extractor.setDataSource(context, uri, null)
         val trackIndex = (0 until extractor.trackCount).firstOrNull { idx ->
             extractor.getTrackFormat(idx).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
-        } ?: throw IllegalStateException("未找到视频轨道")
+        } ?: throw IllegalStateException("Video track not found")
         extractor.selectTrack(trackIndex)
         val format = extractor.getTrackFormat(trackIndex)
-        val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("视频格式未知")
+        val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("Unknown video format")
         width = format.getInteger(MediaFormat.KEY_WIDTH)
         height = format.getInteger(MediaFormat.KEY_HEIGHT)
         frameRate = (if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {

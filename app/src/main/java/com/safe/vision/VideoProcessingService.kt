@@ -147,13 +147,13 @@ class VideoProcessingService : Service() {
                 is VideoProcessingManager.VideoProcessingState.Cancelled -> {
                     notificationManager.notify(
                         NOTIFICATION_ID,
-                        createFinalNotification("Safe Vision - 媒体处理已取消")
+                        createFinalNotification(getString(R.string.notification_video_cancelled_title))
                     )
                 }
                 else -> {
                     notificationManager.notify(
                         NOTIFICATION_ID,
-                        createFinalNotification("Safe Vision - 媒体处理完成")
+                        createFinalNotification(getString(R.string.notification_video_completed_title))
                     )
                 }
             }
@@ -168,7 +168,7 @@ class VideoProcessingService : Service() {
         videoProcessingManager.cancel()
         notificationManager.notify(
             NOTIFICATION_ID,
-            createFinalNotification("Safe Vision - 媒体处理已取消")
+            createFinalNotification(getString(R.string.notification_video_cancelled_title))
         )
         stopForegroundCompat(removeNotification = false)
         stopSelf()
@@ -178,10 +178,10 @@ class VideoProcessingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "视频处理通知",
+                getString(R.string.notification_video_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "显示视频处理状态"
+                description = getString(R.string.notification_video_channel_desc)
                 setShowBadge(false)
                 enableVibration(false)
                 setSound(null, null)
@@ -193,12 +193,12 @@ class VideoProcessingService : Service() {
     private fun createProcessingNotification(): Notification {
         val text = if (queueMode) {
             val unfinished = (totalCount - completedCount).coerceAtLeast(0)
-            "已完成 $completedCount / 未完成 $unfinished"
+            getString(R.string.notification_video_queue_progress, completedCount, unfinished)
         } else {
-            "正在处理媒体"
+            getString(R.string.notification_video_processing_text)
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Safe Vision - 媒体处理中")
+            .setContentTitle(getString(R.string.notification_video_processing_title))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_slideshow)
             .setOngoing(true)
@@ -209,9 +209,9 @@ class VideoProcessingService : Service() {
     private fun createFinalNotification(title: String): Notification {
         val text = if (queueMode) {
             val unfinished = (totalCount - completedCount).coerceAtLeast(0)
-            "已完成 $completedCount / 未完成 $unfinished"
+            getString(R.string.notification_video_queue_progress, completedCount, unfinished)
         } else {
-            "媒体处理任务结束"
+            getString(R.string.notification_video_done_text)
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)

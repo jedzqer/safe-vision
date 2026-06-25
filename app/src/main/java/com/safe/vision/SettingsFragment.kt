@@ -807,10 +807,10 @@ class SettingsFragment : Fragment() {
                     if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else uri.lastPathSegment
                 }
                 ?: uri.lastPathSegment
-                ?: "自定义贴纸"
+                ?: getString(R.string.settings_sticker_custom_default_name)
         } catch (e: Exception) {
             DebugLogManager.addLog("设置", "读取贴纸名称失败: ${e.message}")
-            uri.lastPathSegment ?: "自定义贴纸"
+            uri.lastPathSegment ?: getString(R.string.settings_sticker_custom_default_name)
         }
     }
 
@@ -826,9 +826,9 @@ class SettingsFragment : Fragment() {
     private fun buildLabelStickerSummary(label: String): String {
         val labelUri = privacySettings.getLabelStickerUri(label)
         return if (labelUri.isNullOrBlank()) {
-            "该标签贴纸：跟随全局"
+            getString(R.string.settings_label_sticker_prefix, getString(R.string.settings_label_sticker_follow_global))
         } else {
-            "该标签贴纸：${resolveStickerName(Uri.parse(labelUri))}"
+            getString(R.string.settings_label_sticker_prefix, resolveStickerName(Uri.parse(labelUri)))
         }
     }
 

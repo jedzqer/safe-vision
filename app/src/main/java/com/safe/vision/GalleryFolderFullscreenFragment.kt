@@ -649,9 +649,9 @@ class GalleryFolderFullscreenFragment : Fragment() {
                     else -> android.graphics.Bitmap.CompressFormat.JPEG
                 }
                 if (!processed.compress(format, 95, output)) {
-                    throw IllegalStateException("压缩失败")
+                    throw IllegalStateException("Compression failed")
                 }
-            } ?: throw IllegalStateException("无法写入输出流")
+            } ?: throw IllegalStateException("Cannot write to output stream")
             if (!processed.isRecycled) {
                 processed.recycle()
             }
@@ -690,7 +690,7 @@ class GalleryFolderFullscreenFragment : Fragment() {
             insertedUri = uri
             resolver.openOutputStream(uri)?.use { output ->
                 videoFile.inputStream().use { input -> input.copyTo(output) }
-            } ?: throw IllegalStateException("无法写入输出流")
+            } ?: throw IllegalStateException("Cannot write to output stream")
             true
         } catch (e: Exception) {
             insertedUri?.let { appContext.contentResolver.delete(it, null, null) }

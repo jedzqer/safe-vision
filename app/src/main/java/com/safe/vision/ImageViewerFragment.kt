@@ -974,9 +974,9 @@ class ImageViewerFragment : Fragment() {
                     else -> Bitmap.CompressFormat.JPEG
                 }
                 if (!processedBitmap.compress(format, 95, output)) {
-                    throw IllegalStateException("压缩失败")
+                    throw IllegalStateException("Compression failed")
                 }
-            } ?: throw IllegalStateException("无法写入输出流")
+            } ?: throw IllegalStateException("Cannot write to output stream")
             if (!processedBitmap.isRecycled) {
                 processedBitmap.recycle()
             }
@@ -1023,7 +1023,7 @@ class ImageViewerFragment : Fragment() {
                 videoFile.inputStream().use { input ->
                     input.copyTo(output)
                 }
-            } ?: throw IllegalStateException("无法写入输出流")
+            } ?: throw IllegalStateException("Cannot write to output stream")
             DebugLogManager.addLog("媒体浏览", "导出视频成功: ${videoFile.name}")
             true
         } catch (e: Exception) {
@@ -1089,7 +1089,7 @@ class ImageViewerFragment : Fragment() {
                     val cacheDir = requireContext().externalCacheDir ?: requireContext().cacheDir
                     val shareDir = File(cacheDir, "shared_images")
                     if (!shareDir.exists() && !shareDir.mkdirs()) {
-                        throw IllegalStateException("无法创建分享目录")
+                        throw IllegalStateException("Cannot create share directory")
                     }
 
                     val extension = when (mediaFile.extension.lowercase()) {
@@ -1106,7 +1106,7 @@ class ImageViewerFragment : Fragment() {
                             else -> Bitmap.CompressFormat.JPEG
                         }
                         if (!processedBitmap.compress(format, 95, output)) {
-                            throw IllegalStateException("图片压缩失败")
+                            throw IllegalStateException("Image compression failed")
                         }
                     }
                     file
@@ -1561,7 +1561,7 @@ class ImageViewerFragment : Fragment() {
     private fun showAddLabelDialog() {
         if (!isEditMode) return
         val labels = DetectionConfig.LABELS
-        val names = labels.map { DetectionConfig.getDisplayName(it) }.toTypedArray()
+        val names = labels.map { DetectionConfig.getDisplayName(requireContext(), it) }.toTypedArray()
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.viewer_edit_label_picker_title)
             .setItems(names) { _, which ->

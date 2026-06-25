@@ -110,7 +110,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
         } catch (e: Exception) {
             DebugLogManager.addLog("批量处理", "添加批量任务失败: ${e.message}")
             DebugLogManager.addLog("批量处理", "异常堆栈: ${e.stackTraceToString()}")
-            _processingState.value = BatchProcessingState.Error(e.message ?: "未知错误")
+            _processingState.value = BatchProcessingState.Error(e.message ?: "Unknown error")
         }
     }
     
@@ -171,7 +171,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
                 } catch (e: Exception) {
                     DebugLogManager.addLog("批量处理", "模型加载失败: ${e.message}")
                     DebugLogManager.addLog("批量处理", "异常堆栈: ${e.stackTraceToString()}")
-                    _processingState.value = BatchProcessingState.Error(e.message ?: "模型加载失败")
+                    _processingState.value = BatchProcessingState.Error(e.message ?: "Model loading failed")
                     isProcessing.set(false)
                     return
                 }
@@ -199,7 +199,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
                 } catch (e: Exception) {
                     DebugLogManager.addLog("批量处理", "批量处理失败: ${e.message}")
                     DebugLogManager.addLog("批量处理", "异常堆栈: ${e.stackTraceToString()}")
-                    _processingState.value = BatchProcessingState.Error(e.message ?: "处理失败")
+                    _processingState.value = BatchProcessingState.Error(e.message ?: "Processing failed")
                 } finally {
                     isProcessing.set(false)
                 }
@@ -207,7 +207,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
         } catch (e: Exception) {
             DebugLogManager.addLog("批量处理", "启动处理失败: ${e.message}")
             DebugLogManager.addLog("批量处理", "异常堆栈: ${e.stackTraceToString()}")
-            _processingState.value = BatchProcessingState.Error(e.message ?: "启动失败")
+            _processingState.value = BatchProcessingState.Error(e.message ?: "Start failed")
             isProcessing.set(false)
         }
     }
@@ -267,13 +267,13 @@ class BatchProcessingManager private constructor(private val context: Context) {
     }
     
     private suspend fun processImage(task: BatchProcessingTask): BatchProcessingResult {
-        val runner = yoloRunner ?: throw IllegalStateException("YOLO模型未初始化")
+        val runner = yoloRunner ?: throw IllegalStateException("YOLO model not initialized")
         val bytes = withContext(Dispatchers.IO) {
             task.tempFile.readBytes()
         }
         val bitmap = withContext(Dispatchers.IO) {
             BitmapFactory.decodeFile(task.tempFile.absolutePath)
-        } ?: throw IOException("图片格式不受支持")
+        } ?: throw IOException("Unsupported image format")
         
         val detections = try {
             // 运行检测
@@ -320,7 +320,7 @@ class BatchProcessingManager private constructor(private val context: Context) {
     private suspend fun copyToTempInput(uri: Uri, index: Int, fileName: String): File {
         return withContext(Dispatchers.IO) {
             if (!tempInputDir.exists() && !tempInputDir.mkdirs()) {
-                throw IOException("无法创建临时目录")
+                throw IOException("Cannot create temp directory")
             }
 
             val ext = fileName.substringAfterLast('.', "")
@@ -335,10 +335,10 @@ class BatchProcessingManager private constructor(private val context: Context) {
                 tempFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
-            } ?: throw IOException("无法读取图片内容")
+            } ?: throw IOException("Cannot read image content")
 
             if (!tempFile.exists() || tempFile.length() == 0L) {
-                throw IOException("写入临时文件失败")
+                throw IOException("Failed to write temp file")
             }
             tempFile
         }

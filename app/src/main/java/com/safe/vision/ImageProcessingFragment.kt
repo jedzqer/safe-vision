@@ -218,7 +218,7 @@ class ImageProcessingFragment : Fragment() {
             loadedModelVariant = null
             Toast.makeText(
                 requireContext(),
-                getString(R.string.image_processing_model_switched, newVariant.displayName),
+                getString(R.string.image_processing_model_switched, DetectionModelVariant.displayName(requireContext(), newVariant)),
                 Toast.LENGTH_SHORT
             ).show()
             DebugLogManager.addLog("模型", "首页检测模型切换为: ${newVariant.runtimeLabel}")
@@ -858,7 +858,7 @@ class ImageProcessingFragment : Fragment() {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             requireContext(),
-                            getString(R.string.image_processing_model_loaded, targetVariant.displayName),
+                            getString(R.string.image_processing_model_loaded, DetectionModelVariant.displayName(requireContext(), targetVariant)),
                             Toast.LENGTH_SHORT
                         ).show()
                         DebugLogManager.addLog("模型", "YOLO 模型加载成功: ${targetVariant.runtimeLabel}")
@@ -870,7 +870,7 @@ class ImageProcessingFragment : Fragment() {
                 val runner = yoloRunner
                 if (runner == null) {
                     DebugLogManager.addLog("图片处理", "错误: YOLO 模型未初始化")
-                    throw IllegalStateException("YOLO 模型未初始化")
+                    throw IllegalStateException("YOLO model not initialized")
                 }
                 
                 DebugLogManager.addLog("图片处理", "开始运行模型推理")

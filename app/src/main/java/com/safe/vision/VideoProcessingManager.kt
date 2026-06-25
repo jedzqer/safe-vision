@@ -176,8 +176,8 @@ class VideoProcessingManager private constructor(private val context: Context) {
             } catch (e: Exception) {
                 val userMessage = when (e.message) {
                     "未找到视频轨道",
-                    "视频格式未知" -> "不支持的视频格式"
-                    else -> e.message ?: "未知错误"
+                    "视频格式未知" -> "Unsupported video format"
+                    else -> e.message ?: "Unknown error"
                 }
                 DebugLogManager.addLog("视频处理", "[SESSION $sessionId] 处理失败: ${e.message}")
                 DebugLogManager.addLog("视频处理", "[SESSION $sessionId] 异常堆栈: ${e.stackTraceToString()}")
@@ -281,7 +281,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 val codecInfo = probeEncoder.codecInfo
                 val codecCapabilities = codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
                 val caps = codecCapabilities.videoCapabilities
-                    ?: throw IllegalStateException("编码器不支持视频能力查询: ${codecInfo.name}")
+                    ?: throw IllegalStateException("Encoder does not support video capability query: ${codecInfo.name}")
                 val bitrateMode = resolveBitrateMode(codecCapabilities.encoderCapabilities)
                 val (resolvedWidth, resolvedHeight) = VideoCodecUtils.resolveSupportedSize(
                     capabilities = caps,
@@ -337,10 +337,10 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 if (videoEncoder != null) break
             }
             val activeEncoder = videoEncoder ?: throw IllegalStateException(
-                "视频编码器配置失败: ${lastConfigureError?.message ?: "无可用配置"}"
+                "Video encoder configuration failed: ${lastConfigureError?.message ?: "No available configuration"}"
             )
             val activeInputSurface = encoderInputSurface
-                ?: throw IllegalStateException("编码输入 Surface 创建失败")
+                ?: throw IllegalStateException("Encoder input Surface creation failed")
             val activeProfile = configuredProfile ?: initialProfile
             DebugLogManager.addLog(
                 "视频处理",
@@ -367,7 +367,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
             val codecContext = "codec=${activeEncoder.codecInfo.name}, size=${width}x${height}, color=${VideoCodecUtils.colorFormatToString(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)}, bitrate=${activeProfile.bitrate}, fps=${activeProfile.frameRate}"
 
             fun codecStateFailure(step: String, cause: IllegalStateException): IllegalStateException {
-                return IllegalStateException("视频编码器在${step}时进入非法状态 ($codecContext)", cause)
+                return IllegalStateException("Video encoder entered illegal state at $step ($codecContext)", cause)
             }
 
             fun dequeueOutputBufferSafe(): Int {
@@ -414,7 +414,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                             if (bufferInfo.size > 0 && muxerStarted && videoTrackIndex >= 0) {
                                 audioTrackCopier?.copySamplesUpTo(bufferInfo.presentationTimeUs)
                                 val encodedData = activeEncoder.getOutputBuffer(outputIndex)
-                                    ?: throw IllegalStateException("编码缓冲区为空")
+                                    ?: throw IllegalStateException("Encoder output buffer is null")
                                 encodedData.position(bufferInfo.offset)
                                 encodedData.limit(bufferInfo.offset + bufferInfo.size)
                                 muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
@@ -437,7 +437,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 }
             }
 
-            val runner = yoloRunner ?: throw IllegalStateException("模型未初始化")
+            val runner = yoloRunner ?: throw IllegalStateException("Model not initialized")
             val blocked = options.blockedLabels.toSet()
             val reverseLabels = options.reverseLabels.toSet()
             val needsSticker = options.blurMode == PrivacySettingsManager.BLUR_MODE_STICKER ||
@@ -624,7 +624,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
                 frameDecoder.close()
 
                 if (!tempOutputFile.renameTo(outputFile)) {
-                    throw IllegalStateException("输出文件重命名失败")
+                    throw IllegalStateException("Output file rename failed")
                 }
                 completedSuccessfully = true
                 val durationCostMs = System.currentTimeMillis() - startAt

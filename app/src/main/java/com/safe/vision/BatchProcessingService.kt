@@ -107,10 +107,10 @@ class BatchProcessingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "批量处理通知",
+                getString(R.string.notification_batch_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "显示批量图片处理进度"
+                description = getString(R.string.notification_batch_channel_desc)
                 setShowBadge(false)
                 enableVibration(false)
                 setSound(null, null)
@@ -175,8 +175,8 @@ class BatchProcessingService : Service() {
     
     private fun createInitialNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Safe Vision - 批量处理")
-            .setContentText("正在准备批量处理...")
+            .setContentTitle(getString(R.string.notification_batch_title))
+            .setContentText(getString(R.string.notification_batch_preparing))
             .setSmallIcon(android.R.drawable.ic_menu_gallery)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -187,8 +187,8 @@ class BatchProcessingService : Service() {
         val notification = when (state) {
             is BatchProcessingManager.BatchProcessingState.Loading -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理")
-                    .setContentText("正在准备批量处理...")
+                    .setContentTitle(getString(R.string.notification_batch_title))
+                    .setContentText(getString(R.string.notification_batch_preparing))
                     .setSmallIcon(android.R.drawable.ic_menu_gallery)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -196,8 +196,8 @@ class BatchProcessingService : Service() {
             }
             is BatchProcessingManager.BatchProcessingState.LoadingModel -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理")
-                    .setContentText("正在加载模型...")
+                    .setContentTitle(getString(R.string.notification_batch_title))
+                    .setContentText(getString(R.string.notification_batch_loading_model))
                     .setSmallIcon(android.R.drawable.ic_menu_gallery)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -205,8 +205,8 @@ class BatchProcessingService : Service() {
             }
             is BatchProcessingManager.BatchProcessingState.Processing -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理")
-                    .setContentText("正在处理图片...")
+                    .setContentTitle(getString(R.string.notification_batch_title))
+                    .setContentText(getString(R.string.notification_batch_processing))
                     .setSmallIcon(android.R.drawable.ic_menu_gallery)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -214,8 +214,8 @@ class BatchProcessingService : Service() {
             }
             is BatchProcessingManager.BatchProcessingState.Completed -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理完成")
-                    .setContentText("所有图片处理完成")
+                    .setContentTitle(getString(R.string.notification_batch_completed_title))
+                    .setContentText(getString(R.string.notification_batch_completed_text))
                     .setSmallIcon(android.R.drawable.ic_menu_save)
                     .setOngoing(false)
                     .setAutoCancel(true)
@@ -223,8 +223,8 @@ class BatchProcessingService : Service() {
             }
             is BatchProcessingManager.BatchProcessingState.Cancelled -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理已取消")
-                    .setContentText("批量处理已被取消")
+                    .setContentTitle(getString(R.string.notification_batch_cancelled_title))
+                    .setContentText(getString(R.string.notification_batch_cancelled_text))
                     .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
                     .setOngoing(false)
                     .setAutoCancel(true)
@@ -232,8 +232,8 @@ class BatchProcessingService : Service() {
             }
             is BatchProcessingManager.BatchProcessingState.Error -> {
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Safe Vision - 批量处理失败")
-                    .setContentText("处理过程中发生错误: ${state.message}")
+                    .setContentTitle(getString(R.string.notification_batch_failed_title))
+                    .setContentText(getString(R.string.notification_batch_failed_text, state.message))
                     .setSmallIcon(android.R.drawable.ic_dialog_alert)
                     .setOngoing(false)
                     .setAutoCancel(true)
@@ -255,8 +255,8 @@ class BatchProcessingService : Service() {
     
     private fun updateProgressNotification(progress: BatchProcessingManager.BatchProgress) {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Safe Vision - 批量处理")
-            .setContentText("已处理 ${progress.processedCount}/${progress.totalCount} 张图片")
+            .setContentTitle(getString(R.string.notification_batch_title))
+            .setContentText(getString(R.string.notification_batch_progress, progress.processedCount, progress.totalCount))
             .setProgress(progress.totalCount, progress.processedCount, false)
             .setSmallIcon(android.R.drawable.ic_menu_gallery)
             .setOngoing(true)

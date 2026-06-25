@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class ScreenDetectionState(
     val isRunning: Boolean = false,
-    val status: String = "屏幕检测未启动",
+    val status: String = "",
     val lastDetectionCount: Int? = null,
     val lastUpdatedAtMillis: Long = 0L
 )
@@ -15,7 +15,7 @@ object ScreenDetectionStateHolder {
     private val mutableState = MutableStateFlow(ScreenDetectionState())
     val state: StateFlow<ScreenDetectionState> = mutableState.asStateFlow()
 
-    fun setIdle(status: String = "屏幕检测未启动") {
+    fun setIdle(status: String = "") {
         mutableState.value = ScreenDetectionState(
             isRunning = false,
             status = status,

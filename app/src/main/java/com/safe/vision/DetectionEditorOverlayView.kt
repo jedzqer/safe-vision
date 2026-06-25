@@ -192,7 +192,7 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
     }
 
     private fun drawLabel(canvas: Canvas, label: String, rect: RectF) {
-        val display = DetectionConfig.getDisplayName(label)
+        val display = DetectionConfig.getDisplayName(context, label)
         val textWidth = labelTextPaint.measureText(display)
         val textHeight = labelTextPaint.fontMetrics.run { bottom - top }
         val left = rect.left

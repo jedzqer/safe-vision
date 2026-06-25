@@ -377,6 +377,9 @@
     <string name="settings_label_sticker_reset">전역 설정 따르기</string>
     <string name="settings_label_sticker_cleared">%1$s 전용 스티커를 삭제했습니다</string>
     <string name="settings_label_sticker_saved">%1$s에 스티커를 설정했습니다: %2$s</string>
+    <string name="settings_label_sticker_prefix">라벨 스티커: %1$s</string>
+    <string name="settings_label_sticker_follow_global">전역 설정 따르기</string>
+    <string name="settings_sticker_custom_default_name">사용자 지정 스티커</string>
     <string name="settings_random_queue_labels_title_with_count">감지 카테고리 (%1$d개)</string>
     <string name="error_report_pending_title">이전 비정상 종료가 감지되었습니다</string>
     <string name="error_report_pending_message">%1$s에 앱이 충돌한 것으로 보입니다. 확인을 위해 충돌 로그를 공유하시겠습니까?</string>
@@ -449,4 +452,76 @@
     <string name="image_processing_folder_confirm_message">폴더에서 찾은 항목:\n• 이미지 %1$d개\n• 동영상 %2$d개\n\n이미지를 먼저 처리한 뒤 동영상을 처리합니다. 계속할까요?</string>
     <string name="image_processing_folder_confirm_start">처리 시작</string>
     <string name="image_processing_folder_scan_failed">폴더 스캔 실패: %1$s</string>
+
+    <!-- 감지 라벨 표시명 -->
+    <string name="detection_label_female_genitalia_covered">여성 음부 (가려짐)</string>
+    <string name="detection_label_face_female">여성 얼굴</string>
+    <string name="detection_label_buttocks_exposed">둔부 (노출)</string>
+    <string name="detection_label_female_breast_exposed">여성 가슴 (노출)</string>
+    <string name="detection_label_female_genitalia_exposed">여성 음부 (노출)</string>
+    <string name="detection_label_male_breast_exposed">남성 가슴 (노출)</string>
+    <string name="detection_label_anus_exposed">항문 (노출)</string>
+    <string name="detection_label_feet_exposed">발 (노출)</string>
+    <string name="detection_label_belly_covered">복부 (가려짐)</string>
+    <string name="detection_label_feet_covered">발 (가려짐)</string>
+    <string name="detection_label_armpits_covered">겨드랑이 (가려짐)</string>
+    <string name="detection_label_armpits_exposed">겨드랑이 (노출)</string>
+    <string name="detection_label_face_male">남성 얼굴</string>
+    <string name="detection_label_belly_exposed">복부 (노출)</string>
+    <string name="detection_label_male_genitalia_exposed">남성 음부 (노출)</string>
+    <string name="detection_label_anus_covered">항문 (가려짐)</string>
+    <string name="detection_label_female_breast_covered">여성 가슴 (가려짐)</string>
+    <string name="detection_label_buttocks_covered">둔부 (가려짐)</string>
+    <string name="detection_label_animal">동물</string>
+    <string name="detection_label_anus">항문</string>
+    <string name="detection_label_ass">둔부</string>
+    <string name="detection_label_balls">고환</string>
+    <string name="detection_label_boob">가슴</string>
+    <string name="detection_label_dick">음경</string>
+    <string name="detection_label_face">얼굴</string>
+    <string name="detection_label_feet">발</string>
+    <string name="detection_label_nipple">유두</string>
+    <string name="detection_label_pussy">음부</string>
+    <string name="detection_label_eye_region">눈</string>
+
+    <!-- 마스크 모드 표시명 -->
+    <string name="blur_mode_name_mosaic">모자이크</string>
+    <string name="blur_mode_name_black">검은색 가림</string>
+    <string name="blur_mode_name_gaussian">가우시안 블러</string>
+    <string name="blur_mode_name_sticker">스티커 가림</string>
+    <string name="blur_mode_name_sobel">스케치 효과</string>
+    <string name="blur_mode_name_eyes">눈 모드</string>
+    <string name="blur_mode_name_unknown">알 수 없음</string>
+
+    <!-- 모델 표시명 -->
+    <string name="model_name_standard">표준 모델</string>
+    <string name="model_name_anime">애니메이션 모델</string>
+
+    <!-- 화면 감지 상태 -->
+    <string name="screen_detection_state_idle">화면 감지가 시작되지 않음</string>
+
+    <!-- 일괄 처리 알림 -->
+    <string name="notification_batch_channel_name">일괄 처리</string>
+    <string name="notification_batch_channel_desc">일괄 이미지 처리 진행 상황을 표시합니다</string>
+    <string name="notification_batch_title">Safe Vision - 일괄 처리</string>
+    <string name="notification_batch_preparing">일괄 처리를 준비하는 중...</string>
+    <string name="notification_batch_loading_model">모델을 불러오는 중...</string>
+    <string name="notification_batch_processing">이미지를 처리하는 중...</string>
+    <string name="notification_batch_completed_title">Safe Vision - 일괄 처리 완료</string>
+    <string name="notification_batch_completed_text">모든 이미지 처리 완료</string>
+    <string name="notification_batch_cancelled_title">Safe Vision - 일괄 처리 취소됨</string>
+    <string name="notification_batch_cancelled_text">일괄 처리가 취소되었습니다</string>
+    <string name="notification_batch_failed_title">Safe Vision - 일괄 처리 실패</string>
+    <string name="notification_batch_failed_text">처리 중 오류 발생: %1$s</string>
+    <string name="notification_batch_progress">%1$d/%2$d 이미지 처리 완료</string>
+
+    <!-- 동영상 처리 알림 -->
+    <string name="notification_video_channel_name">동영상 처리 알림</string>
+    <string name="notification_video_channel_desc">동영상 처리 상태를 표시합니다</string>
+    <string name="notification_video_processing_title">Safe Vision - 미디어 처리 중</string>
+    <string name="notification_video_processing_text">미디어를 처리하는 중</string>
+    <string name="notification_video_completed_title">Safe Vision - 미디어 처리 완료</string>
+    <string name="notification_video_cancelled_title">Safe Vision - 미디어 처리 취소됨</string>
+    <string name="notification_video_queue_progress">완료 %1$d / 남음 %2$d</string>
+    <string name="notification_video_done_text">미디어 처리 작업 종료</string>
 </resources>

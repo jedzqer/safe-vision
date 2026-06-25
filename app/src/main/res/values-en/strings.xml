@@ -415,6 +415,9 @@
     <string name="settings_label_sticker_reset">Follow Global Setting</string>
     <string name="settings_label_sticker_cleared">Cleared the custom sticker for %1$s</string>
     <string name="settings_label_sticker_saved">Set sticker for %1$s: %2$s</string>
+    <string name="settings_label_sticker_prefix">Label sticker: %1$s</string>
+    <string name="settings_label_sticker_follow_global">Follow Global</string>
+    <string name="settings_sticker_custom_default_name">Custom Sticker</string>
     <string name="settings_random_queue_labels_title_with_count">Detection Categories (%1$d)</string>
     <string name="error_report_pending_title">Previous abnormal exit detected</string>
     <string name="error_report_pending_message">The app appears to have crashed at %1$s. Share the crash log for investigation?</string>
@@ -450,4 +453,76 @@
     <string name="image_processing_folder_confirm_message">Found in the folder:\n• %1$d images\n• %2$d videos\n\nImages will be processed first, then videos. Continue?</string>
     <string name="image_processing_folder_confirm_start">Start Processing</string>
     <string name="image_processing_folder_scan_failed">Failed to scan folder: %1$s</string>
+
+    <!-- Detection label display names -->
+    <string name="detection_label_female_genitalia_covered">Female Genitalia (Covered)</string>
+    <string name="detection_label_face_female">Female Face</string>
+    <string name="detection_label_buttocks_exposed">Buttocks (Exposed)</string>
+    <string name="detection_label_female_breast_exposed">Female Breast (Exposed)</string>
+    <string name="detection_label_female_genitalia_exposed">Female Genitalia (Exposed)</string>
+    <string name="detection_label_male_breast_exposed">Male Breast (Exposed)</string>
+    <string name="detection_label_anus_exposed">Anus (Exposed)</string>
+    <string name="detection_label_feet_exposed">Feet (Exposed)</string>
+    <string name="detection_label_belly_covered">Belly (Covered)</string>
+    <string name="detection_label_feet_covered">Feet (Covered)</string>
+    <string name="detection_label_armpits_covered">Armpits (Covered)</string>
+    <string name="detection_label_armpits_exposed">Armpits (Exposed)</string>
+    <string name="detection_label_face_male">Male Face</string>
+    <string name="detection_label_belly_exposed">Belly (Exposed)</string>
+    <string name="detection_label_male_genitalia_exposed">Male Genitalia (Exposed)</string>
+    <string name="detection_label_anus_covered">Anus (Covered)</string>
+    <string name="detection_label_female_breast_covered">Female Breast (Covered)</string>
+    <string name="detection_label_buttocks_covered">Buttocks (Covered)</string>
+    <string name="detection_label_animal">Animal</string>
+    <string name="detection_label_anus">Anus</string>
+    <string name="detection_label_ass">Buttocks</string>
+    <string name="detection_label_balls">Testicles</string>
+    <string name="detection_label_boob">Breast</string>
+    <string name="detection_label_dick">Penis</string>
+    <string name="detection_label_face">Face</string>
+    <string name="detection_label_feet">Feet</string>
+    <string name="detection_label_nipple">Nipple</string>
+    <string name="detection_label_pussy">Vagina</string>
+    <string name="detection_label_eye_region">Eye Region</string>
+
+    <!-- Blur mode display names -->
+    <string name="blur_mode_name_mosaic">Mosaic</string>
+    <string name="blur_mode_name_black">Solid Black Mask</string>
+    <string name="blur_mode_name_gaussian">Gaussian Blur</string>
+    <string name="blur_mode_name_sticker">Sticker Mask</string>
+    <string name="blur_mode_name_sobel">Sketch Effect</string>
+    <string name="blur_mode_name_eyes">Eye Mode</string>
+    <string name="blur_mode_name_unknown">Unknown</string>
+
+    <!-- Model display names -->
+    <string name="model_name_standard">Standard Model</string>
+    <string name="model_name_anime">Anime Model</string>
+
+    <!-- Screen detection state -->
+    <string name="screen_detection_state_idle">Screen detection not started</string>
+
+    <!-- Batch processing notifications -->
+    <string name="notification_batch_channel_name">Batch Processing</string>
+    <string name="notification_batch_channel_desc">Shows batch image processing progress</string>
+    <string name="notification_batch_title">Safe Vision - Batch Processing</string>
+    <string name="notification_batch_preparing">Preparing batch processing...</string>
+    <string name="notification_batch_loading_model">Loading model...</string>
+    <string name="notification_batch_processing">Processing images...</string>
+    <string name="notification_batch_completed_title">Safe Vision - Batch Processing Completed</string>
+    <string name="notification_batch_completed_text">All images processed</string>
+    <string name="notification_batch_cancelled_title">Safe Vision - Batch Processing Cancelled</string>
+    <string name="notification_batch_cancelled_text">Batch processing cancelled</string>
+    <string name="notification_batch_failed_title">Safe Vision - Batch Processing Failed</string>
+    <string name="notification_batch_failed_text">Error during processing: %1$s</string>
+    <string name="notification_batch_progress">Processed %1$d/%2$d images</string>
+
+    <!-- Video processing notifications -->
+    <string name="notification_video_channel_name">Video Processing</string>
+    <string name="notification_video_channel_desc">Shows video processing status</string>
+    <string name="notification_video_processing_title">Safe Vision - Processing Media</string>
+    <string name="notification_video_processing_text">Processing media</string>
+    <string name="notification_video_completed_title">Safe Vision - Media Processing Completed</string>
+    <string name="notification_video_cancelled_title">Safe Vision - Media Processing Cancelled</string>
+    <string name="notification_video_queue_progress">Completed %1$d / Remaining %2$d</string>
+    <string name="notification_video_done_text">Media processing finished</string>
 </resources>

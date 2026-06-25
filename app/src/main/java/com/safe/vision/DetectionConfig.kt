@@ -182,6 +182,14 @@ object DetectionConfig {
         return LABEL_DISPLAY_NAMES[label] ?: label
     }
 
+    fun getDisplayName(context: android.content.Context, label: String): String {
+        val key = label.lowercase(java.util.Locale.ROOT)
+        val resId = context.resources.getIdentifier(
+            "detection_label_$key", "string", context.packageName
+        )
+        return if (resId != 0) context.getString(resId) else LABEL_DISPLAY_NAMES[label] ?: label
+    }
+
     fun supportsFaceLandmarks(label: String): Boolean {
         return STANDARD_FACE_LABELS.contains(label)
     }

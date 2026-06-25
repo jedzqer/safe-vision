@@ -181,7 +181,7 @@ class ScreenDetectionService : Service() {
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_starting))
                 val projectionManager = getSystemService(MediaProjectionManager::class.java)
                 val projection = projectionManager.getMediaProjection(resultCode, resultData)
-                    ?: error("MediaProjection 初始化失败")
+                    ?: error("MediaProjection initialization failed")
                 mediaProjection = projection
                 projection.registerCallback(projectionCallback, null)
 

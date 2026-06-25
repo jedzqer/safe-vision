@@ -506,11 +506,11 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun getLabelDisplayName(label: String): String {
-        return DetectionConfig.getDisplayName(label)
+        return DetectionConfig.getDisplayName(context, label)
     }
 
     fun getDisplayNames(labels: List<String>): List<String> {
-        return labels.map { getLabelDisplayName(it) }
+        return labels.map { DetectionConfig.getDisplayName(context, it) }
     }
 
     fun getActivePresetName(): String? {
@@ -617,15 +617,16 @@ class PrivacySettingsManager private constructor(private val context: Context) {
      * 获取遮挡模式的显示名称
      */
     fun getBlurModeName(mode: Int): String {
-        return when (mode) {
-            BLUR_MODE_MOSAIC -> "马赛克"
-            BLUR_MODE_BLACK -> "纯黑遮挡"
-            BLUR_MODE_GAUSSIAN -> "高斯模糊"
-            BLUR_MODE_STICKER -> "遮挡贴纸"
-            BLUR_MODE_SOBEL -> "素描效果"
-            BLUR_MODE_EYES -> "眼睛模式"
-            else -> "未知"
+        val resId = when (mode) {
+            BLUR_MODE_MOSAIC -> R.string.blur_mode_name_mosaic
+            BLUR_MODE_BLACK -> R.string.blur_mode_name_black
+            BLUR_MODE_GAUSSIAN -> R.string.blur_mode_name_gaussian
+            BLUR_MODE_STICKER -> R.string.blur_mode_name_sticker
+            BLUR_MODE_SOBEL -> R.string.blur_mode_name_sobel
+            BLUR_MODE_EYES -> R.string.blur_mode_name_eyes
+            else -> R.string.blur_mode_name_unknown
         }
+        return context.getString(resId)
     }
 
     private fun isValidBlurMode(mode: Int): Boolean {

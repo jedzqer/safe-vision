@@ -377,6 +377,9 @@
     <string name="settings_label_sticker_reset">恢復跟隨全域</string>
     <string name="settings_label_sticker_cleared">已清除 %1$s 專屬貼紙</string>
     <string name="settings_label_sticker_saved">已為 %1$s 設定貼紙：%2$s</string>
+    <string name="settings_label_sticker_prefix">該標籤貼紙：%1$s</string>
+    <string name="settings_label_sticker_follow_global">跟隨全域</string>
+    <string name="settings_sticker_custom_default_name">自訂貼紙</string>
     <string name="settings_random_queue_labels_title_with_count">偵測類別（%1$d 類）</string>
     <string name="error_report_pending_title">偵測到上次異常退出</string>
     <string name="error_report_pending_message">偵測到應用在 %1$s 發生崩潰，是否分享崩潰日誌以便排查？</string>
@@ -449,4 +452,76 @@
     <string name="image_processing_folder_confirm_message">在資料夾中找到：\n• %1$d 張圖片\n• %2$d 個影片\n\n將先處理圖片，再處理影片。是否繼續？</string>
     <string name="image_processing_folder_confirm_start">開始處理</string>
     <string name="image_processing_folder_scan_failed">掃描資料夾失敗：%1$s</string>
+
+    <!-- 檢測標籤顯示名 -->
+    <string name="detection_label_female_genitalia_covered">女性私處（遮擋）</string>
+    <string name="detection_label_face_female">女性面部</string>
+    <string name="detection_label_buttocks_exposed">臀部（暴露）</string>
+    <string name="detection_label_female_breast_exposed">女性胸部（暴露）</string>
+    <string name="detection_label_female_genitalia_exposed">女性私處（暴露）</string>
+    <string name="detection_label_male_breast_exposed">男性胸部（暴露）</string>
+    <string name="detection_label_anus_exposed">肛門（暴露）</string>
+    <string name="detection_label_feet_exposed">腳部（暴露）</string>
+    <string name="detection_label_belly_covered">腹部（遮擋）</string>
+    <string name="detection_label_feet_covered">腳部（遮擋）</string>
+    <string name="detection_label_armpits_covered">腋下（遮擋）</string>
+    <string name="detection_label_armpits_exposed">腋下（暴露）</string>
+    <string name="detection_label_face_male">男性面部</string>
+    <string name="detection_label_belly_exposed">腹部（暴露）</string>
+    <string name="detection_label_male_genitalia_exposed">男性私處（暴露）</string>
+    <string name="detection_label_anus_covered">肛門（遮擋）</string>
+    <string name="detection_label_female_breast_covered">女性胸部（遮擋）</string>
+    <string name="detection_label_buttocks_covered">臀部（遮擋）</string>
+    <string name="detection_label_animal">動物</string>
+    <string name="detection_label_anus">肛門</string>
+    <string name="detection_label_ass">臀部</string>
+    <string name="detection_label_balls">睾丸</string>
+    <string name="detection_label_boob">胸部</string>
+    <string name="detection_label_dick">陰莖</string>
+    <string name="detection_label_face">面部</string>
+    <string name="detection_label_feet">腳部</string>
+    <string name="detection_label_nipple">乳頭</string>
+    <string name="detection_label_pussy">陰部</string>
+    <string name="detection_label_eye_region">眼睛</string>
+
+    <!-- 遮擋模式顯示名 -->
+    <string name="blur_mode_name_mosaic">馬賽克</string>
+    <string name="blur_mode_name_black">純黑遮擋</string>
+    <string name="blur_mode_name_gaussian">高斯模糊</string>
+    <string name="blur_mode_name_sticker">遮擋貼紙</string>
+    <string name="blur_mode_name_sobel">素描效果</string>
+    <string name="blur_mode_name_eyes">眼睛模式</string>
+    <string name="blur_mode_name_unknown">未知</string>
+
+    <!-- 模型顯示名 -->
+    <string name="model_name_standard">標準模型</string>
+    <string name="model_name_anime">動漫模型</string>
+
+    <!-- 螢幕檢測狀態 -->
+    <string name="screen_detection_state_idle">螢幕檢測未啟動</string>
+
+    <!-- 批次處理通知 -->
+    <string name="notification_batch_channel_name">批次處理</string>
+    <string name="notification_batch_channel_desc">顯示批次圖片處理進度</string>
+    <string name="notification_batch_title">Safe Vision - 批次處理</string>
+    <string name="notification_batch_preparing">正在準備批次處理...</string>
+    <string name="notification_batch_loading_model">正在載入模型...</string>
+    <string name="notification_batch_processing">正在處理圖片...</string>
+    <string name="notification_batch_completed_title">Safe Vision - 批次處理完成</string>
+    <string name="notification_batch_completed_text">所有圖片處理完成</string>
+    <string name="notification_batch_cancelled_title">Safe Vision - 批次處理已取消</string>
+    <string name="notification_batch_cancelled_text">批次處理已被取消</string>
+    <string name="notification_batch_failed_title">Safe Vision - 批次處理失敗</string>
+    <string name="notification_batch_failed_text">處理過程中發生錯誤: %1$s</string>
+    <string name="notification_batch_progress">已處理 %1$d/%2$d 張圖片</string>
+
+    <!-- 影片處理通知 -->
+    <string name="notification_video_channel_name">影片處理通知</string>
+    <string name="notification_video_channel_desc">顯示影片處理狀態</string>
+    <string name="notification_video_processing_title">Safe Vision - 媒體處理中</string>
+    <string name="notification_video_processing_text">正在處理媒體</string>
+    <string name="notification_video_completed_title">Safe Vision - 媒體處理完成</string>
+    <string name="notification_video_cancelled_title">Safe Vision - 媒體處理已取消</string>
+    <string name="notification_video_queue_progress">已完成 %1$d / 未完成 %2$d</string>
+    <string name="notification_video_done_text">媒體處理任務結束</string>
 </resources>

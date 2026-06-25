@@ -188,11 +188,11 @@ object DebugLogManager {
 
     private fun writeSessionHeaderLocked() {
         val info = listOf(
-            "Safe Vision 日志会话",
-            "开始时间: ${LocalDateTime.now().format(headerDateFormat)}",
-            "应用版本: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            "设备: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
-            "系统版本: Android ${android.os.Build.VERSION.RELEASE}",
+            "Safe Vision Log Session",
+            "Start time: ${LocalDateTime.now().format(headerDateFormat)}",
+            "App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            "System version: Android ${android.os.Build.VERSION.RELEASE}",
             "========================================",
             ""
         )
@@ -209,7 +209,7 @@ object DebugLogManager {
             writer.append(line)
             writer.newLine()
         } catch (e: Exception) {
-            System.err.println("写入日志文件失败: ${e.message}")
+            System.err.println("Failed to write log file: ${e.message}")
             runCatching { closeWriterLocked() }
         }
     }
@@ -283,7 +283,7 @@ object DebugLogManager {
         return when {
             text.contains("FATAL", ignoreCase = true) -> LogLevel.FATAL
             text.contains("ERROR", ignoreCase = true) -> LogLevel.ERROR
-            text.contains("崩溃") || text.contains("异常") || text.contains("错误") || text.contains("失败") -> LogLevel.ERROR
+            text.contains("crash") || text.contains("exception") || text.contains("error") || text.contains("failed") -> LogLevel.ERROR
             else -> LogLevel.INFO
         }
     }
