@@ -119,6 +119,8 @@ internal class ScreenOverlayWindowHost(
             }
         }
         maskOverlayView?.let { view ->
+            view.translationX = 0f
+            view.translationY = 0f
             bindFullscreenFrame(view, frame, metrics, generation)
             view.visibility = View.VISIBLE
         }
@@ -147,6 +149,8 @@ internal class ScreenOverlayWindowHost(
                 return@forEach
             }
             slot.inUse = true
+            slot.view.translationX = 0f
+            slot.view.translationY = 0f
             if (updateRegionLayout(slot.layoutParams, safeRect, metrics)) {
                 try {
                     windowManager.updateViewLayout(slot.view, slot.layoutParams)
@@ -173,6 +177,30 @@ internal class ScreenOverlayWindowHost(
         clearFullscreenOverlay()
         clearRegionOverlays()
         releaseActiveOverlayFrame()
+    }
+
+    fun applyMotionShift(dxPx: Float, dyPx: Float) {
+        maskOverlayView?.let { view ->
+            if (view.isAttachedToWindow) {
+                view.translationX = dxPx
+                view.translationY = dyPx
+            }
+        }
+        maskRegionOverlaySlots.forEach { slot ->
+            if (slot.attached) {
+                slot.view.translationX = dxPx
+                slot.view.translationY = dyPx
+            }
+        }
+    }
+
+    fun resetMotionShift() {
+        maskOverlayView?.translationX = 0f
+        maskOverlayView?.translationY = 0f
+        maskRegionOverlaySlots.forEach { slot ->
+            slot.view.translationX = 0f
+            slot.view.translationY = 0f
+        }
     }
 
     fun clearRegionOverlays() {

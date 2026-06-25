@@ -364,6 +364,15 @@ class ImageProcessingFragment : Fragment() {
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
             textSize = 13f
         }
+        val motionHint = TextView(requireContext()).apply {
+            text = getString(R.string.screen_detection_settings_interval_motion_hint)
+            setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
+            textSize = 12f
+        }
+        val motionEffect = TextView(requireContext()).apply {
+            setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
+            textSize = 12f
+        }
         val intervalSeekBar = SeekBar(requireContext())
         val initialInterval = appSettings.getScreenDetectionIntervalSeconds()
         intervalSeekBar.max = 99
@@ -373,6 +382,14 @@ class ImageProcessingFragment : Fragment() {
             intervalValue.text = getString(
                 R.string.screen_detection_settings_interval_value,
                 currentIntervalSeconds().toDouble()
+            )
+            val seconds = currentIntervalSeconds()
+            motionEffect.text = getString(
+                when {
+                    seconds < 0.1f -> R.string.screen_detection_settings_interval_motion_effect_high
+                    seconds < 0.3f -> R.string.screen_detection_settings_interval_motion_effect_balanced
+                    else -> R.string.screen_detection_settings_interval_motion_effect_low
+                }
             )
         }
         updateIntervalSummary()
@@ -434,6 +451,24 @@ class ImageProcessingFragment : Fragment() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+        )
+        contentView.addView(
+            motionHint,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (6 * density).toInt()
+            }
+        )
+        contentView.addView(
+            motionEffect,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (2 * density).toInt()
+            }
         )
         DialogUtils.ensureDialogLayoutParams(contentView)
         DialogUtils.builder(requireContext())

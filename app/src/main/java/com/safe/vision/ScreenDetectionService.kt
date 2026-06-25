@@ -23,10 +23,13 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,6 +56,9 @@ class ScreenDetectionService : Service() {
         // 采集端降分辨率：把镜像捕获面的短边压到该目标值，遮挡坐标在叠加边界按比例还原。
         // 模型输入只有 320，全屏挡/黑块/马赛克对像素精度不敏感，缩小可显著降低每帧 RGBA 搬运与缩放开销。
         private const val CAPTURE_TARGET_SHORT_EDGE = 480
+        // 运动补偿：YOLO 推理期间以固定步长偏移遮挡框，让滚动/滑动场景下遮挡跟随更及时。
+        // 检测频率越低（间隔越长），YOLO 单次处理时间内可执行的补偿步数越多，插值介入越多。
+        private const val MOTION_STEP_MS = 33L
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -98,6 +104,9 @@ class ScreenDetectionService : Service() {
     private var useBufferA = true
     private var lastSignature: FloatArray? = null
     private val signatureDstRect = Rect(0, 0, STATIC_FRAME_SIGNATURE_SIZE, STATIC_FRAME_SIGNATURE_SIZE)
+
+    // 运动补偿签名缓冲：与主检测缓冲分离，避免与 YOLO 推理期间的帧读取竞争
+    private val motionSignatureBuffer = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
 
     // 抗闪烁：滑动窗口 + 延迟清除
     private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
@@ -190,7 +199,7 @@ class ScreenDetectionService : Service() {
                     captureWidth,
                     captureHeight,
                     PixelFormat.RGBA_8888,
-                    2
+                    4
                 )
                 virtualDisplay = projection.createVirtualDisplay(
                     "safe-vision-screen-detection",
@@ -265,59 +274,31 @@ class ScreenDetectionService : Service() {
                 continue
             }
 
-            val isStaticFrame = withContext(Dispatchers.Default) {
-                isFrameStatic(bitmap)
+            val analysis = withContext(Dispatchers.Default) {
+                analyseFrame(bitmap)
             }
-            if (isStaticFrame) {
+            if (analysis.isStatic) {
                 // 画面静止：跳过整条 YOLO 链路，遮挡与状态保持上一帧不动
                 delayRemainingInterval(cycleStart)
                 continue
             }
 
-            val renderResult = withContext(Dispatchers.Default) {
-                val detections = yoloRunner?.run(
-                    bitmap,
-                    // Skip face-landmark enrichment during realtime screen detection to reduce latency.
-                    enrichFaceLandmarks = false
-                ).orEmpty()
-                val profile = if (variant == DetectionModelVariant.ANIME) {
-                    DetectionConfig.LabelProfile.ANIME
-                } else {
-                    DetectionConfig.LabelProfile.STANDARD
+            // YOLO 帧签名作为运动补偿基线；运动循环以最新帧与之比对估算全局位移。
+            val baseSignature = analysis.currentSignature
+            val motionCompensationEligible = overlayVisible && baseSignature != null
+
+            val renderResult = coroutineScope {
+                val yoloDeferred = async(Dispatchers.Default) {
+                    runDetectionAndRender(bitmap, variant)
                 }
-                val shouldRenderOverlay =
-                    overlayRenderer?.shouldRenderOverlay(detections, profile, overlayMode) == true
-                val overlayFrame = if (shouldRenderOverlay) {
-                    val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    val currentMetrics = overlayMetrics
-                    val outputScaleX = if (currentMetrics != null && overlayBitmap.width > 0) {
-                        currentMetrics.widthPixels.toFloat() / overlayBitmap.width.toFloat()
-                    } else {
-                        1f
-                    }
-                    val outputScaleY = if (currentMetrics != null && overlayBitmap.height > 0) {
-                        currentMetrics.heightPixels.toFloat() / overlayBitmap.height.toFloat()
-                    } else {
-                        1f
-                    }
-                    overlayRenderer?.render(
-                        overlayBitmap,
-                        detections,
-                        profile,
-                        overlayMode,
-                        outputScaleX,
-                        outputScaleY
-                    ).also { frame ->
-                        if (frame == null && !overlayBitmap.isRecycled) {
-                            overlayBitmap.recycle()
-                        }
-                    }
-                } else {
-                    null
+                if (motionCompensationEligible) {
+                    runMotionCompensation(yoloDeferred, baseSignature!!)
                 }
-                RenderResult(detections.size, overlayFrame)
+                yoloDeferred.await()
             }
 
+            // 运动补偿可能已偏移遮挡框，应用 YOLO 校正前先重置偏移
+            ScreenOverlayController.resetMotionShift(overlayMode)
             applyOverlayFrame(renderResult.overlayFrame)
 
             val status = if (renderResult.detectionCount == 0) {
@@ -334,6 +315,93 @@ class ScreenDetectionService : Service() {
             }
 
             delayRemainingInterval(cycleStart)
+        }
+    }
+
+    private suspend fun runDetectionAndRender(
+        bitmap: Bitmap,
+        variant: DetectionModelVariant
+    ): RenderResult {
+        val detections = yoloRunner?.run(
+            bitmap,
+            // Skip face-landmark enrichment during realtime screen detection to reduce latency.
+            enrichFaceLandmarks = false
+        ).orEmpty()
+        val profile = if (variant == DetectionModelVariant.ANIME) {
+            DetectionConfig.LabelProfile.ANIME
+        } else {
+            DetectionConfig.LabelProfile.STANDARD
+        }
+        val shouldRenderOverlay =
+            overlayRenderer?.shouldRenderOverlay(detections, profile, overlayMode) == true
+        val overlayFrame = if (shouldRenderOverlay) {
+            val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            val currentMetrics = overlayMetrics
+            val outputScaleX = if (currentMetrics != null && overlayBitmap.width > 0) {
+                currentMetrics.widthPixels.toFloat() / overlayBitmap.width.toFloat()
+            } else {
+                1f
+            }
+            val outputScaleY = if (currentMetrics != null && overlayBitmap.height > 0) {
+                currentMetrics.heightPixels.toFloat() / overlayBitmap.height.toFloat()
+            } else {
+                1f
+            }
+            overlayRenderer?.render(
+                overlayBitmap,
+                detections,
+                profile,
+                overlayMode,
+                outputScaleX,
+                outputScaleY
+            ).also { frame ->
+                if (frame == null && !overlayBitmap.isRecycled) {
+                    overlayBitmap.recycle()
+                }
+            }
+        } else {
+            null
+        }
+        return RenderResult(detections.size, overlayFrame)
+    }
+
+    private suspend fun runMotionCompensation(
+        yoloDeferred: Deferred<RenderResult>,
+        baseSignature: FloatArray
+    ) {
+        val screenWidth = overlayMetrics?.widthPixels ?: return
+        val screenHeight = overlayMetrics?.heightPixels ?: return
+        val maxShiftPx = (screenWidth * 0.5f).coerceAtLeast(200f)
+        while (yoloDeferred.isActive) {
+            delay(MOTION_STEP_MS)
+            if (!yoloDeferred.isActive) break
+            val motion = withContext(Dispatchers.Default) {
+                val image = imageReader?.acquireLatestImage()
+                if (image == null) {
+                    null
+                } else {
+                    try {
+                        val signature = extractMotionSignature(image)
+                        if (signature != null) {
+                            MotionEstimator.estimate(
+                                signature,
+                                baseSignature,
+                                screenWidth,
+                                screenHeight
+                            )
+                        } else {
+                            null
+                        }
+                    } finally {
+                        image.close()
+                    }
+                }
+            }
+            if (motion != null) {
+                val dx = motion.dxPx.coerceIn(-maxShiftPx, maxShiftPx)
+                val dy = motion.dyPx.coerceIn(-maxShiftPx, maxShiftPx)
+                ScreenOverlayController.applyMotionShift(dx, dy, overlayMode)
+            }
         }
     }
 
@@ -606,7 +674,12 @@ class ScreenDetectionService : Service() {
         return width.coerceAtLeast(2) to height.coerceAtLeast(2)
     }
 
-    private fun isFrameStatic(bitmap: Bitmap): Boolean {
+    private data class FrameAnalysis(
+        val isStatic: Boolean,
+        val currentSignature: FloatArray?
+    )
+
+    private fun analyseFrame(bitmap: Bitmap): FrameAnalysis {
         val size = STATIC_FRAME_SIGNATURE_SIZE
         val small = signatureBitmap ?: Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
             signatureBitmap = it
@@ -627,14 +700,48 @@ class ScreenDetectionService : Service() {
 
         val previous = lastSignature
         lastSignature = current
-        if (previous == null) return false
+        if (previous == null) return FrameAnalysis(isStatic = false, currentSignature = current)
 
         var sum = 0.0
         for (i in current.indices) {
             sum += kotlin.math.abs(current[i] - previous[i])
         }
         val meanDiff = sum / current.size
-        return meanDiff < STATIC_FRAME_DIFF_THRESHOLD
+        val isStatic = meanDiff < STATIC_FRAME_DIFF_THRESHOLD
+        return FrameAnalysis(isStatic, current)
+    }
+
+    // 直接从 Image 缓冲区采样构建 32x32 灰度签名，无需分配中间 Bitmap。
+    // 运动补偿循环专用，与 analyseFrame 的签名缓冲完全分离。
+    private fun extractMotionSignature(image: Image): FloatArray? {
+        val plane = image.planes.first()
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val crop = image.cropRect
+        val cropWidth = crop.width()
+        val cropHeight = crop.height()
+        val size = STATIC_FRAME_SIGNATURE_SIZE
+        val signature = motionSignatureBuffer
+        val capacity = buffer.capacity()
+        try {
+            for (row in 0 until size) {
+                val srcY = crop.top + (row * cropHeight) / size
+                val rowBase = srcY * rowStride
+                for (col in 0 until size) {
+                    val srcX = crop.left + (col * cropWidth) / size
+                    val idx = rowBase + srcX * pixelStride
+                    if (idx + 2 >= capacity) return null
+                    val r = buffer.get(idx).toInt() and 0xFF
+                    val g = buffer.get(idx + 1).toInt() and 0xFF
+                    val b = buffer.get(idx + 2).toInt() and 0xFF
+                    signature[row * size + col] = r * 0.299f + g * 0.587f + b * 0.114f
+                }
+            }
+            return signature
+        } catch (e: Exception) {
+            return null
+        }
     }
 
     private fun Image.copyToReusableBitmap(): Bitmap {

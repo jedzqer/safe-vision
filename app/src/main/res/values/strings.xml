@@ -53,6 +53,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">用于无法启用无障碍权限的设备。此模式会使用普通悬浮窗显示遮挡，并拦截被遮挡区域的触摸。</string>
     <string name="screen_detection_settings_interval">识别频率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒识别一次</string>
+    <string name="screen_detection_settings_interval_motion_hint">运动插值会在检测间隙自动补足遮挡位移，检测频率并非越高越好。</string>
+    <string name="screen_detection_settings_interval_motion_effect_high">当前频率较高，插值介入较少，功耗稍高</string>
+    <string name="screen_detection_settings_interval_motion_effect_balanced">当前频率适中，插值与检测协同</string>
+    <string name="screen_detection_settings_interval_motion_effect_low">当前频率较低，插值主导遮挡位移，功耗较低</string>
     <string name="screen_detection_accessibility_permission_required">需要开启无障碍遮挡服务才能显示屏幕遮挡</string>
     <string name="screen_detection_accessibility_permission_denied">未启用无障碍遮挡服务，已取消屏幕检测</string>
     <string name="screen_detection_overlay_permission_required">需要授予悬浮窗权限才能显示屏幕遮挡</string>

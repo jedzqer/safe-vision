@@ -101,6 +101,14 @@ object ScreenOverlayController {
         hostForExisting(mode)?.clearFullscreenOverlay()
     }
 
+    fun applyMotionShift(dxPx: Float, dyPx: Float, mode: ScreenOverlayMode) {
+        hostForExisting(mode)?.applyMotionShift(dxPx, dyPx)
+    }
+
+    fun resetMotionShift(mode: ScreenOverlayMode) {
+        hostForExisting(mode)?.resetMotionShift()
+    }
+
     fun removeOverlayViews() {
         accessibilityHost?.removeOverlayViews()
         systemAlertWindowHost?.removeOverlayViews()

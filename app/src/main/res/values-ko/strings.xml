@@ -395,6 +395,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">접근성 권한을 켤 수 없는 기기용입니다. 이 모드는 일반 오버레이 창으로 마스크를 표시하며 가려진 영역의 터치를 차단합니다.</string>
     <string name="screen_detection_settings_interval">감지 주기</string>
     <string name="screen_detection_settings_interval_value">%1$.2f초마다 감지</string>
+    <string name="screen_detection_settings_interval_motion_hint">모션 보간이 감지 사이에 마스크 이동을 자동으로 채웁니다. 감지 빈도가 항상 높을수록 좋은 것은 아닙니다.</string>
+    <string name="screen_detection_settings_interval_motion_effect_high">고주기: 보간 개입 적음, 전력 소비 약간 높음</string>
+    <string name="screen_detection_settings_interval_motion_effect_balanced">균형 주기: 보간과 감지가 함께 작동</string>
+    <string name="screen_detection_settings_interval_motion_effect_low">저주기: 보간이 마스크 이동을 주도, 전력 소비 낮음</string>
     <string name="screen_detection_accessibility_permission_required">화면 마스킹을 표시하려면 접근성 오버레이 서비스가 필요합니다.</string>
     <string name="screen_detection_accessibility_permission_denied">접근성 오버레이 서비스가 활성화되지 않아 화면 감지가 취소되었습니다.</string>
     <string name="screen_detection_overlay_permission_required">화면 마스킹을 표시하려면 오버레이 권한이 필요합니다.</string>

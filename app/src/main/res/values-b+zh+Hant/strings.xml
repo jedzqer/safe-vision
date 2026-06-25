@@ -395,6 +395,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">供無法啟用無障礙權限的裝置使用。此模式會以一般懸浮窗顯示遮罩，並攔截被遮罩區域的觸控。</string>
     <string name="screen_detection_settings_interval">辨識頻率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒辨識一次</string>
+    <string name="screen_detection_settings_interval_motion_hint">運動插值會在偵測間隙自動補足遮罩位移，偵測頻率並非越高越好。</string>
+    <string name="screen_detection_settings_interval_motion_effect_high">目前頻率較高，插值介入較少，功耗稍高</string>
+    <string name="screen_detection_settings_interval_motion_effect_balanced">目前頻率適中，插值與偵測協同</string>
+    <string name="screen_detection_settings_interval_motion_effect_low">目前頻率較低，插值主導遮罩位移，功耗較低</string>
     <string name="screen_detection_accessibility_permission_required">需要開啟無障礙遮罩服務才能顯示畫面遮罩</string>
     <string name="screen_detection_accessibility_permission_denied">未啟用無障礙遮罩服務，已取消畫面偵測</string>
     <string name="screen_detection_overlay_permission_required">需要授予懸浮窗權限才能顯示畫面遮罩</string>
