@@ -74,7 +74,8 @@ class VideoProcessingManager private constructor(private val context: Context) {
 
     private data class PreparedFrame(
         val frame: DecodedVideoFrame,
-        val detections: List<YoloOnnxRunner.Detection>
+        val detections: List<YoloOnnxRunner.Detection>,
+        val rawDetectionsPresent: Boolean
     )
 
     private data class PreparedSegment(
@@ -801,6 +802,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
         detectionHitCount: AtomicLong
     ) {
         var lastEvenDetection: DetectionFrame? = null
+        var lastEvenRawDetectionsPresent = false
         try {
             for (segment in input) {
                 currentCoroutineContext().ensureActive()
@@ -810,14 +812,15 @@ class VideoProcessingManager private constructor(private val context: Context) {
                         ?.bitmap
                         ?: segment.frames.last().bitmap
                     val detectionCopy = detectionFrameBitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    val detections = try {
+                    val rawDetections = try {
                         runner.run(detectionCopy, enrichFaceLandmarks)
-                            .filter { detection -> blocked.contains(detection.className) }
                     } finally {
                         if (!detectionCopy.isRecycled) {
                             detectionCopy.recycle()
                         }
                     }
+                    val rawDetectionsPresent = rawDetections.isNotEmpty()
+                    val detections = rawDetections.filter { detection -> blocked.contains(detection.className) }
                     detectionRunCount.incrementAndGet()
                     if (detections.isNotEmpty()) {
                         detectionHitCount.incrementAndGet()
@@ -825,15 +828,18 @@ class VideoProcessingManager private constructor(private val context: Context) {
 
                     val preparedFrames = if (segment.isEvenSegment) {
                         lastEvenDetection = DetectionFrame(segment.detectionIndex, detections)
+                        lastEvenRawDetectionsPresent = rawDetectionsPresent
                         segment.frames.map { frame ->
                             PreparedFrame(
                                 frame = frame,
-                                detections = lastEvenDetection?.detections ?: emptyList()
+                                detections = lastEvenDetection?.detections ?: emptyList(),
+                                rawDetectionsPresent = rawDetectionsPresent
                             )
                         }
                     } else {
                         val oddDetection = DetectionFrame(segment.detectionIndex, detections)
                         val currentEven = lastEvenDetection
+                        val currentEvenRawPresent = lastEvenRawDetectionsPresent
                         segment.frames.map { frame ->
                             val blended = if (currentEven != null) {
                                 detectionProcessor.blendDetections(currentEven, oddDetection, frame.index)
@@ -842,7 +848,8 @@ class VideoProcessingManager private constructor(private val context: Context) {
                             }
                             PreparedFrame(
                                 frame = frame,
-                                detections = if (blended.isEmpty()) oddDetection.detections else blended
+                                detections = if (blended.isEmpty()) oddDetection.detections else blended,
+                                rawDetectionsPresent = rawDetectionsPresent || currentEvenRawPresent
                             )
                         }
                     }
@@ -889,7 +896,8 @@ class VideoProcessingManager private constructor(private val context: Context) {
                         options.blurMode,
                         options.labelEffectOverrides,
                         reverseLabels,
-                        stickerProvider
+                        stickerProvider,
+                        rawDetectionsPresent = preparedFrame.rawDetectionsPresent
                     )
                     val encoderBitmap = ensureEncoderBitmapSize(processedBitmap, targetWidth, targetHeight)
                     if (encoderBitmap !== processedBitmap && processedBitmap !== sourceBitmap && !processedBitmap.isRecycled) {

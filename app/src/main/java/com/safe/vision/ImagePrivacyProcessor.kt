@@ -160,7 +160,8 @@ class ImagePrivacyProcessor {
                         privacySettings.isReverseLabelMissFullscreenEnabled(),
                     reversePreRenderEnabled = privacySettings.isReversePreRenderEnabled(),
                     maskOutlineEnabled = privacySettings.isMaskOutlineEnabled(),
-                    maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet()
+                    maskOutlineLabels = privacySettings.getMaskOutlineLabels(labelProfile).toSet(),
+                    rawDetectionsPresent = rawRenderItems.isNotEmpty()
                 ),
                 stickerProvider = ::getStickerBitmap,
                 normalEffectSourceProvider = { originalBitmap },

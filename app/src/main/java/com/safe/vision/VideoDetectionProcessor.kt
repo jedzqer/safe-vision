@@ -86,7 +86,8 @@ class VideoDetectionProcessor(
         defaultBlurMode: Int,
         labelEffectOverrides: Map<String, Int>,
         reverseLabels: Set<String>,
-        stickerProvider: (String?) -> Bitmap?
+        stickerProvider: (String?) -> Bitmap?,
+        rawDetectionsPresent: Boolean = detections.isNotEmpty()
     ): Bitmap {
         return renderEngine.applyDetections(
             sourceBitmap = bitmap,
@@ -112,7 +113,8 @@ class VideoDetectionProcessor(
                     privacySettings.isReverseLabelMissFullscreenEnabled(),
                 reversePreRenderEnabled = privacySettings.isReversePreRenderEnabled(),
                 maskOutlineEnabled = privacySettings.isMaskOutlineEnabled(),
-                maskOutlineLabels = privacySettings.getMaskOutlineLabels().toSet()
+                maskOutlineLabels = privacySettings.getMaskOutlineLabels().toSet(),
+                rawDetectionsPresent = rawDetectionsPresent
             ),
             stickerProvider = stickerProvider,
             normalEffectSourceProvider = { it },

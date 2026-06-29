@@ -31,7 +31,10 @@ class DetectionRenderEngine(
         val fullScreenMaskWhenReverseLabelsMissing: Boolean,
         val reversePreRenderEnabled: Boolean,
         val maskOutlineEnabled: Boolean,
-        val maskOutlineLabels: Set<String>
+        val maskOutlineLabels: Set<String>,
+        // 是否在本次渲染对应的原始检测中识别到任意目标。
+        // 即使被识别出的标签都不需要遮挡，仍应据此判定反向标签“未命中”，以便触发全屏遮挡回退。
+        val rawDetectionsPresent: Boolean = false
     )
 
     data class RenderCallbacks(
@@ -81,7 +84,7 @@ class DetectionRenderEngine(
         val shouldFullscreenFallback =
             settings.fullScreenMaskWhenReverseLabelsMissing &&
                 settings.reverseLabels.isNotEmpty() &&
-                detections.isNotEmpty() &&
+                settings.rawDetectionsPresent &&
                 detections.none { settings.reverseLabels.contains(it.className) }
         if (shouldFullscreenFallback) {
             val firstReverseLabel = settings.reverseLabels.firstOrNull()
