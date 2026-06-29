@@ -84,16 +84,25 @@ class ImageViewerFragment : Fragment() {
 
     private fun releaseCurrentProcessedBitmap() {
         val previous = currentProcessedBitmap
+        currentProcessedBitmap = null
         if (previous != null && !previous.isRecycled) {
+            // 先解除 ImageView 对该 bitmap 的引用，避免在回收后绘制时
+            // 触发 "Canvas: trying to use a recycled bitmap" 崩溃。
+            if (this::fullSizeImage.isInitialized) {
+                val drawable = fullSizeImage.drawable
+                if (drawable is android.graphics.drawable.BitmapDrawable && drawable.bitmap === previous) {
+                    fullSizeImage.setImageDrawable(null)
+                }
+            }
             previous.recycle()
         }
-        currentProcessedBitmap = null
     }
 
     private var pendingTargetPath: String? = null
     private val browseHistory = ArrayDeque<Int>()
     private lateinit var appSettings: AppSettingsManager
     private var randomPlayJob: Job? = null
+    private var imageLoadJob: Job? = null
     private var metronomeJob: Job? = null
     private var metronomePlayer: MediaPlayer? = null
     private lateinit var scaleDetector: ScaleGestureDetector
@@ -607,8 +616,11 @@ class ImageViewerFragment : Fragment() {
             stopVideoProgressUpdates()
             hideVideoSeekControls()
             fullSizeImage.visibility = View.VISIBLE
+            // 先清除上一张残留的 drawable，防止解码挂起期间绘制到已回收的 bitmap
+            fullSizeImage.setImageDrawable(null)
             // 加载图片
-            viewLifecycleOwner.lifecycleScope.launch {
+            imageLoadJob?.cancel()
+            imageLoadJob = viewLifecycleOwner.lifecycleScope.launch {
                 try {
                     val bitmap = withContext(Dispatchers.IO) {
                         BitmapFactory.decodeFile(mediaFile.absolutePath)
@@ -644,8 +656,10 @@ class ImageViewerFragment : Fragment() {
                     fullSizeImage.setImageBitmap(processedBitmap)
                     if (!zoomApplied) {
                         fullSizeImage.post {
-                            resetImageZoom(processedBitmap)
-                            detectionEditorOverlay.setImageMatrix(imageMatrix)
+                            if (!processedBitmap.isRecycled) {
+                                resetImageZoom(processedBitmap)
+                                detectionEditorOverlay.setImageMatrix(imageMatrix)
+                            }
                         }
                     } else {
                         detectionEditorOverlay.setImageMatrix(imageMatrix)
@@ -1357,6 +1371,8 @@ class ImageViewerFragment : Fragment() {
         }
         cancelRandomPlay()
         stopMetronome()
+        imageLoadJob?.cancel()
+        imageLoadJob = null
         randomQueueBuildJob?.cancel()
         randomQueueBuildJob = null
         stopVideoProgressUpdates()
