@@ -86,23 +86,20 @@ class DetectionRenderEngine(
                 settings.reverseLabels.isNotEmpty() &&
                 settings.rawDetectionsPresent &&
                 detections.none { settings.reverseLabels.contains(it.className) }
-        if (shouldFullscreenFallback) {
-            val firstReverseLabel = settings.reverseLabels.firstOrNull()
-            val rawMode = firstReverseLabel?.let { settings.labelEffectOverrides[it] } ?: settings.defaultBlurMode
-            val fullscreenMode = if (rawMode == PrivacySettingsManager.BLUR_MODE_EYES) {
-                PrivacySettingsManager.BLUR_MODE_MOSAIC
-            } else {
-                rawMode
+        val fullscreenFallbackLabel = settings.reverseLabels.firstOrNull()
+        val fullscreenFallbackMode = shouldFullscreenFallback.let {
+            if (!it) 0
+            else {
+                val rawMode = fullscreenFallbackLabel
+                    ?.let { settings.labelEffectOverrides[it] } ?: settings.defaultBlurMode
+                if (rawMode == PrivacySettingsManager.BLUR_MODE_EYES) {
+                    PrivacySettingsManager.BLUR_MODE_MOSAIC
+                } else {
+                    rawMode
+                }
             }
-            return applyFullscreenMask(
-                base = sourceBitmap,
-                mode = fullscreenMode,
-                stickerLabel = firstReverseLabel,
-                stickerProvider = stickerProvider,
-                callbacks = callbacks
-            )
         }
-        if (detections.isEmpty()) return sourceBitmap
+        if (detections.isEmpty() && !shouldFullscreenFallback) return sourceBitmap
 
         val reverseRects = mutableListOf<ReverseRect>()
         val normalTasks = mutableListOf<NormalRenderTask>()
@@ -201,18 +198,31 @@ class DetectionRenderEngine(
             }
         }
 
-        val modeToUse = if (reverseModeMixed) settings.defaultBlurMode else (reverseBlurMode ?: settings.defaultBlurMode)
+        val reverseActive = reverseRects.isNotEmpty() || shouldFullscreenFallback
+        val modeToUse = when {
+            reverseModeMixed -> settings.defaultBlurMode
+            reverseRects.isNotEmpty() -> reverseBlurMode ?: settings.defaultBlurMode
+            shouldFullscreenFallback -> fullscreenFallbackMode
+            else -> settings.defaultBlurMode
+        }
         if (reverseRects.isNotEmpty() && reverseModeMixed) {
             callbacks.onReverseModeMixed(modeToUse)
         }
 
-        val preRenderReverse = reverseRects.isNotEmpty() && settings.reversePreRenderEnabled
-        val outputBitmap = if (preRenderReverse) {
-            applyReverseMask(sourceBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks)
-        } else if (normalTasks.isNotEmpty()) {
-            sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
-        } else {
-            sourceBitmap
+        val preRenderReverse = reverseActive && settings.reversePreRenderEnabled
+        val outputBitmap = when {
+            preRenderReverse && shouldFullscreenFallback -> applyFullscreenMask(
+                base = sourceBitmap,
+                mode = fullscreenFallbackMode,
+                stickerLabel = fullscreenFallbackLabel,
+                stickerProvider = stickerProvider,
+                callbacks = callbacks
+            )
+            preRenderReverse -> applyReverseMask(
+                sourceBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks
+            )
+            normalTasks.isNotEmpty() -> sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            else -> sourceBitmap
         }
         if (normalTasks.isNotEmpty()) {
             val outputCanvas = Canvas(outputBitmap)
@@ -233,10 +243,18 @@ class DetectionRenderEngine(
             }
         }
 
-        val finalBitmap = if (reverseRects.isNotEmpty() && !preRenderReverse) {
-            applyReverseMask(outputBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks)
-        } else {
-            outputBitmap
+        val finalBitmap = when {
+            reverseActive && !preRenderReverse && shouldFullscreenFallback -> applyFullscreenMask(
+                base = outputBitmap,
+                mode = fullscreenFallbackMode,
+                stickerLabel = fullscreenFallbackLabel,
+                stickerProvider = stickerProvider,
+                callbacks = callbacks
+            )
+            reverseRects.isNotEmpty() && !preRenderReverse -> applyReverseMask(
+                outputBitmap, reverseRects, modeToUse, stickerProvider, ::shouldOutline, callbacks
+            )
+            else -> outputBitmap
         }
         if (finalBitmap !== outputBitmap && outputBitmap !== sourceBitmap && !outputBitmap.isRecycled) {
             outputBitmap.recycle()
