@@ -5,9 +5,9 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
     app:cardBackgroundColor="?attr/svColorCard"
-    app:cardCornerRadius="18dp"
-    app:cardElevation="3dp"
-    app:cardUseCompatPadding="true"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:cardUseCompatPadding="false"
     app:strokeColor="?attr/svColorBorder"
     app:strokeWidth="1dp">
 
@@ -57,7 +57,7 @@
                 android:contentDescription="@string/gallery_open_folder"
                 android:padding="8dp"
                 android:src="@drawable/ic_page_next"
-                android:tint="?attr/svColorAccent" />
+                app:tint="?attr/svColorAccent" />
         </LinearLayout>
 
         <TextView

@@ -156,6 +156,7 @@ safe-app/
 - `ThemeSelectionDialog.kt`：内置主题预览、自定义颜色编辑与 RGB 取色面板
 - `AppLanguageManager.kt`：语言切换与系统语言映射
 - `DialogUtils.kt`：统一弹窗入口与主题取色
+- `themes.xml`、`bg_card_surface.xml`、`bg_tab_bar.xml`：全局扁平卡片、按钮和分段导航视觉规范
 
 ### 日志与异常
 
@@ -187,6 +188,8 @@ safe-app/
 
 - 新增页面优先检查 `MainActivity.kt`、`ViewPagerAdapter.kt` 与对应 Fragment 的关系。
 - 新增字符串时同步维护 `values`、`values-en`、`values-ko`、`values-b+zh+Hant`。
+- 新增页面或组件时优先复用 `Widget.SafeVision.Card`、`Widget.SafeVision.Button` 和 `svColor*` 属性，避免写死阴影、渐变和主题颜色。
+- 自定义主题的 Base / Primary / Accent 仅接受不透明 `#RRGGBB`，其 surface、card、border、chip 与文字色统一由 `CustomPalette.toColorMap()` 派生。
 - 修改检测标签、模型输出或 JSON 字段时，同时检查推理、渲染、媒体浏览、编辑和随机筛选链路。
 - 修改视频处理时注意前台服务、队列、进度通知和音轨混流。
 - 修改屏幕检测时注意通知权限、录屏权限、无障碍 overlay 与普通悬浮窗 overlay 的差异。

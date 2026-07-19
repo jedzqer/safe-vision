@@ -214,7 +214,7 @@
     <string name="settings_theme_custom_base">基色（Base）</string>
     <string name="settings_theme_custom_primary">主色（Primary）</string>
     <string name="settings_theme_custom_accent">强调色（Accent）</string>
-    <string name="settings_theme_custom_hint">支持 #RRGGBB / #AARRGGBB</string>
+    <string name="settings_theme_custom_hint">请输入 #RRGGBB 格式颜色</string>
     <string name="settings_theme_applied_custom">已应用自定义主题</string>
     <string name="settings_theme_manage">选择主题</string>
     <string name="settings_theme_current">当前主题：%1$s</string>

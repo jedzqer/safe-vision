@@ -76,6 +76,8 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             }
         }
     }
+
+    fun getSettingsSignature(): Int = sharedPrefs.all.hashCode()
     
     /**
      * 获取当前遮挡模式

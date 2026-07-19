@@ -290,7 +290,7 @@ class AppSettingsManager private constructor(context: Context) {
     fun getCustomPalette(): CustomPalette {
         val base = sharedPreferences.getString(KEY_CUSTOM_THEME_BASE, "#000000") ?: "#000000"
         val primary = sharedPreferences.getString(KEY_CUSTOM_THEME_PRIMARY, "#FF3B30") ?: "#FF3B30"
-        val accent = sharedPreferences.getString(KEY_CUSTOM_THEME_ACCENT, "#B026FF") ?: "#B026FF"
+        val accent = sharedPreferences.getString(KEY_CUSTOM_THEME_ACCENT, "#7D3CFF") ?: "#7D3CFF"
         return CustomPalette(base, primary, accent)
     }
 

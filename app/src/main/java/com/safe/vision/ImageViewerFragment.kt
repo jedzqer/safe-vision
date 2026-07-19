@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.os.Environment
 import android.media.MediaPlayer
 import android.provider.MediaStore
+import android.transition.AutoTransition
+import android.transition.TransitionManager
 import android.view.LayoutInflater
 import android.view.ScaleGestureDetector
 import android.view.MotionEvent
@@ -35,7 +37,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
@@ -59,7 +63,7 @@ class ImageViewerFragment : Fragment() {
         private const val STATE_RESTORE_FULLSCREEN = "restore_fullscreen"
     }
 
-    private lateinit var mediaContainer: View
+    private lateinit var mediaContainer: MaterialCardView
     private lateinit var fullSizeImage: ImageView
     private lateinit var fullSizeVideo: VideoView
     private lateinit var imageInfo: TextView
@@ -79,8 +83,11 @@ class ImageViewerFragment : Fragment() {
     private var allMedia = listOf<File>()
     private var currentIndex = 0
     private lateinit var privacyProcessor: ImagePrivacyProcessor
+    private lateinit var privacySettings: PrivacySettingsManager
     private var currentProcessedBitmap: Bitmap? = null
     private var currentMetadataFile: File? = null
+    private var lastMediaSnapshot = emptyList<MediaSnapshot>()
+    private var lastPrivacySettingsSignature = Int.MIN_VALUE
 
     private fun releaseCurrentProcessedBitmap() {
         val previous = currentProcessedBitmap
@@ -148,6 +155,14 @@ class ImageViewerFragment : Fragment() {
         val labels: Set<String>
     )
 
+    private data class MediaSnapshot(
+        val path: String,
+        val lastModified: Long,
+        val length: Long,
+        val metadataLastModified: Long,
+        val metadataLength: Long
+    )
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -160,6 +175,7 @@ class ImageViewerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         mediaContainer = view.findViewById(R.id.mediaContainer)
+        mediaContainer.clipToOutline = true
         fullSizeImage = view.findViewById(R.id.fullSizeImage)
         fullSizeVideo = view.findViewById(R.id.fullSizeVideo)
         imageInfo = view.findViewById(R.id.imageInfo)
@@ -181,6 +197,7 @@ class ImageViewerFragment : Fragment() {
         
         // 初始化隐私处理器
         privacyProcessor = ImagePrivacyProcessor(requireContext())
+        privacySettings = PrivacySettingsManager.getInstance(requireContext())
         appSettings = AppSettingsManager.getInstance(requireContext())
         fullSizeVideo.setMediaController(null)
         fullSizeVideo.setOnErrorListener { _, what, extra ->
@@ -457,7 +474,7 @@ class ImageViewerFragment : Fragment() {
                         when {
                             x < width / 3f -> showPreviousMedia()
                             x > width * 2f / 3f -> showNextMedia()
-                            else -> Unit
+                            else -> touchedView.performClick()
                         }
                     }
                 }
@@ -494,22 +511,11 @@ class ImageViewerFragment : Fragment() {
         )
     }
 
-    private fun loadMedia() {
+    private fun loadMedia(scannedMedia: List<File> = scanAllMedia()) {
         val currentPath = allMedia.getOrNull(currentIndex)?.absolutePath
-        val rootDir = requireContext().getExternalFilesDir(null) ?: requireContext().filesDir
-        val safeNetDir = File(rootDir, FolderModels.SAFE_NET_DIR)
-        val noDetectionDir = File(rootDir, FolderModels.NO_DETECTION_DIR)
-        val videoDir = File(rootDir, FolderModels.SAFE_VIDEO_DIR)
-        val customImageDirs = appSettings.getCustomImageFolders().map { File(rootDir, it) }
-
-        val safeNetImages = listMediaFiles(safeNetDir, video = false)
-        val noDetectionImages = listMediaFiles(noDetectionDir, video = false)
-        val customFolderImages = customImageDirs.flatMap { dir -> listMediaFiles(dir, video = false) }
-        val videos = listMediaFiles(videoDir, video = true)
-
-        // 合并并按修改时间排序（最新的在前）
-        allMedia = (safeNetImages + customFolderImages + noDetectionImages + videos)
-            .sortedByDescending { it.lastModified() }
+        allMedia = scannedMedia
+        lastMediaSnapshot = buildMediaSnapshot(scannedMedia)
+        lastPrivacySettingsSignature = privacySettings.getSettingsSignature()
         browseHistory.clear()
         rebuildRandomCandidatesIfNeeded(force = true)
 
@@ -546,6 +552,53 @@ class ImageViewerFragment : Fragment() {
             }
             restartRandomPlayCountdown()
         }
+    }
+
+    private fun scanAllMedia(): List<File> {
+        val rootDir = requireContext().getExternalFilesDir(null) ?: requireContext().filesDir
+        val safeNetDir = File(rootDir, FolderModels.SAFE_NET_DIR)
+        val noDetectionDir = File(rootDir, FolderModels.NO_DETECTION_DIR)
+        val videoDir = File(rootDir, FolderModels.SAFE_VIDEO_DIR)
+        val customImageDirs = appSettings.getCustomImageFolders().map { File(rootDir, it) }
+
+        val safeNetImages = listMediaFiles(safeNetDir, video = false)
+        val noDetectionImages = listMediaFiles(noDetectionDir, video = false)
+        val customFolderImages = customImageDirs.flatMap { dir -> listMediaFiles(dir, video = false) }
+        val videos = listMediaFiles(videoDir, video = true)
+
+        return (safeNetImages + customFolderImages + noDetectionImages + videos)
+            .sortedByDescending { it.lastModified() }
+    }
+
+    private fun buildMediaSnapshot(mediaFiles: List<File>): List<MediaSnapshot> {
+        val metadataByKey = mutableMapOf<String, File>()
+        mediaFiles.asSequence()
+            .filterNot(::isVideoFile)
+            .mapNotNull { it.parentFile }
+            .distinctBy { it.absolutePath }
+            .forEach { directory ->
+                directory.listFiles { file ->
+                    file.isFile && file.extension.equals("json", ignoreCase = true)
+                }.orEmpty().forEach { metadataFile ->
+                    metadataByKey[metadataKey(directory, metadataFile.nameWithoutExtension)] = metadataFile
+                }
+            }
+        return mediaFiles.map { mediaFile ->
+            val metadataFile = mediaFile.parentFile?.let { directory ->
+                metadataByKey[metadataKey(directory, mediaFile.nameWithoutExtension)]
+            }
+            MediaSnapshot(
+                path = mediaFile.absolutePath,
+                lastModified = mediaFile.lastModified(),
+                length = mediaFile.length(),
+                metadataLastModified = metadataFile?.lastModified() ?: 0L,
+                metadataLength = metadataFile?.length() ?: 0L
+            )
+        }
+    }
+
+    private fun metadataKey(directory: File, nameWithoutExtension: String): String {
+        return "${directory.absolutePath}/${nameWithoutExtension.lowercase(Locale.ROOT)}"
     }
 
     private fun listMediaFiles(dir: File, video: Boolean): List<File> {
@@ -1163,9 +1216,37 @@ class ImageViewerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // 每次页面可见时重新加载媒体，以便显示最新的处理结果
-        loadMedia()
+        val reloaded = refreshMediaIfNeeded()
+        if (!reloaded) {
+            resumeCurrentVideoIfNeeded()
+        }
+        restartRandomPlayCountdown()
         startMetronomeIfNeeded()
+    }
+
+    private fun refreshMediaIfNeeded(): Boolean {
+        val scannedMedia = scanAllMedia()
+        val snapshot = buildMediaSnapshot(scannedMedia)
+        val privacySignature = privacySettings.getSettingsSignature()
+        if (snapshot != lastMediaSnapshot ||
+            privacySignature != lastPrivacySettingsSignature ||
+            pendingTargetPath != null
+        ) {
+            loadMedia(scannedMedia)
+            return true
+        }
+        return false
+    }
+
+    private fun resumeCurrentVideoIfNeeded() {
+        if (currentVideoFile == null || fullSizeVideo.visibility != View.VISIBLE) return
+        val duration = currentVideoDurationMs()
+        configureVideoSeekControls(duration)
+        syncVideoProgress(forceDuration = duration)
+        if (shouldAutoPlayVideo()) {
+            fullSizeVideo.start()
+        }
+        startVideoProgressUpdates()
     }
 
     private fun tryShowPendingMedia(): Boolean {
@@ -1550,14 +1631,33 @@ class ImageViewerFragment : Fragment() {
 
     private fun updateMediaContainerFullscreenState(fullscreen: Boolean) {
         val layoutParams = mediaContainer.layoutParams as? ConstraintLayout.LayoutParams ?: return
+        (mediaContainer.parent as? ViewGroup)?.let { parent ->
+            TransitionManager.beginDelayedTransition(
+                parent,
+                AutoTransition().apply {
+                    duration = 220L
+                    interpolator = FastOutSlowInInterpolator()
+                }
+            )
+        }
         if (fullscreen) {
             layoutParams.bottomToTop = ConstraintLayout.LayoutParams.UNSET
             layoutParams.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+            layoutParams.setMargins(0, 0, 0, 0)
+            mediaContainer.radius = 0f
+            mediaContainer.strokeWidth = 0
         } else {
             layoutParams.bottomToBottom = ConstraintLayout.LayoutParams.UNSET
             layoutParams.bottomToTop = R.id.imageInfo
+            layoutParams.setMargins(dp(12), dp(4), dp(12), dp(8))
+            mediaContainer.radius = dp(16).toFloat()
+            mediaContainer.strokeWidth = dp(1)
         }
         mediaContainer.layoutParams = layoutParams
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).roundToInt()
     }
 
     private fun hideSystemBars() {

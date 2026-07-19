@@ -246,10 +246,10 @@ class SettingsFragment : Fragment() {
             expandedLabelCard = this
             tag = label
             alpha = 0f
-            scaleX = 0.88f
-            scaleY = 0.88f
-            radius = 22f * resources.displayMetrics.density
-            cardElevation = 6f * resources.displayMetrics.density
+            scaleX = 0.96f
+            scaleY = 0.96f
+            radius = 16f * resources.displayMetrics.density
+            cardElevation = 0f
             setCardBackgroundColor(resolveThemeColor(R.attr.svColorCard))
             strokeColor = resolveThemeColor(R.attr.svColorAccent)
             strokeWidth = resources.displayMetrics.density.toInt()
@@ -726,8 +726,8 @@ class SettingsFragment : Fragment() {
         }
         card.animate()
             .alpha(0f)
-            .scaleX(0.88f)
-            .scaleY(0.88f)
+            .scaleX(0.96f)
+            .scaleY(0.96f)
             .setDuration(180L)
             .withEndAction {
                 activeLabelEditor?.applyChanges?.invoke(true)

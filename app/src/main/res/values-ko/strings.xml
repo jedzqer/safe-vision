@@ -176,7 +176,7 @@
     <string name="settings_theme_custom_base">기본색</string>
     <string name="settings_theme_custom_primary">주 색상</string>
     <string name="settings_theme_custom_accent">강조색</string>
-    <string name="settings_theme_custom_hint">#RRGGBB / #AARRGGBB 지원</string>
+    <string name="settings_theme_custom_hint">#RRGGBB 형식의 색상을 입력하세요</string>
     <string name="settings_theme_applied_custom">사용자 지정 테마를 적용했습니다</string>
     <string name="settings_theme_manage">테마 선택</string>
     <string name="settings_theme_current">현재 테마: %1$s</string>

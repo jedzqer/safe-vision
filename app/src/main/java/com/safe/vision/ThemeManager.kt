@@ -8,9 +8,7 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.util.TypedValue
-import android.util.Log
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.annotation.StyleRes
 import androidx.core.graphics.ColorUtils
@@ -31,21 +29,12 @@ enum class AppTheme(val prefValue: String, @StyleRes val styleRes: Int, val labe
 }
 
 object ThemeManager {
-    private const val TAG = "ThemeManager"
-
-    fun applyTheme(activity: Activity, theme: AppTheme, customPalette: CustomPalette? = null) {
-        if (theme == AppTheme.CUSTOM && customPalette != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val applied = applyResourcesLoader(activity, customPalette.toColorMap())
-            if (!applied) {
-                Log.e(TAG, "Unable to apply the custom color resources loader")
-            }
-        }
+    fun applyTheme(activity: Activity, theme: AppTheme) {
         activity.setTheme(theme.styleRes)
     }
 
     fun wrapContextWithCustomColors(base: Context, theme: AppTheme, customPalette: CustomPalette?): Context {
         if (theme != AppTheme.CUSTOM || customPalette == null) return base
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return base
 
         val overrides = customPalette.toColorMap()
         val customResources = ColorOverrideResources(base.resources, overrides)
@@ -71,21 +60,6 @@ object ThemeManager {
         }
     }
 
-    private fun applyResourcesLoader(context: Context, overrides: Map<Int, Int>): Boolean {
-        return runCatching {
-            val loaderUtilsClass = Class.forName(
-                "com.google.android.material.color.ResourcesLoaderUtils"
-            )
-            val method = loaderUtilsClass.getDeclaredMethod(
-                "addResourcesLoaderToContext",
-                Context::class.java,
-                Map::class.java
-            ).apply { isAccessible = true }
-            method.invoke(null, context, overrides) as? Boolean ?: false
-        }.onFailure { error ->
-            Log.e(TAG, "Custom color resource loader failed", error)
-        }.getOrDefault(false)
-    }
 }
 
 data class CustomPalette(
@@ -102,22 +76,42 @@ data class CustomPalette(
     }
 
     fun toColorMap(): Map<Int, Int> {
-        val base = parse(baseHex, Color.BLACK)
-        val primary = parse(primaryHex, Color.parseColor("#FF3B30"))
-        val accent = parse(accentHex, Color.parseColor("#7D3CFF"))
+        val base = opaque(parse(baseHex, Color.BLACK))
+        val primary = opaque(parse(primaryHex, Color.parseColor("#FF3B30")))
+        val accent = opaque(parse(accentHex, Color.parseColor("#7D3CFF")))
+        val surfaceLuminance = ColorUtils.calculateLuminance(base)
 
-        val surfaceVariant = ColorUtils.blendARGB(base, Color.WHITE, 0.08f)
-        val card = ColorUtils.blendARGB(base, Color.WHITE, 0.06f)
-        val border = ColorUtils.blendARGB(base, Color.WHITE, 0.12f)
-        val chip = ColorUtils.blendARGB(base, Color.WHITE, 0.1f)
+        val surfaceVariant: Int
+        val card: Int
+        val border: Int
+        val chip: Int
+        when {
+            surfaceLuminance < 0.18 -> {
+                surfaceVariant = ColorUtils.blendARGB(base, Color.WHITE, 0.08f)
+                card = ColorUtils.blendARGB(base, Color.WHITE, 0.06f)
+                border = ColorUtils.blendARGB(base, Color.WHITE, 0.15f)
+                chip = ColorUtils.blendARGB(base, Color.WHITE, 0.11f)
+            }
+            surfaceLuminance < 0.58 -> {
+                surfaceVariant = ColorUtils.blendARGB(base, Color.BLACK, 0.1f)
+                card = ColorUtils.blendARGB(base, Color.BLACK, 0.2f)
+                border = ColorUtils.blendARGB(base, Color.WHITE, 0.16f)
+                chip = ColorUtils.blendARGB(base, Color.WHITE, 0.1f)
+            }
+            else -> {
+                surfaceVariant = ColorUtils.blendARGB(base, Color.WHITE, 0.34f)
+                card = ColorUtils.blendARGB(base, Color.WHITE, 0.82f)
+                border = ColorUtils.blendARGB(base, Color.BLACK, 0.14f)
+                chip = ColorUtils.blendARGB(card, accent, 0.1f)
+            }
+        }
         val primaryVariant = ColorUtils.blendARGB(primary, Color.BLACK, 0.2f)
         val accentVariant = ColorUtils.blendARGB(accent, Color.BLACK, 0.2f)
 
-        val surfaceLum = ColorUtils.calculateLuminance(base)
-        val onSurface = if (surfaceLum < 0.5) Color.WHITE else Color.BLACK
-        val textSecondary = ColorUtils.blendARGB(onSurface, base, 0.35f)
-        val onPrimary = if (ColorUtils.calculateLuminance(primary) < 0.5) Color.WHITE else Color.BLACK
-        val onSecondary = if (ColorUtils.calculateLuminance(accent) < 0.5) Color.WHITE else Color.BLACK
+        val onSurface = bestOnColor(card)
+        val textSecondary = ColorUtils.blendARGB(onSurface, card, 0.34f)
+        val onPrimary = bestOnColor(primary)
+        val onSecondary = bestOnColor(accent)
 
         return mapOf(
             R.color.palette_custom_primary to primary,
@@ -134,6 +128,18 @@ data class CustomPalette(
             R.color.palette_custom_on_primary to onPrimary,
             R.color.palette_custom_on_secondary to onSecondary
         )
+    }
+
+    private fun opaque(color: Int): Int = Color.rgb(
+        Color.red(color),
+        Color.green(color),
+        Color.blue(color)
+    )
+
+    private fun bestOnColor(background: Int): Int {
+        val whiteContrast = ColorUtils.calculateContrast(Color.WHITE, background)
+        val blackContrast = ColorUtils.calculateContrast(Color.BLACK, background)
+        return if (whiteContrast >= blackContrast) Color.WHITE else Color.BLACK
     }
 }
 

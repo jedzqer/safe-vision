@@ -100,11 +100,12 @@ object ThemeSelectionDialog {
             })
 
             val card = MaterialCardView(context).apply {
-                radius = dp(8).toFloat()
+                radius = dp(14).toFloat()
                 cardElevation = 0f
                 setCardBackgroundColor(cardColor)
                 strokeColor = borderColor
                 strokeWidth = dp(1)
+                rippleColor = ColorStateList.valueOf(chipColor)
                 isClickable = true
                 isFocusable = true
                 addView(row)
@@ -230,8 +231,29 @@ object ThemeSelectionDialog {
                 option.card.strokeColor = if (selected) accentColor else borderColor
                 option.card.strokeWidth = dp(if (selected) 2 else 1)
                 option.card.setCardBackgroundColor(if (selected) chipColor else cardColor)
+                option.card.animate()
+                    .scaleX(if (selected) 1f else 0.99f)
+                    .scaleY(if (selected) 1f else 0.99f)
+                    .setDuration(160L)
+                    .start()
             }
-            customPanel.visibility = if (theme == AppTheme.CUSTOM) View.VISIBLE else View.GONE
+            if (theme == AppTheme.CUSTOM) {
+                if (customPanel.visibility != View.VISIBLE) {
+                    customPanel.alpha = 0f
+                    customPanel.translationY = dp(-6).toFloat()
+                    customPanel.visibility = View.VISIBLE
+                    customPanel.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(180L)
+                        .start()
+                }
+            } else {
+                customPanel.animate().cancel()
+                customPanel.visibility = View.GONE
+                customPanel.alpha = 1f
+                customPanel.translationY = 0f
+            }
         }
 
         options.forEach { (theme, option) ->
@@ -262,7 +284,11 @@ object ThemeSelectionDialog {
                         ).show()
                         return@setOnClickListener
                     }
-                    CustomPalette(values[0], values[1], values[2])
+                    CustomPalette(
+                        formatColor(parseColorOrNull(values[0])!!),
+                        formatColor(parseColorOrNull(values[1])!!),
+                        formatColor(parseColorOrNull(values[2])!!)
+                    )
                 } else {
                     currentPalette
                 }
@@ -287,7 +313,7 @@ object ThemeSelectionDialog {
             setPadding(dp(20), dp(8), dp(20), dp(4))
         }
         val preview = MaterialCardView(context).apply {
-            radius = dp(8).toFloat()
+            radius = dp(14).toFloat()
             cardElevation = 0f
             strokeWidth = dp(1)
             strokeColor = DialogUtils.resolveThemeColor(context, R.attr.svColorBorder)
@@ -358,24 +384,25 @@ object ThemeSelectionDialog {
     }
 
     private fun paletteColors(palette: CustomPalette): List<Int> = listOf(
-        Color.parseColor(palette.baseHex),
-        Color.parseColor(palette.primaryHex),
-        Color.parseColor(palette.accentHex)
+        parseColorOrNull(palette.baseHex) ?: Color.BLACK,
+        parseColorOrNull(palette.primaryHex) ?: Color.parseColor("#FF3B30"),
+        parseColorOrNull(palette.accentHex) ?: Color.parseColor("#7D3CFF")
     )
 
     private fun parseColorOrNull(value: String?): Int? {
         return try {
-            Color.parseColor(value?.trim().orEmpty())
+            val normalized = value?.trim().orEmpty()
+            if (!normalized.matches(Regex("^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$"))) {
+                return null
+            }
+            val parsed = Color.parseColor(normalized)
+            Color.rgb(Color.red(parsed), Color.green(parsed), Color.blue(parsed))
         } catch (_: IllegalArgumentException) {
             null
         }
     }
 
     private fun formatColor(color: Int): String {
-        return if (Color.alpha(color) == 255) {
-            String.format(Locale.US, "#%06X", color and 0xFFFFFF)
-        } else {
-            String.format(Locale.US, "#%08X", color.toLong() and 0xFFFFFFFFL)
-        }
+        return String.format(Locale.US, "#%06X", color and 0xFFFFFF)
     }
 }

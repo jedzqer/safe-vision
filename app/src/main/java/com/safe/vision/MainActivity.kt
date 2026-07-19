@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
         val appSettings = AppSettingsManager.getInstance(this)
         val appTheme = appSettings.getAppTheme()
         val customPalette = appSettings.getCustomPalette()
-        ThemeManager.applyTheme(this, appTheme, customPalette)
+        ThemeManager.applyTheme(this, appTheme)
         super.onCreate(savedInstanceState)
         
         // 启用边到边显示模式（Android 15+ 必需）

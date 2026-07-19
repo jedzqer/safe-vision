@@ -214,7 +214,7 @@
     <string name="settings_theme_custom_base">Base</string>
     <string name="settings_theme_custom_primary">Primary</string>
     <string name="settings_theme_custom_accent">Accent</string>
-    <string name="settings_theme_custom_hint">Supports #RRGGBB / #AARRGGBB</string>
+    <string name="settings_theme_custom_hint">Use #RRGGBB color values</string>
     <string name="settings_theme_applied_custom">Custom theme applied</string>
     <string name="settings_theme_manage">Choose Theme</string>
     <string name="settings_theme_current">Current theme: %1$s</string>
