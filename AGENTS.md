@@ -152,7 +152,8 @@ safe-app/
 
 - `SettingsFragment.kt`：设置页 UI 与交互
 - `AppSettingsManager.kt`：通用设置持久化
-- `ThemeManager.kt`：主题应用与切换
+- `ThemeManager.kt`：主题应用、自定义色板资源覆盖与系统栏明暗适配
+- `ThemeSelectionDialog.kt`：内置主题预览、自定义颜色编辑与 RGB 取色面板
 - `AppLanguageManager.kt`：语言切换与系统语言映射
 - `DialogUtils.kt`：统一弹窗入口与主题取色
 

@@ -169,6 +169,10 @@
     <string name="settings_theme_pastel">파스텔: #BBD8FF / #FFD4C4 / #2B3A67</string>
     <string name="settings_theme_deep_sea">딥 씨: #114468 / #EF6837 / #2DE2E6</string>
     <string name="settings_theme_custom">사용자 지정 테마</string>
+    <string name="settings_theme_name_black_red">블랙 레드</string>
+    <string name="settings_theme_name_pastel">파스텔</string>
+    <string name="settings_theme_name_deep_sea">딥 씨</string>
+    <string name="settings_theme_name_custom">사용자 지정</string>
     <string name="settings_theme_custom_base">기본색</string>
     <string name="settings_theme_custom_primary">주 색상</string>
     <string name="settings_theme_custom_accent">강조색</string>

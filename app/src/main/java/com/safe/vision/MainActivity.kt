@@ -47,12 +47,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppLanguageManager.applyToApp(this)
-        val appTheme = AppSettingsManager.getInstance(this).getAppTheme()
-        ThemeManager.applyTheme(this, appTheme)
+        val appSettings = AppSettingsManager.getInstance(this)
+        val appTheme = appSettings.getAppTheme()
+        val customPalette = appSettings.getCustomPalette()
+        ThemeManager.applyTheme(this, appTheme, customPalette)
         super.onCreate(savedInstanceState)
         
         // 启用边到边显示模式（Android 15+ 必需）
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        ThemeManager.applySystemBarAppearance(
+            this,
+            appTheme,
+            customPalette
+        )
         
         // 初始化崩溃处理器
         CrashHandler.init(this)

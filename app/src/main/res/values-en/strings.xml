@@ -207,6 +207,10 @@
     <string name="settings_theme_pastel">Pastel: #BBD8FF / #FFD4C4 / #2B3A67</string>
     <string name="settings_theme_deep_sea">Deep Sea: #114468 / #EF6837 / #2DE2E6</string>
     <string name="settings_theme_custom">Custom Theme</string>
+    <string name="settings_theme_name_black_red">Black Red</string>
+    <string name="settings_theme_name_pastel">Pastel</string>
+    <string name="settings_theme_name_deep_sea">Deep Sea</string>
+    <string name="settings_theme_name_custom">Custom</string>
     <string name="settings_theme_custom_base">Base</string>
     <string name="settings_theme_custom_primary">Primary</string>
     <string name="settings_theme_custom_accent">Accent</string>

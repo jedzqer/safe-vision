@@ -977,172 +977,41 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showThemeDialog() {
-        val context = requireContext()
-        val palette = appSettings.getCustomPalette()
-        val padding = (16 * resources.displayMetrics.density).toInt()
-        val primaryTextColor = resolveThemeColor(R.attr.svColorTextPrimary)
-        val secondaryTextColor = resolveThemeColor(R.attr.svColorTextSecondary)
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, padding)
-        }
+        ThemeSelectionDialog.show(
+            context = requireContext(),
+            currentTheme = currentTheme,
+            currentPalette = appSettings.getCustomPalette()
+        ) { selection ->
+            val themeChanged = selection.theme != currentTheme
+            val paletteChanged = selection.theme == AppTheme.CUSTOM &&
+                selection.palette != appSettings.getCustomPalette()
+            if (!themeChanged && !paletteChanged) return@show
 
-        val themeGroup = RadioGroup(context).apply { orientation = RadioGroup.VERTICAL }
-        val defaultOption = RadioButton(context).apply {
-            id = View.generateViewId()
-            text = getString(R.string.settings_theme_default)
-            setTextColor(primaryTextColor)
-        }
-        val pastelOption = RadioButton(context).apply {
-            id = View.generateViewId()
-            text = getString(R.string.settings_theme_pastel)
-            setTextColor(primaryTextColor)
-        }
-        val deepSeaOption = RadioButton(context).apply {
-            id = View.generateViewId()
-            text = getString(R.string.settings_theme_deep_sea)
-            setTextColor(primaryTextColor)
-        }
-        val customOption = RadioButton(context).apply {
-            id = View.generateViewId()
-            text = getString(R.string.settings_theme_custom)
-            setTextColor(primaryTextColor)
-        }
-        themeGroup.addView(defaultOption)
-        themeGroup.addView(pastelOption)
-        themeGroup.addView(deepSeaOption)
-        themeGroup.addView(customOption)
-
-        val baseLayout = TextInputLayout(context).apply {
-            hint = getString(R.string.settings_theme_custom_base)
-            isEnabled = false
-        }
-        val baseInput = TextInputEditText(context).apply {
-            setText(palette.baseHex)
-            hint = getString(R.string.settings_theme_custom_hint)
-            setTextColor(primaryTextColor)
-            setHintTextColor(secondaryTextColor)
-        }
-        baseLayout.addView(baseInput)
-
-        val primaryLayout = TextInputLayout(context).apply {
-            hint = getString(R.string.settings_theme_custom_primary)
-            isEnabled = false
-        }
-        val primaryInput = TextInputEditText(context).apply {
-            setText(palette.primaryHex)
-            hint = getString(R.string.settings_theme_custom_hint)
-            setTextColor(primaryTextColor)
-            setHintTextColor(secondaryTextColor)
-        }
-        primaryLayout.addView(primaryInput)
-
-        val accentLayout = TextInputLayout(context).apply {
-            hint = getString(R.string.settings_theme_custom_accent)
-            isEnabled = false
-        }
-        val accentInput = TextInputEditText(context).apply {
-            setText(palette.accentHex)
-            hint = getString(R.string.settings_theme_custom_hint)
-            setTextColor(primaryTextColor)
-            setHintTextColor(secondaryTextColor)
-        }
-        accentLayout.addView(accentInput)
-
-        fun setCustomEnabled(enabled: Boolean) {
-            baseLayout.isEnabled = enabled
-            primaryLayout.isEnabled = enabled
-            accentLayout.isEnabled = enabled
-        }
-
-        container.addView(themeGroup)
-        container.addView(baseLayout)
-        container.addView(primaryLayout)
-        container.addView(accentLayout)
-
-        val scrollView = AndroidScrollView(context).apply { addView(container) }
-        DialogUtils.ensureDialogLayoutParams(scrollView)
-
-        val currentForUi = when (currentTheme) {
-            AppTheme.BLACK_RED -> AppTheme.DEFAULT
-            else -> currentTheme
-        }
-        when (currentForUi) {
-            AppTheme.DEFAULT -> themeGroup.check(defaultOption.id)
-            AppTheme.PASTEL -> themeGroup.check(pastelOption.id)
-            AppTheme.DEEP_SEA -> themeGroup.check(deepSeaOption.id)
-            AppTheme.CUSTOM -> {
-                themeGroup.check(customOption.id)
-                setCustomEnabled(true)
+            if (selection.theme == AppTheme.CUSTOM) {
+                appSettings.setCustomPalette(selection.palette)
+                DebugLogManager.addLog(
+                    "设置",
+                    "应用自定义主题: base=${selection.palette.baseHex} " +
+                        "primary=${selection.palette.primaryHex} accent=${selection.palette.accentHex}"
+                )
+                Toast.makeText(
+                    requireContext(),
+                    R.string.settings_theme_applied_custom,
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                DebugLogManager.addLog("设置", "切换主题: ${selection.theme.name}")
+                Toast.makeText(
+                    requireContext(),
+                    R.string.settings_theme_applied,
+                    Toast.LENGTH_SHORT
+                ).show()
             }
-            else -> themeGroup.check(defaultOption.id)
-        }
 
-        themeGroup.setOnCheckedChangeListener { _, checkedId ->
-            setCustomEnabled(checkedId == customOption.id)
-        }
-
-        val dialog = DialogUtils.builder(context)
-            .setTitle(R.string.settings_theme_title)
-            .setView(scrollView)
-            .setPositiveButton(android.R.string.ok, null)
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-
-        dialog.setOnShowListener {
-            DialogUtils.styleShownDialog(dialog)
-            val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            positive.setOnClickListener {
-                val selectedTheme = when (themeGroup.checkedRadioButtonId) {
-                    defaultOption.id -> AppTheme.DEFAULT
-                    pastelOption.id -> AppTheme.PASTEL
-                    deepSeaOption.id -> AppTheme.DEEP_SEA
-                    customOption.id -> AppTheme.CUSTOM
-                    else -> currentTheme
-                }
-                if (selectedTheme == AppTheme.CUSTOM) {
-                    val base = baseInput.text?.toString()?.trim().orEmpty()
-                    val primary = primaryInput.text?.toString()?.trim().orEmpty()
-                    val accent = accentInput.text?.toString()?.trim().orEmpty()
-                    if (!isValidColor(base) || !isValidColor(primary) || !isValidColor(accent)) {
-                        Toast.makeText(requireContext(), R.string.settings_theme_custom_hint, Toast.LENGTH_SHORT).show()
-                        return@setOnClickListener
-                    }
-                    val newPalette = CustomPalette(base, primary, accent)
-                    appSettings.setCustomPalette(newPalette)
-                    appSettings.setAppTheme(AppTheme.CUSTOM)
-                    currentTheme = AppTheme.CUSTOM
-                    DebugLogManager.addLog("设置", "应用自定义主题: base=$base primary=$primary accent=$accent")
-                    Toast.makeText(requireContext(), R.string.settings_theme_applied_custom, Toast.LENGTH_SHORT).show()
-                    updateThemeSummary(currentTheme, newPalette)
-                    ThemeManager.applyTheme(requireActivity(), AppTheme.CUSTOM)
-                    requireActivity().recreate()
-                    dialog.dismiss()
-                    return@setOnClickListener
-                }
-
-                if (selectedTheme != currentTheme) {
-                    currentTheme = selectedTheme
-                    appSettings.setAppTheme(selectedTheme)
-                    DebugLogManager.addLog("设置", "切换主题: ${selectedTheme.name}")
-                    Toast.makeText(requireContext(), R.string.settings_theme_applied, Toast.LENGTH_SHORT).show()
-                    updateThemeSummary(selectedTheme, appSettings.getCustomPalette())
-                    ThemeManager.applyTheme(requireActivity(), selectedTheme)
-                    requireActivity().recreate()
-                }
-                dialog.dismiss()
-            }
-        }
-
-        dialog.show()
-    }
-
-    private fun isValidColor(hex: String): Boolean {
-        return try {
-            android.graphics.Color.parseColor(hex)
-            true
-        } catch (_: Exception) {
-            false
+            currentTheme = selection.theme
+            appSettings.setAppTheme(selection.theme)
+            updateThemeSummary(selection.theme, selection.palette)
+            requireActivity().recreate()
         }
     }
 
