@@ -413,6 +413,8 @@
     <string name="gallery_action_move_short">移动</string>
     <string name="gallery_action_select_all_short">全选</string>
     <string name="viewer_video_time_placeholder">0:00</string>
+    <string name="viewer_video_play">播放视频</string>
+    <string name="viewer_video_pause">暂停视频</string>
     <string name="viewer_video_playback_failed">视频无法播放</string>
     <string name="settings_label_dialog_hint_tap_outside">点击卡片外区域自动收起</string>
     <string name="settings_label_sticker_pick">上传该标签贴纸</string>

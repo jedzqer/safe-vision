@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         val appSettings = AppSettingsManager.getInstance(this)
         val appTheme = appSettings.getAppTheme()
         val customPalette = appSettings.getCustomPalette()
+        ThemeManager.applyCustomColorResources(this, appTheme, customPalette)
         ThemeManager.applyTheme(this, appTheme)
         super.onCreate(savedInstanceState)
         

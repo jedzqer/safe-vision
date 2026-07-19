@@ -8,11 +8,13 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.util.TypedValue
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.annotation.StyleRes
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
+import com.google.android.material.color.ColorResourcesOverride
 
 enum class AppTheme(val prefValue: String, @StyleRes val styleRes: Int, val labelRes: Int) {
     DEFAULT("default", R.style.Theme_SafeVision, R.string.settings_theme_default),
@@ -33,10 +35,33 @@ object ThemeManager {
         activity.setTheme(theme.styleRes)
     }
 
+    @SuppressLint("RestrictedApi")
+    fun applyCustomColorResources(
+        activity: Activity,
+        theme: AppTheme,
+        customPalette: CustomPalette?
+    ) {
+        if (
+            theme != AppTheme.CUSTOM ||
+            customPalette == null ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        ) {
+            return
+        }
+
+        ColorResourcesOverride.getInstance()
+            ?.applyIfPossible(activity, customPalette.toColorMap())
+    }
+
     fun wrapContextWithCustomColors(base: Context, theme: AppTheme, customPalette: CustomPalette?): Context {
         if (theme != AppTheme.CUSTOM || customPalette == null) return base
 
         val overrides = customPalette.toColorMap()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // The loader must be installed on the final Activity context in onCreate().
+            return base
+        }
+
         val customResources = ColorOverrideResources(base.resources, overrides)
         return object : ContextThemeWrapper(base, theme.styleRes) {
             override fun getResources(): Resources = customResources

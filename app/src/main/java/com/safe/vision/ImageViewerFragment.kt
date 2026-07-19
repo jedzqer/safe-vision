@@ -76,6 +76,7 @@ class ImageViewerFragment : Fragment() {
     private lateinit var btnAddBox: MaterialButton
     private lateinit var btnDoneEdit: MaterialButton
     private lateinit var videoSeekContainer: LinearLayout
+    private lateinit var btnVideoPlayPause: ImageButton
     private lateinit var videoSeekSlider: Slider
     private lateinit var videoPositionText: TextView
     private lateinit var videoDurationText: TextView
@@ -131,6 +132,8 @@ class ImageViewerFragment : Fragment() {
     private var pendingLongPress: Runnable? = null
     private var longPressTriggered = false
     private var currentVideoFile: File? = null
+    private var isVideoPrepared = false
+    private var videoPlaybackRequested = false
     private var lastPlaybackErrorPath: String? = null
     private var videoTouchStartX = 0f
     private var videoTouchStartY = 0f
@@ -188,6 +191,7 @@ class ImageViewerFragment : Fragment() {
         btnAddBox = view.findViewById(R.id.btnAddBox)
         btnDoneEdit = view.findViewById(R.id.btnDoneEdit)
         videoSeekContainer = view.findViewById(R.id.videoSeekContainer)
+        btnVideoPlayPause = view.findViewById(R.id.btnVideoPlayPause)
         videoSeekSlider = view.findViewById(R.id.videoSeekSlider)
         videoPositionText = view.findViewById(R.id.videoPositionText)
         videoDurationText = view.findViewById(R.id.videoDurationText)
@@ -202,6 +206,9 @@ class ImageViewerFragment : Fragment() {
         fullSizeVideo.setMediaController(null)
         fullSizeVideo.setOnErrorListener { _, what, extra ->
             val failedFile = currentVideoFile
+            isVideoPrepared = false
+            videoPlaybackRequested = false
+            hideVideoSeekControls()
             if (failedFile == null) {
                 DebugLogManager.addLog("媒体浏览", "视频播放失败(无目标文件): what=$what extra=$extra")
                 return@setOnErrorListener true
@@ -229,6 +236,7 @@ class ImageViewerFragment : Fragment() {
         }
         btnAddBox.setOnClickListener { showAddLabelDialog() }
         btnDoneEdit.setOnClickListener { saveAndExitEditMode() }
+        btnVideoPlayPause.setOnClickListener { toggleVideoPlayback() }
         detectionEditorOverlay.onBoxLongPress = { id -> showEditBoxActions(id) }
         detectionEditorOverlay.onDataChanged = { Unit }
         detectionEditorOverlay.eyeModeResolver = { detection -> DetectionConfig.isEyeRegionLabel(detection.label) }
@@ -260,7 +268,7 @@ class ImageViewerFragment : Fragment() {
                     videoSwipeHandled = false
                     longPressTriggered = false
                     scheduleLongPress(fullSizeVideo)
-                    false
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.x - videoTouchStartX
@@ -279,18 +287,31 @@ class ImageViewerFragment : Fragment() {
                         videoSwipeHandled = true
                         val forward = if (verticalScroll) dy < 0f else dx < 0f
                         if (forward) showNextMedia() else showPreviousMedia()
-                        true
-                    } else {
-                        false
                     }
+                    true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP -> {
                     cancelLongPress(fullSizeVideo)
-                    val consumed = videoSwipeHandled || longPressTriggered
+                    if (!videoSwipeHandled && !longPressTriggered) {
+                        val dx = event.x - videoTouchStartX
+                        val dy = event.y - videoTouchStartY
+                        if (abs(dx) <= touchSlop && abs(dy) <= touchSlop) {
+                            when {
+                                event.x < fullSizeVideo.width / 3f -> showPreviousMedia()
+                                event.x > fullSizeVideo.width * 2f / 3f -> showNextMedia()
+                                else -> toggleVideoPlayback()
+                            }
+                        }
+                    }
                     videoSwipeHandled = false
-                    consumed
+                    true
                 }
-                else -> false
+                MotionEvent.ACTION_CANCEL -> {
+                    cancelLongPress(fullSizeVideo)
+                    videoSwipeHandled = false
+                    true
+                }
+                else -> true
             }
         }
         touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
@@ -632,6 +653,8 @@ class ImageViewerFragment : Fragment() {
             animeMetadataBadge.visibility = View.GONE
             btnEnterFullscreen.visibility = View.GONE
             fullSizeVideo.stopPlayback()
+            isVideoPrepared = false
+            videoPlaybackRequested = true
             stopVideoProgressUpdates()
             fullSizeImage.visibility = View.GONE
             fullSizeVideo.visibility = View.VISIBLE
@@ -642,28 +665,41 @@ class ImageViewerFragment : Fragment() {
                 return
             }
             try {
-                fullSizeVideo.setVideoURI(Uri.fromFile(mediaFile))
                 fullSizeVideo.setMediaController(null)
                 fullSizeVideo.setOnPreparedListener {
+                    if (currentVideoFile?.absolutePath != mediaFile.absolutePath) {
+                        return@setOnPreparedListener
+                    }
+                    isVideoPrepared = true
                     it.isLooping = false
                     lastPlaybackErrorPath = null
                     configureVideoSeekControls(fullSizeVideo.duration)
                     startVideoProgressUpdates()
-                    if (shouldAutoPlayVideo()) {
+                    if (videoPlaybackRequested && shouldAutoPlayVideo()) {
                         fullSizeVideo.start()
                     }
+                    updateVideoPlaybackButton()
                 }
                 fullSizeVideo.setOnCompletionListener {
+                    videoPlaybackRequested = false
                     stopVideoProgressUpdates()
                     syncVideoProgress(forceDuration = currentVideoDurationMs())
+                    updateVideoPlaybackButton()
                 }
+                fullSizeVideo.setVideoURI(Uri.fromFile(mediaFile))
+                configureVideoSeekControls(0)
+                updateVideoPlaybackButton()
                 DebugLogManager.addLog("媒体浏览", "播放视频: ${mediaFile.name}")
             } catch (e: Exception) {
+                isVideoPrepared = false
+                videoPlaybackRequested = false
                 hideVideoSeekControls()
                 DebugLogManager.addLog("媒体浏览", "视频播放失败: ${e.message}")
             }
         } else {
             currentVideoFile = null
+            isVideoPrepared = false
+            videoPlaybackRequested = false
             fullSizeVideo.stopPlayback()
             fullSizeVideo.visibility = View.GONE
             stopVideoProgressUpdates()
@@ -1243,9 +1279,10 @@ class ImageViewerFragment : Fragment() {
         val duration = currentVideoDurationMs()
         configureVideoSeekControls(duration)
         syncVideoProgress(forceDuration = duration)
-        if (shouldAutoPlayVideo()) {
+        if (videoPlaybackRequested && shouldAutoPlayVideo()) {
             fullSizeVideo.start()
         }
+        updateVideoPlaybackButton()
         startVideoProgressUpdates()
     }
 
@@ -1438,6 +1475,7 @@ class ImageViewerFragment : Fragment() {
         randomQueueBuildJob?.cancel()
         randomQueueBuildJob = null
         fullSizeVideo.pause()
+        updateVideoPlaybackButton()
         stopVideoProgressUpdates()
         hideVideoSeekControls()
     }
@@ -1470,6 +1508,35 @@ class ImageViewerFragment : Fragment() {
         videoSeekContainer.visibility = View.VISIBLE
     }
 
+    private fun toggleVideoPlayback() {
+        if (currentVideoFile == null || fullSizeVideo.visibility != View.VISIBLE) return
+        if (fullSizeVideo.isPlaying || videoPlaybackRequested) {
+            videoPlaybackRequested = false
+            fullSizeVideo.pause()
+        } else {
+            val duration = currentVideoDurationMs()
+            if (isVideoPrepared && duration > 0 && fullSizeVideo.currentPosition >= duration) {
+                fullSizeVideo.seekTo(0)
+            }
+            videoPlaybackRequested = true
+            fullSizeVideo.start()
+            startVideoProgressUpdates()
+        }
+        updateVideoPlaybackButton()
+    }
+
+    private fun updateVideoPlaybackButton() {
+        if (!this::btnVideoPlayPause.isInitialized || !this::fullSizeVideo.isInitialized) return
+        val isPlaying = runCatching { fullSizeVideo.isPlaying }.getOrDefault(false)
+        val isPlaybackActive = isPlaying || videoPlaybackRequested
+        btnVideoPlayPause.setImageResource(
+            if (isPlaybackActive) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        )
+        btnVideoPlayPause.contentDescription = getString(
+            if (isPlaybackActive) R.string.viewer_video_pause else R.string.viewer_video_play
+        )
+    }
+
     private fun hideVideoSeekControls() {
         isSeekingVideo = false
         videoSeekContainer.visibility = View.GONE
@@ -1477,6 +1544,7 @@ class ImageViewerFragment : Fragment() {
         videoSeekSlider.valueTo = 1f
         videoSeekSlider.value = 0f
         updateVideoProgressTexts(0, 0)
+        updateVideoPlaybackButton()
     }
 
     private fun startVideoProgressUpdates() {
@@ -1487,6 +1555,7 @@ class ImageViewerFragment : Fragment() {
                 if (!isSeekingVideo) {
                     syncVideoProgress()
                 }
+                updateVideoPlaybackButton()
                 delay(250L)
             }
         }

@@ -62,6 +62,18 @@
             android:paddingBottom="10dp"
             android:visibility="gone">
 
+            <ImageButton
+                android:id="@+id/btnVideoPlayPause"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_action_circle"
+                android:contentDescription="@string/viewer_video_play"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_media_play"
+                app:tint="@android:color/white" />
+
             <TextView
                 android:id="@+id/videoPositionText"
                 android:layout_width="wrap_content"

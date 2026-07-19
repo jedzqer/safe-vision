@@ -413,6 +413,8 @@
     <string name="gallery_action_move_short">Move</string>
     <string name="gallery_action_select_all_short">All</string>
     <string name="viewer_video_time_placeholder">0:00</string>
+    <string name="viewer_video_play">Play video</string>
+    <string name="viewer_video_pause">Pause video</string>
     <string name="viewer_video_playback_failed">Unable to play the video</string>
     <string name="settings_label_dialog_hint_tap_outside">Tap outside the card to collapse it automatically</string>
     <string name="settings_label_sticker_pick">Upload Sticker for This Label</string>
