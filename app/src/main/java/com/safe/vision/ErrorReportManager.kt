@@ -5,16 +5,17 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileWriter
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object ErrorReportManager {
     private const val PREFS_NAME = "error_report_prefs"
     private const val KEY_PENDING_CRASH_PATH = "pending_crash_path"
     private const val KEY_PENDING_CRASH_TIME = "pending_crash_time"
 
-    private val timestampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
-    private val humanTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private const val TIMESTAMP_FORMAT = "yyyyMMdd_HHmmss"
+    private const val HUMAN_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
 
     fun captureHandledError(context: Context, source: String, message: String, throwable: Throwable? = null): File? {
         return createReportFile(
@@ -40,7 +41,7 @@ object ErrorReportManager {
 
         appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_PENDING_CRASH_PATH, file.absolutePath)
-            .putString(KEY_PENDING_CRASH_TIME, LocalDateTime.now().format(humanTimeFormatter))
+            .putString(KEY_PENDING_CRASH_TIME, formatDate(Date(), HUMAN_TIME_FORMAT))
             .apply()
         return file
     }
@@ -98,11 +99,11 @@ object ErrorReportManager {
             DebugLogManager.flushNow()
             val rootDir = context.getExternalFilesDir(null) ?: context.filesDir
             val dir = File(rootDir, "logs/error_reports").apply { if (!exists()) mkdirs() }
-            val now = LocalDateTime.now()
-            val file = File(dir, "error_${now.format(timestampFormatter)}.txt")
+            val now = Date()
+            val file = File(dir, "error_${formatDate(now, TIMESTAMP_FORMAT)}.txt")
             FileWriter(file, false).use { writer ->
                 writer.appendLine(title)
-                writer.appendLine("Time: ${now.format(humanTimeFormatter)}")
+                writer.appendLine("Time: ${formatDate(now, HUMAN_TIME_FORMAT)}")
                 writer.appendLine("Source: $source")
                 writer.appendLine("Message: $message")
                 writer.appendLine("App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
@@ -145,5 +146,9 @@ object ErrorReportManager {
         }.onFailure {
             DebugLogManager.addLog("ErrorReport", "Failed to share error log: ${it.message}", DebugLogManager.LogLevel.ERROR)
         }
+    }
+
+    private fun formatDate(date: Date, pattern: String): String {
+        return SimpleDateFormat(pattern, Locale.US).format(date)
     }
 }

@@ -651,7 +651,7 @@ class ScreenDetectionService : Service() {
     }
 
     private fun pendingIntentImmutableFlag(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        return PendingIntent.FLAG_IMMUTABLE
     }
 
     @Suppress("DEPRECATION")

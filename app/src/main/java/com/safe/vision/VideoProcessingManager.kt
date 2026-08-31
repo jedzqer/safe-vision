@@ -9,8 +9,8 @@ import android.media.MediaFormat
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -39,7 +39,7 @@ import kotlin.math.roundToInt
  * 视频处理管理器，负责接收视频任务并在后台线程中处理/导出。
  */
 class VideoProcessingManager private constructor(private val context: Context) {
-    private val sessionIdFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.US)
+    private val sessionIdFormatter = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
     private val _state = MutableStateFlow<VideoProcessingState>(VideoProcessingState.Idle)
     val state: StateFlow<VideoProcessingState> = _state.asStateFlow()
@@ -118,7 +118,7 @@ class VideoProcessingManager private constructor(private val context: Context) {
 
         val previousJob = processingJob
         val job = processingScope.launch(start = CoroutineStart.LAZY) {
-            val sessionId = LocalDateTime.now().format(sessionIdFormatter)
+            val sessionId = synchronized(sessionIdFormatter) { sessionIdFormatter.format(Date()) }
             val sessionTag = "[SESSION $sessionId]"
             try {
                 previousJob?.cancelAndJoin()
@@ -603,6 +603,9 @@ class VideoProcessingManager private constructor(private val context: Context) {
                     audioTrackCopier?.finish()
                     val finalSamples = audioTrackCopier?.audioSamples ?: 0
                     val audioMime = audioTrackCopier?.audioMime ?: "?"
+                    if (finalSamples <= 0) {
+                        throw IllegalStateException("输入视频包含音轨，但没有音频样本被写入输出文件")
+                    }
                     DebugLogManager.addLog("视频处理", "$sessionTag [MUXER] 音轨混流完成 mime=$audioMime，共写入 $finalSamples 个音频样本")
                 }
                 _progress.value = _progress.value.copy(percentage = 99)

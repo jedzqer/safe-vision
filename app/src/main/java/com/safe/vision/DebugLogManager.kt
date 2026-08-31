@@ -9,9 +9,9 @@ import java.io.File
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.lang.ref.WeakReference
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.ArrayDeque
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
@@ -27,9 +27,9 @@ object DebugLogManager {
     private const val FLUSH_BATCH_SIZE = 50
 
     private val logs = ArrayDeque<String>()
-    private val dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-    private val fileDateFormat = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
-    private val headerDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private const val DATE_FORMAT = "HH:mm:ss.SSS"
+    private const val FILE_DATE_FORMAT = "yyyyMMdd_HHmmss"
+    private const val HEADER_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
     private val listeners = CopyOnWriteArraySet<WeakReference<(String) -> Unit>>()
     private val logsLock = Any()
     private val fileLock = Any()
@@ -52,7 +52,7 @@ object DebugLogManager {
             if (isInitialized) return
             val rootDir = context.getExternalFilesDir(null) ?: context.filesDir
             logDir = File(rootDir, "logs").apply { if (!exists()) mkdirs() }
-            val timestamp = LocalDateTime.now().format(fileDateFormat)
+            val timestamp = formatNow(FILE_DATE_FORMAT)
             logFile = File(logDir, "safe_vision_log_$timestamp.txt")
             openWriterLocked()
             writeSessionHeaderLocked()
@@ -67,7 +67,7 @@ object DebugLogManager {
     }
 
     fun addLog(tag: String, message: String, level: LogLevel) {
-        val timestamp = LocalDateTime.now().format(dateFormat)
+        val timestamp = formatNow(DATE_FORMAT)
         val logLine = "[$timestamp] $tag: $message"
 
         synchronized(logsLock) {
@@ -189,7 +189,7 @@ object DebugLogManager {
     private fun writeSessionHeaderLocked() {
         val info = listOf(
             "Safe Vision Log Session",
-            "Start time: ${LocalDateTime.now().format(headerDateFormat)}",
+            "Start time: ${formatNow(HEADER_DATE_FORMAT)}",
             "App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             "Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             "System version: Android ${android.os.Build.VERSION.RELEASE}",
@@ -232,7 +232,7 @@ object DebugLogManager {
         val projected = file.length() + nextLineLength
         if (projected <= MAX_LOG_FILE_SIZE_BYTES) return
         closeWriterLocked()
-        val timestamp = LocalDateTime.now().format(fileDateFormat)
+        val timestamp = formatNow(FILE_DATE_FORMAT)
         logFile = File(dir, "safe_vision_log_$timestamp.txt")
         openWriterLocked()
         writeSessionHeaderLocked()
@@ -276,6 +276,10 @@ object DebugLogManager {
                 TimeUnit.MILLISECONDS
             )
         }
+    }
+
+    private fun formatNow(pattern: String): String {
+        return java.text.SimpleDateFormat(pattern, Locale.US).format(Date())
     }
 
     private fun inferLevel(tag: String, message: String): LogLevel {

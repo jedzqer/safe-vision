@@ -267,11 +267,6 @@ class BatchProcessingService : Service() {
     }
     
     private fun stopForegroundCompat(removeNotification: Boolean) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(if (removeNotification) STOP_FOREGROUND_REMOVE else STOP_FOREGROUND_DETACH)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(removeNotification)
-        }
+        stopForeground(if (removeNotification) STOP_FOREGROUND_REMOVE else STOP_FOREGROUND_DETACH)
     }
 }

@@ -8,6 +8,7 @@
     android:fillViewport="true"
     android:background="?attr/svColorSurface"
     android:clickable="true"
+    android:focusable="true"
     android:padding="12dp">
 
     <LinearLayout

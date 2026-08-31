@@ -14,7 +14,7 @@
         <item name="android:statusBarColor">?attr/svColorPrimaryVariant</item>
         <item name="android:navigationBarColor">?attr/svColorSurface</item>
         <item name="android:windowBackground">?attr/svColorSurface</item>
-        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
         <item name="materialButtonStyle">@style/Widget.SafeVision.Button</item>
         <item name="materialCardViewStyle">@style/Widget.SafeVision.Card</item>
         <item name="alertDialogTheme">@style/ThemeOverlay.SafeVision.AlertDialog</item>
@@ -41,7 +41,7 @@
         <item name="svColorOnPrimary">@color/palette_blue_on_primary</item>
         <item name="svColorOnSecondary">@color/palette_blue_on_secondary</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
     <!-- 黑底红主题 + 电紫强调 -->
@@ -60,7 +60,7 @@
         <item name="svColorOnPrimary">@color/palette_blue_on_primary</item>
         <item name="svColorOnSecondary">@color/palette_blue_on_secondary</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
     <!-- 自定义主题，颜色运行时覆盖 palette_custom_* -->
@@ -79,7 +79,7 @@
         <item name="svColorOnPrimary">@color/palette_custom_on_primary</item>
         <item name="svColorOnSecondary">@color/palette_custom_on_secondary</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
     <!-- Pastel 主题 -->
@@ -98,7 +98,7 @@
         <item name="svColorOnPrimary">@color/palette_pastel_on_primary</item>
         <item name="svColorOnSecondary">@color/palette_pastel_on_secondary</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
     </style>
 
     <!-- Deep Sea 主题 -->
@@ -117,7 +117,7 @@
         <item name="svColorOnPrimary">@color/palette_deepsea_on_primary</item>
         <item name="svColorOnSecondary">@color/palette_deepsea_on_secondary</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
     <style name="ShapeAppearance.SafeVision.Small" parent="ShapeAppearance.MaterialComponents.SmallComponent">

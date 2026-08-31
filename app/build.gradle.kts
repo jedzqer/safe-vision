@@ -7,30 +7,43 @@ android {
     namespace = "com.safe.vision"
     compileSdk = 36
 
+    val storeFilePath = project.findProperty("STORE_FILE") as String?
+    val storePasswordProp = project.findProperty("STORE_PASSWORD") as String?
+    val keyAliasProp = project.findProperty("KEY_ALIAS") as String?
+    val keyPasswordProp = project.findProperty("KEY_PASSWORD") as String?
+    val hasSigning = !storeFilePath.isNullOrBlank() &&
+        !storePasswordProp.isNullOrBlank() &&
+        !keyAliasProp.isNullOrBlank() &&
+        !keyPasswordProp.isNullOrBlank()
+
     defaultConfig {
         applicationId = "com.safe.vision2"
         minSdk = 24
         targetSdk = 36
-        versionCode = 58
-        versionName = "2.1.2"
+        versionCode = 60
+        versionName = "2.1.4"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("../keystore.jks")
-            storePassword = "safe-vision-jed"
-            keyAlias = "release"
-            keyPassword = "safe-vision-jed"
+    val releaseSigning = if (hasSigning) {
+        signingConfigs.create("release") {
+            storeFile = rootProject.file(storeFilePath!!)
+            storePassword = storePasswordProp
+            keyAlias = keyAliasProp
+            keyPassword = keyPasswordProp
         }
+    } else {
+        null
     }
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigning != null) {
+                signingConfig = releaseSigning
+            }
         }
     }
 

@@ -46,11 +46,7 @@ object ScreenOverlayController {
     }
 
     fun canDrawSystemAlertWindow(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
+        return Settings.canDrawOverlays(context)
     }
 
     fun isOverlayPermissionGranted(context: Context, mode: ScreenOverlayMode): Boolean {

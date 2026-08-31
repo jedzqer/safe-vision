@@ -36,6 +36,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 import com.safe.vision.MediaSaveHelper.SaveResult
 import kotlin.coroutines.resume
 
@@ -887,7 +888,7 @@ class ImageProcessingFragment : Fragment() {
                     DebugLogManager.addLog("检测结果", "检测到的目标详情:")
                     detections.forEachIndexed { index, detection ->
                         val box = detection.box
-                        val scoreStr = String.format("%.3f", detection.score)
+                        val scoreStr = String.format(Locale.US, "%.3f", detection.score)
                         DebugLogManager.addLog("检测结果", "  #${index + 1}: ${detection.className} (置信度: $scoreStr)")
                         DebugLogManager.addLog("检测结果", "     位置: [${box.left.toInt()}, ${box.top.toInt()}, ${box.width().toInt()}, ${box.height().toInt()}]")
                     }

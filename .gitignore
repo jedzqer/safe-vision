@@ -14,6 +14,12 @@
 .vscode
 *.iml
 
-# Local config & secrets
+# Codex / codewhale state
+.codewhale
+
+# Local signing credentials and keystores (never commit)
 local.properties
+signing.properties
+*.keystore
+*.jks
 keystore.jks

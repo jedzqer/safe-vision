@@ -2,8 +2,9 @@ package com.safe.vision
 
 import android.content.Context
 import com.safe.vision.BuildConfig
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.system.exitProcess
 
 /**
@@ -11,7 +12,7 @@ import kotlin.system.exitProcess
  * 确保应用崩溃时能够保存详细的崩溃信息
  */
 object CrashHandler {
-    private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private const val DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
     
     /**
      * 初始化崩溃处理器
@@ -52,7 +53,7 @@ object CrashHandler {
      * 生成崩溃信息
      */
     private fun generateCrashInfo(thread: Thread, exception: Throwable): String {
-        val timestamp = LocalDateTime.now().format(dateFormat)
+        val timestamp = formatNow()
         val deviceInfo = getDeviceInfo()
         val versionName = BuildConfig.VERSION_NAME
         val versionCode = BuildConfig.VERSION_CODE
@@ -69,7 +70,6 @@ object CrashHandler {
             appendLine()
             appendLine("Thread info:")
             appendLine("  Name: ${thread.name}")
-            appendLine("  ID: ${thread.threadId()}")
             appendLine("  Priority: ${thread.priority}")
             appendLine()
             appendLine("Exception info:")
@@ -101,16 +101,10 @@ object CrashHandler {
             append(", Model: ${android.os.Build.MODEL}")
             append(", Product: ${android.os.Build.PRODUCT}")
             append(", Hardware: ${android.os.Build.HARDWARE}")
-            append(", Serial: ${getDeviceSerial()}")
         }
     }
 
-    private fun getDeviceSerial(): String {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            runCatching { android.os.Build.getSerial() }.getOrDefault(android.os.Build.UNKNOWN)
-        } else {
-            @Suppress("DEPRECATION")
-            android.os.Build.SERIAL
-        }
+    private fun formatNow(): String {
+        return SimpleDateFormat(DATE_FORMAT, Locale.US).format(Date())
     }
 }

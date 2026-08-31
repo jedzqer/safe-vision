@@ -28,7 +28,7 @@
                 android:contentDescription="@string/gallery_action_close_folder"
                 android:padding="10dp"
                 android:src="@drawable/ic_action_close"
-                android:tint="?attr/svColorAccent" />
+                app:tint="?attr/svColorAccent" />
 
             <TextView
                 android:id="@+id/folderTitle"
@@ -157,7 +157,7 @@
                 android:contentDescription="@string/gallery_action_save_selected"
                 android:padding="9dp"
                 android:src="@drawable/ic_action_download"
-                android:tint="?attr/svColorOnPrimary" />
+                app:tint="?attr/svColorOnPrimary" />
 
             <ImageButton
                 android:id="@+id/btnDeleteSelected"
@@ -168,7 +168,7 @@
                 android:contentDescription="@string/gallery_action_delete_selected"
                 android:padding="9dp"
                 android:src="@drawable/ic_action_delete"
-                android:tint="?attr/svColorOnPrimary" />
+                app:tint="?attr/svColorOnPrimary" />
 
             <ImageButton
                 android:id="@+id/btnCancelSelection"
@@ -178,7 +178,7 @@
                 android:contentDescription="@string/gallery_action_cancel_selection"
                 android:padding="9dp"
                 android:src="@drawable/ic_action_close"
-                android:tint="?attr/svColorOnPrimary" />
+                app:tint="?attr/svColorOnPrimary" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
