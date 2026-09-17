@@ -124,6 +124,9 @@ safe-app/
 - `DetectionMetadataFormat.kt`：检测结果元数据格式
 - `DetectionEditModels.kt`：检测框编辑数据模型与 JSON 读写
 - `DetectionEditorOverlayView.kt`：浏览页检测框叠加绘制与交互
+- `EyeRegionHelper.kt`：由人脸框与双眼关键点推导眼睛遮挡区域
+
+**眼睛遮挡几何（对齐 `test/eye/2.py`）**：眼睛遮挡条由双眼关键点推算，是以双眼连线为长轴的有向矩形，中心取双眼中点，尺寸按眼距取值（宽 = 眼距 × 1.5 × 1.3，高 = 眼距 × 0.5 × 0.8），眼点缺失或退化时退回人脸上部横向条带。数据表示统一为「未旋转矩形 + 倾角」：元数据里 `eye_bar` 是未旋转矩形、`eye_bar_rotation` 是倾角，渲染时对该矩形施加倾角得到倾斜四边形；两者必须成对传递，把外接轴对齐矩形再按倾角旋转会把倾角计入两次，使遮挡框明显偏大且偏离眼睛。注意图片路径在检测阶段只写元数据、不渲染，遮罩是浏览时由 `ImagePrivacyProcessor` 读取元数据重渲染的，因此倾角必须随元数据持久化（`MediaSaveHelper`）；`box_rotation` 只表示人脸框自身的旋转，不要用 `eye_bar_rotation` 回填。
 
 ### 屏幕实时检测
 

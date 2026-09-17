@@ -60,10 +60,10 @@ class ImagePrivacyProcessor {
                 val height = box.getInt(3)
                 val rect = BlurEffects.clampRect(Rect(x, y, x + width, y + height), originalBitmap.width, originalBitmap.height)
                 if (rect.width() <= 0 || rect.height() <= 0) continue
+                // 只取框自身的旋转；眼睛条的倾角由 eye_bar_rotation 单独提供，
+                // 否则人脸框会被眼睛倾角带着一起旋转。
                 val boxRotationDegrees = if (detection.has("box_rotation")) {
                     detection.optDouble("box_rotation", 0.0).toFloat()
-                } else if (detection.has("eye_bar_rotation") && detection.has("eye_bar")) {
-                    detection.optDouble("eye_bar_rotation", 0.0).toFloat()
                 } else {
                     null
                 }
@@ -115,7 +115,7 @@ class ImagePrivacyProcessor {
                     renderItems.add(item)
                 }
                 if (!hasExplicitEyeRegion && DetectionConfig.canDeriveEyeRegion(item.className)) {
-                    val derivedRect = EyeRegionHelper.deriveEyeRegion(
+                    val eyeRegion = EyeRegionHelper.deriveEyeRegion(
                         EyeRegionHelper.EyeRegionSource(
                             sourceLabel = item.className,
                             faceRect = RectF(item.rect),
@@ -127,21 +127,21 @@ class ImagePrivacyProcessor {
                         originalBitmap.width,
                         originalBitmap.height
                     )
-                    if (derivedRect != null && privacySettings.isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, labelProfile)) {
+                    if (eyeRegion != null && privacySettings.isLabelBlocked(DetectionConfig.EYE_REGION_LABEL, labelProfile)) {
                         renderItems.add(
                             DetectionRenderEngine.DetectionRenderItem(
                                 className = DetectionConfig.EYE_REGION_LABEL,
                                 rect = Rect(
-                                    derivedRect.left.toInt(),
-                                    derivedRect.top.toInt(),
-                                    derivedRect.right.toInt(),
-                                    derivedRect.bottom.toInt()
+                                    eyeRegion.bounds.left.toInt(),
+                                    eyeRegion.bounds.top.toInt(),
+                                    eyeRegion.bounds.right.toInt(),
+                                    eyeRegion.bounds.bottom.toInt()
                                 ),
-                                boxRotationDegrees = item.eyeBarRotationDegrees ?: item.boxRotationDegrees,
+                                boxRotationDegrees = eyeRegion.rotationDegrees,
                                 leftEye = item.leftEye,
                                 rightEye = item.rightEye,
-                                eyeBarRect = derivedRect,
-                                eyeBarRotationDegrees = item.eyeBarRotationDegrees
+                                eyeBarRect = eyeRegion.rect,
+                                eyeBarRotationDegrees = eyeRegion.rotationDegrees
                             )
                         )
                     }

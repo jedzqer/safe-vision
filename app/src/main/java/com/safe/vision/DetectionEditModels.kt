@@ -39,10 +39,9 @@ object DetectionMetadataIo {
             if (w <= 0f || h <= 0f) continue
             val eyes = parseEyes(obj.optJSONArray("eyes"))
             val eyeBar = parseRect(obj.optJSONArray("eye_bar"))
+            // 只取框自身的旋转；眼睛条的倾角由 eye_bar_rotation 单独提供。
             val boxRotationDegrees = if (obj.has("box_rotation")) {
                 obj.optDouble("box_rotation", 0.0).toFloat()
-            } else if (obj.has("eye_bar_rotation") && eyeBar != null) {
-                obj.optDouble("eye_bar_rotation", 0.0).toFloat()
             } else {
                 null
             }
@@ -69,7 +68,7 @@ object DetectionMetadataIo {
         list.forEach { item ->
             withDerivedEyeRegions.add(item)
             if (hasExplicitEyeRegion || !DetectionConfig.canDeriveEyeRegion(item.label)) return@forEach
-            val eyeRect = EyeRegionHelper.deriveEyeRegion(
+            val eyeRegion = EyeRegionHelper.deriveEyeRegion(
                 EyeRegionHelper.EyeRegionSource(
                     sourceLabel = item.label,
                     faceRect = item.rect,
@@ -84,12 +83,12 @@ object DetectionMetadataIo {
             withDerivedEyeRegions.add(
                 EditableDetection(
                     label = DetectionConfig.EYE_REGION_LABEL,
-                    rect = eyeRect,
-                    boxRotationDegrees = item.eyeBarRotationDegrees ?: item.boxRotationDegrees,
+                    rect = eyeRegion.rect,
+                    boxRotationDegrees = eyeRegion.rotationDegrees,
                     score = item.score,
                     eyes = item.eyes,
-                    eyeBar = eyeRect,
-                    eyeBarRotationDegrees = item.eyeBarRotationDegrees,
+                    eyeBar = eyeRegion.rect,
+                    eyeBarRotationDegrees = eyeRegion.rotationDegrees,
                     isDerivedEyeRegion = true
                 )
             )

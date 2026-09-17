@@ -8,7 +8,6 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import kotlin.math.abs
-import kotlin.math.atan2
 
 class DetectionRenderEngine(
     private val privacySettings: PrivacySettingsManager
@@ -519,16 +518,11 @@ class DetectionRenderEngine(
 
         if (detection.leftEye != null && detection.rightEye != null) {
             val strip = BlurEffects.eyeStripFromEyes(faceRect, detection.leftEye, detection.rightEye, width, height)
-            if (strip != null && strip.bounds.width() > 0 && strip.bounds.height() > 0) {
+            if (strip != null && strip.rect.width() > 0 && strip.rect.height() > 0) {
                 return EyeTarget(
-                    rect = strip.bounds,
+                    rect = strip.rect,
                     path = strip.path,
-                    rotationDegrees = Math.toDegrees(
-                        atan2(
-                            (detection.rightEye.y - detection.leftEye.y).toDouble(),
-                            (detection.rightEye.x - detection.leftEye.x).toDouble()
-                        )
-                    ).toFloat()
+                    rotationDegrees = strip.rotationDegrees
                 )
             }
         }

@@ -21,10 +21,38 @@ import kotlin.math.sin
  * Shared image/video blur/mosaic helpers.
  */
 object BlurEffects {
+    /**
+     * 眼睛遮挡条带。
+     *
+     * [rect] 是**未旋转**的 w×h 矩形，绘制效果与贴纸时对它施加 [rotationDegrees]；
+     * [bounds] 是倾斜四边形的外接轴对齐矩形；[path] 是可直接用的倾斜四边形。
+     * 该表示与元数据里 `eye_bar`（未旋转矩形）/ `eye_bar_rotation`（倾角）的语义一致。
+     */
     data class EyeStrip(
+        val rect: Rect,
         val bounds: Rect,
-        val path: Path
+        val path: Path,
+        val rotationDegrees: Float
     )
+
+    /**
+     * 以双眼连线为长轴的有向矩形，几何与 test/eye/2.py 的 `cv2.boxPoints` 一致。
+     */
+    data class OrientedEyeRect(
+        val rect: Rect,
+        val bounds: Rect,
+        val path: Path,
+        val rotationDegrees: Float
+    )
+
+    /**
+     * 眼距基准的遮挡框尺寸系数，与 test/eye/2.py 的 WIDTH_SCALE / HEIGHT_SCALE 对齐：
+     * 宽 = 眼距 × 1.5 × 1.3，高 = 眼距 × 0.5 × 0.8。
+     */
+    private const val EYE_BOX_WIDTH_SCALE = 1.5f * 1.3f
+    private const val EYE_BOX_HEIGHT_SCALE = 0.5f * 0.8f
+    private const val EYE_BOX_MIN_EDGE = 2f
+    private const val EYE_BOX_MIN_EYE_DISTANCE = 2f
 
     sealed class OutlineShape {
         data class RectShape(val rect: Rect) : OutlineShape()
@@ -123,6 +151,81 @@ object BlurEffects {
         return clampRect(stripRect, surfaceWidth, surfaceHeight)
     }
 
+    /**
+     * 由双眼点推算贴合倾斜的遮挡框，尺寸基准与 test/eye/2.py 一致：
+     * 宽 = 眼距 × 1.5 × WIDTH_SCALE，高 = 眼距 × 0.5 × HEIGHT_SCALE，中心为双眼中点，长轴沿双眼连线。
+     * 眼点缺失或退化（两点重合）时返回 null，由调用方退回人脸条带。
+     */
+    fun orientedEyeRectFromEyes(
+        leftEye: PointF,
+        rightEye: PointF,
+        surfaceWidth: Int,
+        surfaceHeight: Int
+    ): OrientedEyeRect? {
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return null
+
+        val eyeDx = rightEye.x - leftEye.x
+        val eyeDy = rightEye.y - leftEye.y
+        val eyeDistance = hypot(eyeDx, eyeDy)
+        if (eyeDistance < EYE_BOX_MIN_EYE_DISTANCE) return null
+
+        val angle = atan2(eyeDy, eyeDx)
+        val boxWidth = max(EYE_BOX_MIN_EDGE, eyeDistance * EYE_BOX_WIDTH_SCALE)
+        val boxHeight = max(EYE_BOX_MIN_EDGE, eyeDistance * EYE_BOX_HEIGHT_SCALE)
+        val centerX = (leftEye.x + rightEye.x) / 2f
+        val centerY = (leftEye.y + rightEye.y) / 2f
+
+        val ux = cos(angle)
+        val uy = sin(angle)
+        val nx = -uy
+        val ny = ux
+        val halfW = boxWidth / 2f
+        val halfH = boxHeight / 2f
+        val p1 = PointF(centerX - ux * halfW + nx * halfH, centerY - uy * halfW + ny * halfH)
+        val p2 = PointF(centerX + ux * halfW + nx * halfH, centerY + uy * halfW + ny * halfH)
+        val p3 = PointF(centerX + ux * halfW - nx * halfH, centerY + uy * halfW - ny * halfH)
+        val p4 = PointF(centerX - ux * halfW - nx * halfH, centerY - uy * halfW - ny * halfH)
+        val points = arrayOf(p1, p2, p3, p4)
+
+        val bounds = clampRect(
+            Rect(
+                points.minOf { it.x }.roundToInt(),
+                points.minOf { it.y }.roundToInt(),
+                points.maxOf { it.x }.roundToInt(),
+                points.maxOf { it.y }.roundToInt()
+            ),
+            surfaceWidth,
+            surfaceHeight
+        )
+        if (bounds.width() <= 0 || bounds.height() <= 0) return null
+
+        val rect = clampRect(
+            Rect(
+                (centerX - halfW).roundToInt(),
+                (centerY - halfH).roundToInt(),
+                (centerX + halfW).roundToInt(),
+                (centerY + halfH).roundToInt()
+            ),
+            surfaceWidth,
+            surfaceHeight
+        )
+        if (rect.width() <= 0 || rect.height() <= 0) return null
+
+        val path = Path().apply {
+            moveTo(p1.x, p1.y)
+            lineTo(p2.x, p2.y)
+            lineTo(p3.x, p3.y)
+            lineTo(p4.x, p4.y)
+            close()
+        }
+        return OrientedEyeRect(
+            rect = rect,
+            bounds = bounds,
+            path = path,
+            rotationDegrees = Math.toDegrees(angle.toDouble()).toFloat()
+        )
+    }
+
     fun eyeStripFromEyes(
         faceRect: Rect,
         leftEye: PointF,
@@ -133,67 +236,27 @@ object BlurEffects {
         val safeFace = clampRect(faceRect, surfaceWidth, surfaceHeight)
         if (safeFace.width() <= 0 || safeFace.height() <= 0) return null
 
-        val baseStrip = cropToEyeStrip(safeFace, surfaceWidth, surfaceHeight)
-        if (baseStrip.width() <= 0 || baseStrip.height() <= 0) return null
+        // 优先按双眼连线构建旋转矩形，倾斜时也能贴合眼睛；
+        // 眼点退化或落点明显偏离人脸时，退回人脸上部横向条带。
+        orientedEyeRectFromEyes(leftEye, rightEye, surfaceWidth, surfaceHeight)
+            ?.takeIf { Rect.intersects(it.bounds, safeFace) }
+            ?.let { oriented ->
+                return EyeStrip(
+                    rect = oriented.rect,
+                    bounds = oriented.bounds,
+                    path = oriented.path,
+                    rotationDegrees = oriented.rotationDegrees
+                )
+            }
 
-        val lx = leftEye.x.coerceIn(safeFace.left.toFloat(), safeFace.right.toFloat())
-        val rx = rightEye.x.coerceIn(safeFace.left.toFloat(), safeFace.right.toFloat())
-        val ly = leftEye.y.coerceIn(safeFace.top.toFloat(), safeFace.bottom.toFloat())
-        val ry = rightEye.y.coerceIn(safeFace.top.toFloat(), safeFace.bottom.toFloat())
-
-        val eyeDx = rx - lx
-        val eyeDy = ry - ly
-        val eyeDistance = hypot(eyeDx, eyeDy).coerceAtLeast(1f)
-        val angle = atan2(eyeDy, eyeDx)
-
-        val barThickness = baseStrip.height().toFloat().coerceAtLeast(1f)
-        var barLength = baseStrip.width().toFloat().coerceAtLeast(1f)
-        val minLengthByEyes = eyeDistance * 1.15f
-        if (barLength < eyeDistance) {
-            barLength = minLengthByEyes
-        }
-
-        val ux = cos(angle)
-        val uy = sin(angle)
-        val nx = -uy
-        val ny = ux
-        val centerX = (lx + rx) / 2f
-        val centerY = (ly + ry) / 2f
-
-        val halfL = barLength / 2f
-        val halfT = barThickness / 2f
-        val p1 = PointF(centerX - ux * halfL + nx * halfT, centerY - uy * halfL + ny * halfT)
-        val p2 = PointF(centerX + ux * halfL + nx * halfT, centerY + uy * halfL + ny * halfT)
-        val p3 = PointF(centerX + ux * halfL - nx * halfT, centerY + uy * halfL - ny * halfT)
-        val p4 = PointF(centerX - ux * halfL - nx * halfT, centerY - uy * halfL - ny * halfT)
-        val points = arrayOf(p1, p2, p3, p4)
-
-        val minX = points.minOf { it.x }.roundToInt()
-        val maxX = points.maxOf { it.x }.roundToInt()
-        val minY = points.minOf { it.y }.roundToInt()
-        val maxY = points.maxOf { it.y }.roundToInt()
-        val finalBounds = clampRect(Rect(minX, minY, maxX, maxY), surfaceWidth, surfaceHeight)
-        if (finalBounds.width() <= 0 || finalBounds.height() <= 0) return null
-
-        val path = Path().apply {
-            moveTo(p1.x, p1.y)
-            lineTo(p2.x, p2.y)
-            lineTo(p3.x, p3.y)
-            lineTo(p4.x, p4.y)
-            close()
-        }
-        return EyeStrip(bounds = finalBounds, path = path)
-    }
-
-    fun eyeBarFromEyes(
-        faceRect: Rect,
-        leftEye: PointF,
-        rightEye: PointF,
-        surfaceWidth: Int,
-        surfaceHeight: Int
-    ): Rect {
-        return eyeStripFromEyes(faceRect, leftEye, rightEye, surfaceWidth, surfaceHeight)?.bounds
-            ?: cropToEyeStrip(faceRect, surfaceWidth, surfaceHeight)
+        val strip = cropToEyeStrip(safeFace, surfaceWidth, surfaceHeight)
+        if (strip.width() <= 0 || strip.height() <= 0) return null
+        return EyeStrip(
+            rect = strip,
+            bounds = strip,
+            path = Path().apply { addRect(RectF(strip), Path.Direction.CW) },
+            rotationDegrees = 0f
+        )
     }
 
     fun rotatedRectPath(rect: RectF, rotationDegrees: Float): Path {

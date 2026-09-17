@@ -10,7 +10,6 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import kotlin.math.abs
-import kotlin.math.atan2
 import kotlin.math.roundToInt
 
 class ScreenPrivacyMaskRenderer(context: Context) {
@@ -177,16 +176,11 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                     sourceBitmap.width,
                     sourceBitmap.height
                 )
-                if (strip != null && strip.bounds.width() > 0 && strip.bounds.height() > 0) {
+                if (strip != null && strip.rect.width() > 0 && strip.rect.height() > 0) {
                     return EyeTarget(
-                        rect = strip.bounds,
+                        rect = strip.rect,
                         path = strip.path,
-                        rotationDegrees = Math.toDegrees(
-                            atan2(
-                                (rightEye.y - leftEye.y).toDouble(),
-                                (rightEye.x - leftEye.x).toDouble()
-                            )
-                        ).toFloat()
+                        rotationDegrees = strip.rotationDegrees
                     )
                 }
             }

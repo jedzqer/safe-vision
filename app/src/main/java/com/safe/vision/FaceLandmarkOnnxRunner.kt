@@ -141,7 +141,10 @@ class FaceLandmarkOnnxRunner(
             val leftEye = decodeLandmarkPoint(landmRow[0], landmRow[1], cx, cy, pw, ph, scaleX, scaleY)
             val rightEye = decodeLandmarkPoint(landmRow[2], landmRow[3], cx, cy, pw, ph, scaleX, scaleY)
             val faceRect = Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
-            val eyeBarRect = BlurEffects.eyeBarFromEyes(faceRect, leftEye, rightEye, srcWidth, srcHeight)
+            // 按双眼连线生成贴合倾斜眼睛的遮挡条：未旋转矩形 + 倾角；眼点退化时退回人脸上部条带。
+            val orientedEyeBar = BlurEffects.orientedEyeRectFromEyes(leftEye, rightEye, srcWidth, srcHeight)
+            val eyeBarRect = orientedEyeBar?.rect
+                ?: BlurEffects.cropToEyeStrip(faceRect, srcWidth, srcHeight)
             detections.add(
                 FaceDetection(
                     box = RectF(left, top, right, bottom),
@@ -153,7 +156,8 @@ class FaceLandmarkOnnxRunner(
                         eyeBarRect.top.toFloat(),
                         eyeBarRect.right.toFloat(),
                         eyeBarRect.bottom.toFloat()
-                    )
+                    ),
+                    eyeBarRotationDegrees = orientedEyeBar?.rotationDegrees ?: 0f
                 )
             )
         }
@@ -277,6 +281,9 @@ class FaceLandmarkOnnxRunner(
         val score: Float,
         val leftEye: PointF,
         val rightEye: PointF,
-        val eyeBar: RectF
+        /** 未旋转的眼睛遮挡矩形，绘制时配合 [eyeBarRotationDegrees] 旋转。 */
+        val eyeBar: RectF,
+        /** 双眼连线相对水平方向的倾角（度），0 表示水平。 */
+        val eyeBarRotationDegrees: Float = 0f
     )
 }

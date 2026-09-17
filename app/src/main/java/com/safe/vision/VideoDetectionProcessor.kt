@@ -72,7 +72,12 @@ class VideoDetectionProcessor(
                         box = box,
                         leftEye = interpolatePoint(prevDet.leftEye, nextDet.leftEye, t),
                         rightEye = interpolatePoint(prevDet.rightEye, nextDet.rightEye, t),
-                        eyeBar = interpolateRect(prevDet.eyeBar, nextDet.eyeBar, t)
+                        eyeBar = interpolateRect(prevDet.eyeBar, nextDet.eyeBar, t),
+                        eyeBarRotationDegrees = interpolateAngle(
+                            prevDet.eyeBarRotationDegrees,
+                            nextDet.eyeBarRotationDegrees,
+                            t
+                        )
                     )
                 )
             }
@@ -101,7 +106,9 @@ class VideoDetectionProcessor(
                         detection.box.bottom.toInt()
                     ),
                     leftEye = detection.leftEye,
-                    rightEye = detection.rightEye
+                    rightEye = detection.rightEye,
+                    eyeBarRect = detection.eyeBar,
+                    eyeBarRotationDegrees = detection.eyeBarRotationDegrees
                 )
             },
             settings = DetectionRenderEngine.RenderSettings(
@@ -173,6 +180,16 @@ class VideoDetectionProcessor(
             a == null && b != null -> if (t >= 0.5f) b else null
             else -> null
         }
+    }
+
+    /**
+     * 角度插值：沿最短弧插值，避免 ±180° 附近绕远路。
+     */
+    private fun interpolateAngle(a: Float?, b: Float?, t: Float): Float? {
+        if (a == null) return b
+        if (b == null) return a
+        val delta = ((b - a) % 360f + 540f) % 360f - 180f
+        return a + delta * t
     }
 
 }

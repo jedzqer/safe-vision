@@ -410,7 +410,8 @@ class YoloOnnxRunner(
                 detection.copy(
                     leftEye = face.leftEye,
                     rightEye = face.rightEye,
-                    eyeBar = face.eyeBar
+                    eyeBar = face.eyeBar,
+                    eyeBarRotationDegrees = face.eyeBarRotationDegrees
                 )
             } else {
                 detection
@@ -486,7 +487,10 @@ class YoloOnnxRunner(
         val box: RectF,
         val leftEye: PointF? = null,
         val rightEye: PointF? = null,
+        /** 未旋转的眼睛遮挡矩形，绘制时配合 [eyeBarRotationDegrees] 旋转。 */
         val eyeBar: RectF? = null,
+        /** 双眼连线相对水平方向的倾角（度），写入元数据 eye_bar_rotation。 */
+        val eyeBarRotationDegrees: Float? = null,
         val isDerivedEyeRegion: Boolean = false
     )
 
@@ -528,14 +532,15 @@ class YoloOnnxRunner(
             detections.forEach { detection ->
                 derived.add(detection)
                 if (!DetectionConfig.canDeriveEyeRegion(detection.className)) return@forEach
-                val eyeRect = EyeRegionHelper.deriveEyeRegion(
+                val eyeRegion = EyeRegionHelper.deriveEyeRegion(
                     EyeRegionHelper.EyeRegionSource(
                         sourceLabel = detection.className,
                         faceRect = detection.box,
                         eyes = detection.leftEye?.let { left ->
                             detection.rightEye?.let { right -> left to right }
                         },
-                        eyeBar = detection.eyeBar
+                        eyeBar = detection.eyeBar,
+                        eyeBarRotationDegrees = detection.eyeBarRotationDegrees
                     ),
                     surfaceWidth = detection.box.right.toInt().coerceAtLeast(1),
                     surfaceHeight = detection.box.bottom.toInt().coerceAtLeast(1)
@@ -543,8 +548,9 @@ class YoloOnnxRunner(
                 derived.add(
                     detection.copy(
                         className = DetectionConfig.EYE_REGION_LABEL,
-                        box = eyeRect,
-                        eyeBar = eyeRect,
+                        box = eyeRegion.bounds,
+                        eyeBar = eyeRegion.rect,
+                        eyeBarRotationDegrees = eyeRegion.rotationDegrees,
                         isDerivedEyeRegion = true
                     )
                 )

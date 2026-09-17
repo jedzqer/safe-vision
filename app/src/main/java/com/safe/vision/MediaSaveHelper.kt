@@ -101,6 +101,10 @@ object MediaSaveHelper {
                             put(eyeBar.height().toInt())
                         }
                     )
+                    // 眼睛条为未旋转矩形，倾角单独记录，浏览时据此旋转以贴合倾斜的眼睛。
+                    detection.eyeBarRotationDegrees?.let { rotation ->
+                        put("eye_bar_rotation", rotation.toDouble())
+                    }
                 }
             }
             array.put(obj)
