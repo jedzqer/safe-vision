@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="?attr/svColorSurface">
 
-    <com.google.android.material.card.MaterialCardView
+    <com.safe.vision.GlassCardView
         android:id="@+id/mediaContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -145,7 +145,7 @@
             app:tint="@android:color/white"
             android:visibility="gone" />
 
-    </com.google.android.material.card.MaterialCardView>
+    </com.safe.vision.GlassCardView>
 
     <LinearLayout
         android:id="@+id/editToolbar"
@@ -166,7 +166,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/btnAddBox"
             style="?attr/materialButtonOutlinedStyle"
             android:layout_width="wrap_content"
@@ -178,7 +178,7 @@
             android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/btnDoneEdit"
             style="?attr/materialButtonStyle"
             android:layout_width="wrap_content"

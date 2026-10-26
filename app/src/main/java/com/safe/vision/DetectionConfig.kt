@@ -21,7 +21,8 @@ object DetectionConfig {
         }
     }
 
-    // Standard YOLO model output labels in fixed order.
+    // Standard YOLO model output labels in fixed model-output order (do not reorder; use
+    // STANDARD_LABELS_DISPLAY_ORDER for UI display).
     val STANDARD_LABELS: List<String> = listOf(
         "FEMALE_GENITALIA_COVERED",
         "FACE_FEMALE",
@@ -43,6 +44,8 @@ object DetectionConfig {
         "BUTTOCKS_COVERED"
     )
 
+    // Anime YOLO model output labels in fixed model-output order (do not reorder; use
+    // ANIME_LABELS_DISPLAY_ORDER for UI display).
     val ANIME_LABELS: List<String> = listOf(
         "Animal",
         "Anus",
@@ -56,8 +59,52 @@ object DetectionConfig {
         "Pussy"
     )
 
-    // All supported labels across saved metadata formats and settings.
-    val LABELS: List<String> = (STANDARD_LABELS + ANIME_LABELS + EYE_REGION_LABEL).distinct()
+    // Standard labels ordered for UI display: body parts top-to-bottom, female group first,
+    // then shared parts, then male group; exposed variants before covered ones.
+    val STANDARD_LABELS_DISPLAY_ORDER: List<String> = listOf(
+        // 女性：面部 → 胸部 → 私处
+        "FACE_FEMALE",
+        "FEMALE_BREAST_EXPOSED",
+        "FEMALE_BREAST_COVERED",
+        "FEMALE_GENITALIA_EXPOSED",
+        "FEMALE_GENITALIA_COVERED",
+        // 通用部位：腋下 → 腹部 → 臀部 → 肛门 → 脚部
+        "ARMPITS_EXPOSED",
+        "ARMPITS_COVERED",
+        "BELLY_EXPOSED",
+        "BELLY_COVERED",
+        "BUTTOCKS_EXPOSED",
+        "BUTTOCKS_COVERED",
+        "ANUS_EXPOSED",
+        "ANUS_COVERED",
+        "FEET_EXPOSED",
+        "FEET_COVERED",
+        // 男性：面部 → 胸部 → 私处
+        "FACE_MALE",
+        "MALE_BREAST_EXPOSED",
+        "MALE_GENITALIA_EXPOSED"
+    )
+
+    // Anime labels ordered for UI display: body parts top-to-bottom; Animal is not a body part and stays last.
+    val ANIME_LABELS_DISPLAY_ORDER: List<String> = listOf(
+        // 面部 → 胸部 → 私处 → 臀部 → 肛门 → 脚部
+        "Face",
+        "Boob",
+        "Nipple",
+        "Pussy",
+        "Dick",
+        "Balls",
+        "Ass",
+        "Anus",
+        "Feet",
+        // 动物与人体部位无关，放在最后
+        "Animal"
+    )
+
+    // All supported labels across saved metadata formats and settings (display order:
+    // eyes first, then standard labels top-to-bottom, then anime labels top-to-bottom).
+    val LABELS: List<String> =
+        (listOf(EYE_REGION_LABEL) + STANDARD_LABELS_DISPLAY_ORDER + ANIME_LABELS_DISPLAY_ORDER).distinct()
 
     // Locked labels cannot be disabled in UI.
     val STANDARD_LOCKED_LABELS: List<String> = listOf(
@@ -147,8 +194,8 @@ object DetectionConfig {
 
     fun getLabels(profile: LabelProfile): List<String> {
         return when (profile) {
-            LabelProfile.STANDARD -> insertBeforeFirstFace(STANDARD_LABELS)
-            LabelProfile.ANIME -> insertBeforeFirstFace(ANIME_LABELS)
+            LabelProfile.STANDARD -> insertBeforeFirstFace(STANDARD_LABELS_DISPLAY_ORDER)
+            LabelProfile.ANIME -> insertBeforeFirstFace(ANIME_LABELS_DISPLAY_ORDER)
             LabelProfile.MIXED -> LABELS
         }
     }

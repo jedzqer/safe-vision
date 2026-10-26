@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/svColorCard"
+    android:background="@android:color/transparent"
     android:orientation="vertical"
     android:paddingStart="20dp"
     android:paddingTop="20dp"
@@ -43,7 +43,7 @@
         android:gravity="end"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/rotationCancelButton"
             style="?attr/materialButtonStyle"
             android:layout_width="wrap_content"
@@ -52,7 +52,7 @@
             android:textColor="?attr/svColorTextPrimary"
             android:backgroundTint="?attr/svColorChip" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/rotationApplyButton"
             style="?attr/materialButtonStyle"
             android:layout_width="wrap_content"

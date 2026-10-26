@@ -115,7 +115,8 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         items[idx] = if (isEyeMode(item)) {
             item.copy(
                 boxRotationDegrees = rotationDegrees,
-                eyeBarRotationDegrees = rotationDegrees
+                eyeBarRotationDegrees = rotationDegrees,
+                isEyeRegionEdited = true
             )
         } else {
             item.copy(boxRotationDegrees = rotationDegrees)
@@ -333,7 +334,8 @@ class DetectionEditorOverlayView @JvmOverloads constructor(
         return if (isEyeMode(item)) {
             item.copy(
                 rect = RectF(rect),
-                eyeBar = RectF(rect)
+                eyeBar = RectF(rect),
+                isEyeRegionEdited = true
             )
         } else {
             item.copy(rect = rect)

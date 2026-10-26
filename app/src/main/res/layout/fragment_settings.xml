@@ -16,7 +16,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <com.google.android.material.card.MaterialCardView
+        <com.safe.vision.GlassCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -58,7 +58,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/openThemeDialogButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -183,7 +183,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/switchPresetButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -194,7 +194,7 @@
             android:textColor="?attr/svColorOnPrimary"
             app:cornerRadius="12dp" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/savePresetButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -217,37 +217,37 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/sharePresetButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/settings_privacy_preset_share"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.SafeVision.Button.Outlined"
             android:textColor="?attr/svColorPrimary"
             app:strokeColor="?attr/svColorPrimary"
             app:strokeWidth="1dp" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/importPresetButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="@string/settings_privacy_preset_import"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.SafeVision.Button.Outlined"
             android:textColor="?attr/svColorPrimary"
             app:strokeColor="?attr/svColorPrimary"
             app:strokeWidth="1dp" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/deletePresetButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="@string/settings_privacy_preset_delete"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.SafeVision.Button.Outlined"
             android:textColor="?attr/svColorPrimary"
             app:strokeColor="?attr/svColorPrimary"
             app:strokeWidth="1dp" />
@@ -335,7 +335,7 @@
             android:thumbTint="?attr/svColorPrimary"
             android:trackTint="@color/switch_track_tint" />
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/maskOutlineAdjustButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -534,7 +534,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/chooseStickerButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -546,13 +546,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/resetStickerButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="@string/settings_sticker_reset"
         android:layout_marginBottom="16dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/Widget.SafeVision.Button.Outlined"
         app:strokeColor="?attr/svColorPrimary"
         app:strokeWidth="1dp"
         android:textColor="?attr/svColorPrimary"
@@ -585,16 +585,30 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/labelChipGroup"
+    <com.safe.vision.LabelWheelScrollView
+        android:id="@+id/labelChipScrollView"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="176dp"
         android:layout_marginBottom="16dp"
-        app:chipSpacing="8dp"
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="vertical"
+        android:background="@drawable/bg_label_chip_scroll"
+        android:clipToOutline="true"
         app:layout_constraintTop_toBottomOf="@id/labelEffectsHint"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:singleLine="false" />
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/labelChipGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="2dp"
+            app:chipSpacing="6dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="6dp"
+            app:singleLine="false" />
+    </com.safe.vision.LabelWheelScrollView>
 
     <TextView
         android:id="@+id/animeLabelsLabel"
@@ -604,7 +618,7 @@
         android:textAppearance="?attr/textAppearanceBody1"
         android:textColor="?attr/svColorTextPrimary"
         android:layout_marginBottom="8dp"
-        app:layout_constraintTop_toBottomOf="@id/labelChipGroup"
+        app:layout_constraintTop_toBottomOf="@id/labelChipScrollView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -620,18 +634,32 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/animeLabelChipGroup"
+    <com.safe.vision.LabelWheelScrollView
+        android:id="@+id/animeLabelChipScrollView"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="176dp"
         android:layout_marginBottom="16dp"
-        app:chipSpacing="8dp"
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="vertical"
+        android:background="@drawable/bg_label_chip_scroll"
+        android:clipToOutline="true"
         app:layout_constraintTop_toBottomOf="@id/animeLabelEffectsHint"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:singleLine="false" />
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <com.google.android.material.card.MaterialCardView
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/animeLabelChipGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="2dp"
+            app:chipSpacing="6dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="6dp"
+            app:singleLine="false" />
+    </com.safe.vision.LabelWheelScrollView>
+
+    <com.safe.vision.GlassCardView
         android:id="@+id/labelSettingsInlineCard"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -644,7 +672,7 @@
         app:cardElevation="0dp"
         app:strokeColor="?attr/svColorAccent"
         app:strokeWidth="1dp"
-        app:layout_constraintTop_toBottomOf="@id/animeLabelChipGroup"
+        app:layout_constraintTop_toBottomOf="@id/animeLabelChipScrollView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -655,7 +683,7 @@
             android:orientation="vertical"
             android:padding="16dp" />
 
-    </com.google.android.material.card.MaterialCardView>
+    </com.safe.vision.GlassCardView>
 
     <!-- 上传方式设置 -->
     <TextView
@@ -710,7 +738,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/videoSpeedButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -799,7 +827,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/randomQueueButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -835,7 +863,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/randomPlayIntervalButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -885,7 +913,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/metronomeSpeedButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -923,13 +951,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/debugToggle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:minHeight="52dp"
         android:text="@string/settings_debug_toggle"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/Widget.SafeVision.Button.Outlined"
         app:strokeColor="?attr/svColorPrimary"
         app:strokeWidth="1dp"
         android:textColor="?attr/svColorPrimary"
@@ -937,7 +965,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/shareLogsButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -950,7 +978,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/joinGroupButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -963,7 +991,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/languageButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -976,7 +1004,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/aboutButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -989,14 +1017,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
+    <com.safe.vision.GlassButton
         android:id="@+id/supportButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/support_button"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="16dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        style="@style/Widget.SafeVision.Button.Outlined"
         android:textColor="?attr/svColorTextSecondary"
         app:strokeColor="?attr/svColorBorder"
         app:strokeWidth="1dp"
@@ -1006,7 +1034,7 @@
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
-        </com.google.android.material.card.MaterialCardView>
+        </com.safe.vision.GlassCardView>
 
     </LinearLayout>
 

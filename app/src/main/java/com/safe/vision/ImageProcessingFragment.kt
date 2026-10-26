@@ -365,12 +365,12 @@ class ImageProcessingFragment : Fragment() {
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
             textSize = 13f
         }
-        val motionHint = TextView(requireContext()).apply {
-            text = getString(R.string.screen_detection_settings_interval_motion_hint)
+        val intervalHint = TextView(requireContext()).apply {
+            text = getString(R.string.screen_detection_settings_interval_hint)
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
             textSize = 12f
         }
-        val motionEffect = TextView(requireContext()).apply {
+        val intervalEffect = TextView(requireContext()).apply {
             setTextColor(DialogUtils.resolveThemeColor(context, R.attr.svColorTextSecondary))
             textSize = 12f
         }
@@ -385,11 +385,11 @@ class ImageProcessingFragment : Fragment() {
                 currentIntervalSeconds().toDouble()
             )
             val seconds = currentIntervalSeconds()
-            motionEffect.text = getString(
+            intervalEffect.text = getString(
                 when {
-                    seconds < 0.1f -> R.string.screen_detection_settings_interval_motion_effect_high
-                    seconds < 0.3f -> R.string.screen_detection_settings_interval_motion_effect_balanced
-                    else -> R.string.screen_detection_settings_interval_motion_effect_low
+                    seconds < 0.1f -> R.string.screen_detection_settings_interval_effect_high
+                    seconds < 0.3f -> R.string.screen_detection_settings_interval_effect_balanced
+                    else -> R.string.screen_detection_settings_interval_effect_low
                 }
             )
         }
@@ -454,7 +454,7 @@ class ImageProcessingFragment : Fragment() {
             )
         )
         contentView.addView(
-            motionHint,
+            intervalHint,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -463,7 +463,7 @@ class ImageProcessingFragment : Fragment() {
             }
         )
         contentView.addView(
-            motionEffect,
+            intervalEffect,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT

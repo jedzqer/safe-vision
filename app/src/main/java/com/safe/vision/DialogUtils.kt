@@ -1,6 +1,8 @@
 package com.safe.vision
 
 import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
+import androidx.core.graphics.ColorUtils
 import android.content.Context
 import android.util.TypedValue
 import android.widget.Button
@@ -152,6 +154,19 @@ object DialogUtils {
 }
 
 private class SafeVisionMaterialAlertDialogBuilder(context: Context) : MaterialAlertDialogBuilder(context) {
+    init {
+        val card = DialogUtils.resolveThemeColor(this.context, R.attr.svColorCard)
+        val accent = DialogUtils.resolveThemeColor(this.context, R.attr.svColorAccent)
+        val border = DialogUtils.resolveThemeColor(this.context, R.attr.svColorBorder)
+        val density = this.context.resources.displayMetrics.density
+        setBackground(GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(
+            ColorUtils.blendARGB(card, accent, 0.045f), card
+        )).apply {
+            cornerRadius = 24f * density
+            setStroke(density.toInt().coerceAtLeast(1), border)
+        })
+    }
+
     override fun create(): AlertDialog {
         val dialog = super.create()
         dialog.setOnShowListener {

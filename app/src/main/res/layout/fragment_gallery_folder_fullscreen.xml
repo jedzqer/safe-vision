@@ -48,7 +48,7 @@
                 android:textColor="?attr/svColorTextSecondary" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
+        <com.safe.vision.GlassButton
             android:id="@+id/btnImportNoDetectionImages"
             style="?attr/materialButtonOutlinedStyle"
             android:layout_width="match_parent"
@@ -80,7 +80,7 @@
         android:textColor="?attr/svColorTextSecondary"
         android:visibility="gone" />
 
-    <com.google.android.material.card.MaterialCardView
+    <com.safe.vision.GlassCardView
         android:id="@+id/selectionActionBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -180,6 +180,6 @@
                 android:src="@drawable/ic_action_close"
                 app:tint="?attr/svColorOnPrimary" />
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+    </com.safe.vision.GlassCardView>
 
 </FrameLayout>

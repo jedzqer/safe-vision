@@ -53,10 +53,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">For devices that cannot enable accessibility permission. This mode uses a regular overlay window and blocks touches on masked areas.</string>
     <string name="screen_detection_settings_interval">Detection Frequency</string>
     <string name="screen_detection_settings_interval_value">Detect every %1$.2f seconds</string>
-    <string name="screen_detection_settings_interval_motion_hint">Motion interpolation fills in mask displacement between detections; a higher detection rate is not always better.</string>
-    <string name="screen_detection_settings_interval_motion_effect_high">High frequency: less interpolation, slightly higher power draw</string>
-    <string name="screen_detection_settings_interval_motion_effect_balanced">Balanced frequency: interpolation and detection work together</string>
-    <string name="screen_detection_settings_interval_motion_effect_low">Low frequency: interpolation drives mask movement, lower power draw</string>
+    <string name="screen_detection_settings_interval_hint">Detection follows new frames; static scenes are skipped and periodically rechecked. Shorter intervals improve response but use more power.</string>
+    <string name="screen_detection_settings_interval_effect_high">High frequency: faster response, higher power use</string>
+    <string name="screen_detection_settings_interval_effect_balanced">Balanced frequency: response and power use</string>
+    <string name="screen_detection_settings_interval_effect_low">Low frequency: slower response, lower power use</string>
     <string name="screen_detection_accessibility_permission_required">Accessibility overlay service is required to display screen masking.</string>
     <string name="screen_detection_accessibility_permission_denied">Accessibility overlay service was not enabled. Screen detection was cancelled.</string>
     <string name="screen_detection_overlay_permission_required">Overlay permission is required to display screen masking.</string>
@@ -200,6 +200,8 @@
     <string name="first_launch_confirm">Got it</string>
 
     <!-- Settings -->
+    <string name="settings_section_expand">Expand %1$s</string>
+    <string name="settings_section_collapse">Collapse %1$s</string>
     <string name="settings_theme_title">Theme Style</string>
     <string name="settings_theme_summary">Choose your preferred color scheme</string>
     <string name="settings_theme_default">Default: black background with red</string>
@@ -297,7 +299,7 @@
     <string name="settings_sticker_saved">Sticker applied: %1$s</string>
     <string name="settings_sticker_reset_success">Switched to the default sticker</string>
     <string name="settings_label_effects_title">Mask Labels</string>
-    <string name="settings_label_effects_hint">Tap a label to toggle masking or set an effect. Unset labels use the global default effect.</string>
+    <string name="settings_label_effects_hint">Slide up or down to choose a row, then left or right to switch between covered and exposed labels. Release to edit the highlighted label, or tap a label directly to set its masking effect.</string>
     <string name="settings_anime_label_effects_title">Anime Label Handling</string>
     <string name="settings_anime_label_effects_hint">When viewing JSON with anime label format, these label effect settings will be used</string>
     <string name="settings_label_dialog_title">Label Settings: %1$s</string>
@@ -531,4 +533,8 @@
     <string name="notification_video_cancelled_title">Safe Vision - Media Processing Cancelled</string>
     <string name="notification_video_queue_progress">Completed %1$d / Remaining %2$d</string>
     <string name="notification_video_done_text">Media processing finished</string>
+    <string name="settings_privacy_preset_default">Default preset (built-in)</string>
+    <string name="settings_privacy_preset_name_reserved">This name is reserved for the built-in preset. Please choose another name.</string>
+    <string name="settings_label_state_enabled">On</string>
+    <string name="settings_label_state_disabled">Off</string>
 </resources>

@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.InputType
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -43,6 +44,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
@@ -117,7 +119,8 @@ class SettingsFragment : Fragment() {
     private var expandedLabelCard: View? = null
     private var activeLabelEditor: LabelSettingsEditor? = null
     private var isCollapsingLabelCard = false
-    private var pendingStickerLabel: String? = null
+    private var pendingStickerSelection: ((String?) -> Unit)? = null
+    private var labelSettingsDialog: AlertDialog? = null
     private val videoSpeedOptions = listOf(
         VideoSpeedOption(1, R.string.settings_video_speed_best),
         VideoSpeedOption(3, R.string.settings_video_speed_high),
@@ -158,10 +161,10 @@ class SettingsFragment : Fragment() {
     private val pickStickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri != null) {
-            handleStickerSelected(uri)
-        } else {
-            pendingStickerLabel = null
+        val onSelected = pendingStickerSelection
+        pendingStickerSelection = null
+        if (uri != null && onSelected != null) {
+            handleStickerSelected(uri, onSelected)
         }
     }
 
@@ -223,8 +226,60 @@ class SettingsFragment : Fragment() {
         chip.chipStrokeWidth = resources.displayMetrics.density
         chip.setTextColor(resolveThemeColor(R.attr.svColorTextPrimary))
         chip.alpha = if (privacySettings.isLabelBlocked(label)) 1f else 0.5f
-        chip.setOnClickListener { toggleInlineLabelSettings(label) }
+        chip.setOnClickListener { showLabelSettingsDialog(label) }
         return chip
+    }
+
+    private fun showLabelSettingsDialog(label: String) {
+        activeLabelEditor?.applyChanges?.invoke(true)
+        activeLabelEditor = null
+        labelSettingsDialog?.dismiss()
+        val editor = createLabelSettingsEditor(label, includeHeader = false)
+        val scrollView = AndroidScrollView(requireContext()).apply {
+            addView(
+                editor.root,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+        val dialog = DialogUtils.builder(requireContext())
+            .setTitle(getString(R.string.settings_label_dialog_title, privacySettings.getLabelDisplayName(label)))
+            .setView(scrollView)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dialog.setOnShowListener {
+            DialogUtils.styleShownDialog(dialog)
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                editor.applyChanges(true)
+                dialog.dismiss()
+            }
+        }
+        dialog.setOnDismissListener {
+            if (pendingStickerSelection === editor.updateStickerUri) {
+                pendingStickerSelection = null
+            }
+            if (labelSettingsDialog === dialog) {
+                labelSettingsDialog = null
+            }
+        }
+        labelSettingsDialog = dialog
+        dialog.show()
+        dialog.window?.setWindowAnimations(android.R.style.Animation_Dialog)
+    }
+
+    override fun onPause() {
+        view?.findViewById<LabelWheelScrollView>(R.id.labelChipScrollView)?.dismissWheel()
+        view?.findViewById<LabelWheelScrollView>(R.id.animeLabelChipScrollView)?.dismissWheel()
+        super.onPause()
+    }
+
+    override fun onDestroyView() {
+        labelSettingsDialog?.dismiss()
+        pendingStickerSelection = null
+        super.onDestroyView()
     }
 
     private fun createExpandedLabelCard(label: String): View {
@@ -242,7 +297,7 @@ class SettingsFragment : Fragment() {
                 )
             )
         }
-        return MaterialCardView(context).apply {
+        return GlassCardView(context).apply {
             expandedLabelCard = this
             tag = label
             alpha = 0f
@@ -296,6 +351,7 @@ class SettingsFragment : Fragment() {
 
     private data class LabelSettingsEditor(
         val root: View,
+        val updateStickerUri: (String?) -> Unit,
         val applyChanges: (Boolean) -> Unit
     )
 
@@ -411,8 +467,10 @@ class SettingsFragment : Fragment() {
             text = getString(R.string.settings_blur_mode_sticker)
             setTextColor(primaryTextColor)
         }
+        var draftStickerUri = privacySettings.getLabelStickerUri(label)
+        var stickerChanged = false
         val stickerSummaryView = TextView(context).apply {
-            text = buildLabelStickerSummary(label)
+            text = buildLabelStickerSummary(draftStickerUri)
             setTextColor(secondaryTextColor)
             textSize = 13f
             layoutParams = LinearLayout.LayoutParams(
@@ -424,34 +482,30 @@ class SettingsFragment : Fragment() {
         }
         val stickerActionLayout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            // Labels can wrap to different line counts; align button bounds, not text baselines.
+            isBaselineAligned = false
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = smallMargin }
         }
-        val chooseLabelStickerButton = Button(context).apply {
+        val updateStickerUri: (String?) -> Unit = { uri ->
+            draftStickerUri = uri
+            stickerChanged = true
+            stickerSummaryView.text = buildLabelStickerSummary(uri)
+        }
+        val chooseLabelStickerButton = GlassButton(context).apply {
             text = getString(R.string.settings_label_sticker_pick)
             setOnClickListener {
-                pendingStickerLabel = label
+                pendingStickerSelection = updateStickerUri
                 pickStickerLauncher.launch(arrayOf("image/*"))
             }
         }
-        val resetLabelStickerButton = Button(context).apply {
+        val resetLabelStickerButton = GlassButton(context).apply {
             text = getString(R.string.settings_label_sticker_reset)
             setOnClickListener {
-                privacySettings.setLabelStickerUri(label, null)
-                StickerLoader.clearCache()
-                stickerSummaryView.text = buildLabelStickerSummary(label)
-                updateStickerSummary()
-                refreshLabelChips()
-                Toast.makeText(
-                    context,
-                    getString(
-                        R.string.settings_label_sticker_cleared,
-                        privacySettings.getLabelDisplayName(label)
-                    ),
-                    Toast.LENGTH_SHORT
-                ).show()
+                updateStickerUri(null)
             }
         }
         stickerActionLayout.addView(
@@ -593,6 +647,7 @@ class SettingsFragment : Fragment() {
 
         return LabelSettingsEditor(
             root = container,
+            updateStickerUri = updateStickerUri,
             applyChanges = { refreshChips ->
                 privacySettings.setLabelEnabled(label, enabledSwitch.isChecked)
                 privacySettings.setLabelReverse(label, reverseSwitch.isChecked && enabledSwitch.isChecked)
@@ -611,6 +666,11 @@ class SettingsFragment : Fragment() {
                     label,
                     if (followGlobalCheck.isChecked) null else customScale
                 )
+                if (stickerChanged) {
+                    privacySettings.setLabelStickerUri(label, draftStickerUri)
+                    StickerLoader.clearCache()
+                    stickerChanged = false
+                }
                 if (refreshChips) {
                     refreshLabelChips()
                 }
@@ -748,7 +808,7 @@ class SettingsFragment : Fragment() {
         return start + (end - start) * progress
     }
 
-    private fun handleStickerSelected(uri: Uri) {
+    private fun handleStickerSelected(uri: Uri, onSelected: (String?) -> Unit) {
         try {
             requireContext().contentResolver.takePersistableUriPermission(
                 uri,
@@ -773,30 +833,8 @@ class SettingsFragment : Fragment() {
             return
         }
 
-        val label = pendingStickerLabel
-        if (label.isNullOrBlank()) {
-            privacySettings.setStickerUri(uri.toString())
-        } else {
-            privacySettings.setLabelStickerUri(label, uri.toString())
-        }
-        StickerLoader.clearCache()
-        pendingStickerLabel = null
-        updateStickerSummary()
         bitmap.recycle()
-        val name = resolveStickerName(uri)
-        if (label.isNullOrBlank()) {
-            Toast.makeText(requireContext(), getString(R.string.settings_sticker_saved, name), Toast.LENGTH_SHORT).show()
-            DebugLogManager.addLog("设置", "已选择全局贴纸: $name")
-        } else {
-            val labelName = privacySettings.getLabelDisplayName(label)
-            Toast.makeText(
-                requireContext(),
-                getString(R.string.settings_label_sticker_saved, labelName, name),
-                Toast.LENGTH_SHORT
-            ).show()
-            DebugLogManager.addLog("设置", "已为${labelName}设置贴纸: $name")
-        }
-        refreshLabelChips()
+        onSelected(uri.toString())
     }
 
     private fun resolveStickerName(uri: Uri): String {
@@ -823,8 +861,7 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun buildLabelStickerSummary(label: String): String {
-        val labelUri = privacySettings.getLabelStickerUri(label)
+    private fun buildLabelStickerSummary(labelUri: String?): String {
         return if (labelUri.isNullOrBlank()) {
             getString(R.string.settings_label_sticker_prefix, getString(R.string.settings_label_sticker_follow_global))
         } else {
@@ -877,6 +914,16 @@ class SettingsFragment : Fragment() {
         maskScaleSeekBar = view.findViewById(R.id.maskScaleSeekBar)
         labelChipGroup = view.findViewById(R.id.labelChipGroup)
         animeLabelChipGroup = view.findViewById(R.id.animeLabelChipGroup)
+        listOf(
+            R.id.labelChipScrollView to DetectionConfig.LabelProfile.STANDARD,
+            R.id.animeLabelChipScrollView to DetectionConfig.LabelProfile.ANIME
+        ).forEach { (id, profile) ->
+            view.findViewById<LabelWheelScrollView>(id).apply {
+                labels = { labelsForSettingsGroup(profile).map { it to privacySettings.getLabelDisplayName(it) } }
+                isLabelEnabled = { privacySettings.isLabelBlocked(it) }
+                onLabelSelected = { showLabelSettingsDialog(it) }
+            }
+        }
         labelSettingsInlineCard = view.findViewById(R.id.labelSettingsInlineCard)
         labelSettingsInlineContainer = view.findViewById(R.id.labelSettingsInlineContainer)
         stickerSummary = view.findViewById(R.id.stickerSummary)
@@ -912,7 +959,6 @@ class SettingsFragment : Fragment() {
         setupLanguageSection()
         setupAboutSection()
         setupSupportSection()
-        setupInlineLabelCardDismiss()
         registerSharedPresetImportListener()
         
         // 初始化调试日志
@@ -1122,7 +1168,15 @@ class SettingsFragment : Fragment() {
         setupMaskScale()
 
         chooseStickerButton.setOnClickListener {
-            pendingStickerLabel = null
+            pendingStickerSelection = { uri ->
+                privacySettings.setStickerUri(uri)
+                StickerLoader.clearCache()
+                updateStickerSummary()
+                val name = resolveStickerName(Uri.parse(requireNotNull(uri)))
+                Toast.makeText(requireContext(), getString(R.string.settings_sticker_saved, name), Toast.LENGTH_SHORT).show()
+                DebugLogManager.addLog("设置", "已选择全局贴纸: $name")
+                refreshLabelChips()
+            }
             pickStickerLauncher.launch(arrayOf("image/*"))
         }
 
@@ -1140,7 +1194,7 @@ class SettingsFragment : Fragment() {
 
     private fun saveCurrentPreset() {
         val activePreset = privacySettings.getActivePresetName()
-        if (activePreset.isNullOrBlank()) {
+        if (activePreset.isNullOrBlank() || privacySettings.isDefaultPreset(activePreset)) {
             showPresetNamingDialog()
             return
         }
@@ -1179,6 +1233,10 @@ class SettingsFragment : Fragment() {
                     Toast.makeText(context, R.string.settings_privacy_preset_name_empty, Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
+                if (privacySettings.isDefaultPreset(name)) {
+                    inputLayout.error = getString(R.string.settings_privacy_preset_name_reserved)
+                    return@setOnClickListener
+                }
                 privacySettings.savePreset(name)
                 updatePrivacyPresetSummary()
                 Toast.makeText(
@@ -1197,9 +1255,9 @@ class SettingsFragment : Fragment() {
         val context = requireContext()
         val saved = privacySettings.listPresetNames()
         val options = mutableListOf(getString(R.string.settings_privacy_preset_option_empty))
-        options.addAll(saved)
+        options.addAll(saved.map(privacySettings::getPresetDisplayName))
         val active = privacySettings.getActivePresetName()
-        val checkedIndex = if (active.isNullOrBlank()) 0 else options.indexOf(active).takeIf { it >= 0 } ?: 0
+        val checkedIndex = if (active.isNullOrBlank()) 0 else saved.indexOf(active).takeIf { it >= 0 }?.plus(1) ?: 0
 
         DialogUtils.builder(context)
             .setTitle(R.string.settings_privacy_preset_dialog_title)
@@ -1212,14 +1270,14 @@ class SettingsFragment : Fragment() {
                     dialog.dismiss()
                     return@setSingleChoiceItems
                 }
-                val name = options[which]
+                val name = saved[which - 1]
                 val applied = privacySettings.applyPreset(name)
                 if (applied) {
                     refreshPrivacyUiFromSettings()
                     updatePrivacyPresetSummary()
                     Toast.makeText(
                         context,
-                        getString(R.string.settings_privacy_preset_applied, name),
+                        getString(R.string.settings_privacy_preset_applied, privacySettings.getPresetDisplayName(name)),
                         Toast.LENGTH_SHORT
                     ).show()
                     DebugLogManager.addLog("设置", "已切换隐私预设: $name")
@@ -1237,13 +1295,13 @@ class SettingsFragment : Fragment() {
         privacyPresetSummary.text = if (active.isNullOrBlank()) {
             getString(R.string.settings_privacy_preset_empty)
         } else {
-            getString(R.string.settings_privacy_preset_current, active)
+            getString(R.string.settings_privacy_preset_current, privacySettings.getPresetDisplayName(active))
         }
     }
 
     private fun showPresetShareDialog() {
         val context = requireContext()
-        val saved = privacySettings.listPresetNames()
+        val saved = privacySettings.listPresetNames().filterNot(privacySettings::isDefaultPreset)
         if (saved.isEmpty()) {
             Toast.makeText(context, R.string.settings_privacy_preset_no_saved, Toast.LENGTH_SHORT).show()
             return
@@ -1352,57 +1410,112 @@ class SettingsFragment : Fragment() {
     }
 
 
+    /**
+     * 预设 JSON 里一处贴纸引用的位置。收集之后再改写，避免边遍历边删 key。
+     */
+    private class StickerSlot(
+        private val holder: JSONObject,
+        private val key: String,
+        val value: String,
+        private val nullable: Boolean
+    ) {
+        fun rewrite(newValue: String) {
+            holder.put(key, newValue)
+        }
+
+        fun clear() {
+            if (nullable) holder.put(key, JSONObject.NULL) else holder.remove(key)
+        }
+    }
+
+    /**
+     * 枚举包内所有贴纸引用：全局贴纸、动漫全局贴纸、旧版顶层 labelStickerUris，
+     * 以及 profileLabelStates 下每个模型档位的 labelStickerUris。
+     * 导入时真正生效的是 profileLabelStates，早期版本只打包了顶层字段，
+     * 导致别人导入后贴纸全部指向导出者设备上的 content:// 而失效。
+     */
+    private fun collectStickerSlots(root: JSONObject): List<StickerSlot> {
+        val slots = mutableListOf<StickerSlot>()
+        val data = root.optJSONObject("data") ?: return slots
+
+        fun addSingle(holder: JSONObject, key: String) {
+            val value = holder.optString(key, "").trim()
+            if (value.isEmpty() || value == "null") return
+            slots += StickerSlot(holder, key, value, nullable = true)
+        }
+
+        fun addLabelMap(holder: JSONObject?) {
+            val map = holder?.optJSONObject("labelStickerUris") ?: return
+            map.keys().asSequence().toList().forEach { label ->
+                val value = map.optString(label, "").trim()
+                if (value.isEmpty() || value == "null") return@forEach
+                slots += StickerSlot(map, label, value, nullable = false)
+            }
+        }
+
+        data.keys().asSequence().toList().forEach { presetName ->
+            val presetObj = data.optJSONObject(presetName) ?: return@forEach
+            addSingle(presetObj, "stickerUri")
+            addSingle(presetObj, "animeStickerUri")
+            addLabelMap(presetObj)
+            val profileStates = presetObj.optJSONObject("profileLabelStates")
+            profileStates?.keys()?.asSequence()?.toList()?.forEach { profileKey ->
+                addLabelMap(profileStates.optJSONObject(profileKey))
+            }
+        }
+        return slots
+    }
+
     private fun buildPresetZip(targetFile: File, rawJson: String): Boolean {
         val context = requireContext()
         return try {
             val root = JSONObject(rawJson)
-            val data = root.optJSONObject("data") ?: JSONObject()
-            val stickerRefs = mutableMapOf<String, String>()
-            val uriToEntry = linkedMapOf<String, String>()
+            val slots = collectStickerSlots(root)
+            val uriToEntry = mutableMapOf<String, String>()
+            val hashToEntry = mutableMapOf<String, String>()
             var index = 1
-
-            val dataKeys = data.keys()
-            while (dataKeys.hasNext()) {
-                val presetName = dataKeys.next()
-                val presetObj = data.optJSONObject(presetName) ?: continue
-                val globalSticker = presetObj.optString("stickerUri", "").trim()
-                if (globalSticker.isNotEmpty() && globalSticker != "null") {
-                    val entryName = uriToEntry.getOrPut(globalSticker) {
-                        "stickers/sticker_${index++}.png"
-                    }
-                    stickerRefs[globalSticker] = entryName
-                    presetObj.put("stickerUri", "internal:$entryName")
-                }
-                val labelMap = presetObj.optJSONObject("labelStickerUris") ?: JSONObject()
-                val labelKeys = labelMap.keys()
-                while (labelKeys.hasNext()) {
-                    val label = labelKeys.next()
-                    val uri = labelMap.optString(label, "").trim()
-                    if (uri.isEmpty() || uri == "null") continue
-                    val entryName = uriToEntry.getOrPut(uri) {
-                        "stickers/sticker_${index++}.png"
-                    }
-                    stickerRefs[uri] = entryName
-                    labelMap.put(label, "internal:$entryName")
-                }
-            }
+            var missing = 0
 
             ZipOutputStream(FileOutputStream(targetFile)).use { zos ->
-                val manifestEntry = ZipEntry("manifest.json")
-                zos.putNextEntry(manifestEntry)
-                zos.write(root.toString().toByteArray(Charsets.UTF_8))
-                zos.closeEntry()
-
-                stickerRefs.forEach { (sourceUri, entryName) ->
+                // 先写贴纸，确认哪些真的读到了字节，再据此改写 manifest，避免留下空引用。
+                slots.forEach { slot ->
+                    if (uriToEntry.containsKey(slot.value)) return@forEach
                     val bytes = runCatching {
-                        context.contentResolver.openInputStream(Uri.parse(sourceUri))?.use { it.readBytes() }
-                    }.getOrNull() ?: return@forEach
-                    val stickerEntry = ZipEntry(entryName)
-                    zos.putNextEntry(stickerEntry)
+                        context.contentResolver.openInputStream(Uri.parse(slot.value))?.use { it.readBytes() }
+                    }.getOrNull()
+                    if (bytes == null || bytes.isEmpty()) {
+                        missing++
+                        return@forEach
+                    }
+                    val hash = MessageDigest.getInstance("SHA-256")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                    val existing = hashToEntry[hash]
+                    if (existing != null) {
+                        uriToEntry[slot.value] = existing
+                        return@forEach
+                    }
+                    val entryName = "stickers/sticker_${index++}.png"
+                    zos.putNextEntry(ZipEntry(entryName))
                     zos.write(bytes)
                     zos.closeEntry()
+                    uriToEntry[slot.value] = entryName
+                    hashToEntry[hash] = entryName
                 }
+
+                slots.forEach { slot ->
+                    val entryName = uriToEntry[slot.value]
+                    if (entryName != null) slot.rewrite("internal:$entryName") else slot.clear()
+                }
+
+                zos.putNextEntry(ZipEntry("manifest.json"))
+                zos.write(root.toString().toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
             }
+            DebugLogManager.addLog(
+                "设置",
+                "打包预设zip: 引用${slots.size}处, 贴纸${hashToEntry.size}张, 失效${missing}处"
+            )
             true
         } catch (e: Exception) {
             DebugLogManager.addLog("设置", "打包预设zip失败: ${e.message}")
@@ -1445,44 +1558,64 @@ class SettingsFragment : Fragment() {
 
         val manifest = manifestContent ?: return null
         val root = JSONObject(manifest)
-        val data = root.optJSONObject("data") ?: JSONObject()
-        val dataKeys = data.keys()
-        while (dataKeys.hasNext()) {
-            val presetName = dataKeys.next()
-            val presetObj = data.optJSONObject(presetName) ?: continue
-            val globalSticker = presetObj.optString("stickerUri", "").trim()
-            if (globalSticker.startsWith("internal:")) {
-                val path = globalSticker.removePrefix("internal:")
-                val file = extractedFiles[path]
-                if (file != null && file.exists()) {
-                    val fileUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    presetObj.put("stickerUri", fileUri.toString())
-                } else {
-                    presetObj.put("stickerUri", JSONObject.NULL)
+        val pathToUri = mutableMapOf<String, String>()
+        collectStickerSlots(root).forEach { slot ->
+            if (slot.value.startsWith("internal:")) {
+                val path = slot.value.removePrefix("internal:")
+                val mapped = pathToUri.getOrPut(path) {
+                    val file = extractedFiles[path]
+                    if (file != null && file.exists() && file.length() > 0) {
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file
+                        ).toString()
+                    } else {
+                        ""
+                    }
                 }
+                if (mapped.isNotEmpty()) slot.rewrite(mapped) else slot.clear()
+            } else {
+                // 旧版包里残留的导出者设备本地 content:// 在本机不可读，清掉以免贴纸空白。
+                val readable = runCatching {
+                    context.contentResolver.openInputStream(Uri.parse(slot.value))?.use { it.read() != -1 }
+                }.getOrNull() ?: false
+                if (!readable) slot.clear()
             }
-            val labelMap = presetObj.optJSONObject("labelStickerUris") ?: JSONObject()
-            val labelKeys = labelMap.keys()
-            while (labelKeys.hasNext()) {
-                val label = labelKeys.next()
-                val value = labelMap.optString(label, "").trim()
-                if (!value.startsWith("internal:")) continue
-                val path = value.removePrefix("internal:")
-                val file = extractedFiles[path]
-                if (file != null && file.exists()) {
-                    val fileUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    labelMap.put(label, fileUri.toString())
-                } else {
-                    labelMap.remove(label)
+        }
+        backfillProfileStickerUris(root)
+        return root.toString()
+    }
+
+    /**
+     * 旧版导出包只把顶层 labelStickerUris 打进了 zip，profileLabelStates 里仍是导出者设备的
+     * content://。导入时会优先读 profileLabelStates，于是贴纸全丢。顶层那份是两个档位的合集，
+     * 且解析时按档位过滤，所以可以直接回填，救回历史包。
+     */
+    private fun backfillProfileStickerUris(root: JSONObject) {
+        val data = root.optJSONObject("data") ?: return
+        data.keys().asSequence().toList().forEach { presetName ->
+            val presetObj = data.optJSONObject(presetName) ?: return@forEach
+            val topLevel = presetObj.optJSONObject("labelStickerUris") ?: return@forEach
+            val profileStates = presetObj.optJSONObject("profileLabelStates") ?: return@forEach
+            profileStates.keys().asSequence().toList().forEach { profileKey ->
+                val state = profileStates.optJSONObject(profileKey) ?: return@forEach
+                val map = state.optJSONObject("labelStickerUris") ?: JSONObject().also {
+                    state.put("labelStickerUris", it)
+                }
+                topLevel.keys().asSequence().toList().forEach { label ->
+                    val resolved = topLevel.optString(label, "").trim()
+                    if (resolved.isEmpty() || resolved == "null") return@forEach
+                    val current = map.optString(label, "").trim()
+                    if (current.isEmpty() || current == "null") map.put(label, resolved)
                 }
             }
         }
-        return root.toString()
     }
 
     private fun showPresetDeleteDialog() {
         val context = requireContext()
-        val saved = privacySettings.listPresetNames()
+        val saved = privacySettings.listPresetNames().filterNot(privacySettings::isDefaultPreset)
         if (saved.isEmpty()) {
             Toast.makeText(context, R.string.settings_privacy_preset_no_saved, Toast.LENGTH_SHORT).show()
             return
@@ -1928,7 +2061,7 @@ class SettingsFragment : Fragment() {
                 topMargin = smallMargin
             }
         }
-        val selectAllButton = Button(context).apply {
+        val selectAllButton = GlassButton(context).apply {
             text = getString(R.string.settings_random_queue_select_all)
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -1936,7 +2069,7 @@ class SettingsFragment : Fragment() {
                 1f
             )
         }
-        val clearAllButton = Button(context).apply {
+        val clearAllButton = GlassButton(context).apply {
             text = getString(R.string.settings_random_queue_clear_all)
             layoutParams = LinearLayout.LayoutParams(
                 0,

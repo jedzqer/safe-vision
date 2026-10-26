@@ -1,4 +1,6 @@
 <resources>
+    <string name="settings_section_expand">展開 %1$s</string>
+    <string name="settings_section_collapse">收起 %1$s</string>
     <string name="app_name">Safe Vision</string>
 
     <!-- 菜單標題 -->
@@ -259,7 +261,7 @@
     <string name="settings_sticker_saved">已套用貼紙：%1$s</string>
     <string name="settings_sticker_reset_success">已切換為預設貼紙</string>
     <string name="settings_label_effects_title">遮罩標籤</string>
-    <string name="settings_label_effects_hint">點擊標籤可開關遮罩或設定效果，未設定時使用全域預設效果</string>
+    <string name="settings_label_effects_hint">上下滑動選擇標籤列，左右滑動切換遮擋與暴露版本，放手編輯反白標籤；也可直接點選標籤設定遮擋效果。</string>
     <string name="settings_anime_label_effects_title">動漫標籤處理</string>
     <string name="settings_anime_label_effects_hint">查看帶有動漫標籤格式的 JSON 時，將使用這裡的標籤效果設定</string>
     <string name="settings_label_dialog_title">標籤設定：%1$s</string>
@@ -404,10 +406,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">供無法啟用無障礙權限的裝置使用。此模式會以一般懸浮窗顯示遮罩，並攔截被遮罩區域的觸控。</string>
     <string name="screen_detection_settings_interval">辨識頻率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒辨識一次</string>
-    <string name="screen_detection_settings_interval_motion_hint">運動插值會在偵測間隙自動補足遮罩位移，偵測頻率並非越高越好。</string>
-    <string name="screen_detection_settings_interval_motion_effect_high">目前頻率較高，插值介入較少，功耗稍高</string>
-    <string name="screen_detection_settings_interval_motion_effect_balanced">目前頻率適中，插值與偵測協同</string>
-    <string name="screen_detection_settings_interval_motion_effect_low">目前頻率較低，插值主導遮罩位移，功耗較低</string>
+    <string name="screen_detection_settings_interval_hint">新影格到達時偵測；靜止畫面自動略過並定期複查。間隔越短，反應越快，但耗電越高。</string>
+    <string name="screen_detection_settings_interval_effect_high">目前頻率較高，反應更快，耗電較高</string>
+    <string name="screen_detection_settings_interval_effect_balanced">目前頻率適中，兼顧反應與耗電</string>
+    <string name="screen_detection_settings_interval_effect_low">目前頻率較低，反應較慢，耗電較低</string>
     <string name="screen_detection_accessibility_permission_required">需要開啟無障礙遮罩服務才能顯示畫面遮罩</string>
     <string name="screen_detection_accessibility_permission_denied">未啟用無障礙遮罩服務，已取消畫面偵測</string>
     <string name="screen_detection_overlay_permission_required">需要授予懸浮窗權限才能顯示畫面遮罩</string>
@@ -530,4 +532,8 @@
     <string name="notification_video_cancelled_title">Safe Vision - 媒體處理已取消</string>
     <string name="notification_video_queue_progress">已完成 %1$d / 未完成 %2$d</string>
     <string name="notification_video_done_text">媒體處理任務結束</string>
+    <string name="settings_privacy_preset_default">預設配置（內建）</string>
+    <string name="settings_privacy_preset_name_reserved">此名稱為內建配置保留，請使用其他名稱</string>
+    <string name="settings_label_state_enabled">已開啟</string>
+    <string name="settings_label_state_disabled">已關閉</string>
 </resources>

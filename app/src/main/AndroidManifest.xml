@@ -57,6 +57,29 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/x-zip-compressed" />
             </intent-filter>
+
+            <!-- 系统"打开方式"直接导入预设包：文件管理器按 MIME 识别的 zip -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+
+            <!-- 兜底：部分文件管理器把 zip 报成 octet-stream，按扩展名匹配导出的预设包 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\.svpreset\\.zip" />
+                <data android:pathPattern=".*\\..*\\.svpreset\\.zip" />
+                <data android:pathPattern=".*\\..*\\..*\\.svpreset\\.zip" />
+            </intent-filter>
         </activity>
         
         <service

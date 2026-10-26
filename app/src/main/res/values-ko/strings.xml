@@ -162,6 +162,8 @@
     <string name="first_launch_confirm">확인</string>
 
     <!-- Settings -->
+    <string name="settings_section_expand">%1$s 펼치기</string>
+    <string name="settings_section_collapse">%1$s 접기</string>
     <string name="settings_theme_title">테마 스타일</string>
     <string name="settings_theme_summary">원하는 색상 구성을 선택하세요</string>
     <string name="settings_theme_default">기본: 검은 배경 + 빨간색</string>
@@ -259,7 +261,7 @@
     <string name="settings_sticker_saved">스티커 적용됨: %1$s</string>
     <string name="settings_sticker_reset_success">기본 스티커로 전환했습니다</string>
     <string name="settings_label_effects_title">마스크 라벨</string>
-    <string name="settings_label_effects_hint">라벨을 눌러 마스크를 켜거나 효과를 설정하세요. 설정되지 않은 라벨은 전역 기본 효과를 사용합니다.</string>
+    <string name="settings_label_effects_hint">위아래로 밀어 행을 선택하고 좌우로 밀어 가려진 부위와 노출된 부위 라벨을 전환하세요. 손을 떼면 강조된 라벨을 편집합니다. 라벨을 직접 눌러 가림 효과를 설정할 수도 있습니다.</string>
     <string name="settings_anime_label_effects_title">애니메이션 라벨 처리</string>
     <string name="settings_anime_label_effects_hint">애니메이션 라벨 형식의 JSON을 볼 때 이 라벨 효과 설정이 사용됩니다</string>
     <string name="settings_label_dialog_title">라벨 설정: %1$s</string>
@@ -404,10 +406,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">접근성 권한을 켤 수 없는 기기용입니다. 이 모드는 일반 오버레이 창으로 마스크를 표시하며 가려진 영역의 터치를 차단합니다.</string>
     <string name="screen_detection_settings_interval">감지 주기</string>
     <string name="screen_detection_settings_interval_value">%1$.2f초마다 감지</string>
-    <string name="screen_detection_settings_interval_motion_hint">모션 보간이 감지 사이에 마스크 이동을 자동으로 채웁니다. 감지 빈도가 항상 높을수록 좋은 것은 아닙니다.</string>
-    <string name="screen_detection_settings_interval_motion_effect_high">고주기: 보간 개입 적음, 전력 소비 약간 높음</string>
-    <string name="screen_detection_settings_interval_motion_effect_balanced">균형 주기: 보간과 감지가 함께 작동</string>
-    <string name="screen_detection_settings_interval_motion_effect_low">저주기: 보간이 마스크 이동을 주도, 전력 소비 낮음</string>
+    <string name="screen_detection_settings_interval_hint">새 프레임이 도착하면 감지하며 정지 화면은 건너뛰고 주기적으로 다시 확인합니다. 간격이 짧을수록 반응이 빠르지만 전력 소모가 증가합니다.</string>
+    <string name="screen_detection_settings_interval_effect_high">높은 빈도: 빠른 반응, 높은 전력 소모</string>
+    <string name="screen_detection_settings_interval_effect_balanced">중간 빈도: 반응 속도와 전력 소모의 균형</string>
+    <string name="screen_detection_settings_interval_effect_low">낮은 빈도: 느린 반응, 낮은 전력 소모</string>
     <string name="screen_detection_accessibility_permission_required">화면 마스킹을 표시하려면 접근성 오버레이 서비스가 필요합니다.</string>
     <string name="screen_detection_accessibility_permission_denied">접근성 오버레이 서비스가 활성화되지 않아 화면 감지가 취소되었습니다.</string>
     <string name="screen_detection_overlay_permission_required">화면 마스킹을 표시하려면 오버레이 권한이 필요합니다.</string>
@@ -530,4 +532,8 @@
     <string name="notification_video_cancelled_title">Safe Vision - 미디어 처리 취소됨</string>
     <string name="notification_video_queue_progress">완료 %1$d / 남음 %2$d</string>
     <string name="notification_video_done_text">미디어 처리 작업 종료</string>
+    <string name="settings_privacy_preset_default">기본 프리셋 (내장)</string>
+    <string name="settings_privacy_preset_name_reserved">내장 프리셋용으로 예약된 이름입니다. 다른 이름을 입력해 주세요.</string>
+    <string name="settings_label_state_enabled">켜짐</string>
+    <string name="settings_label_state_disabled">꺼짐</string>
 </resources>

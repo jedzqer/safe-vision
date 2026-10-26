@@ -47,6 +47,8 @@ class PrivacySettingsManager private constructor(private val context: Context) {
             "reverse_label_miss_fullscreen_enabled"
         private const val KEY_PRIVACY_PRESETS = "privacy_presets"
         private const val KEY_ACTIVE_PRESET_NAME = "active_preset_name"
+        // Stable identity independent of the UI language; never stored as a user preset.
+        const val DEFAULT_PRESET_NAME = "__safe_vision_builtin_default__"
         // 遮挡模式
         const val BLUR_MODE_MOSAIC = 0  // 马赛克
         const val BLUR_MODE_BLACK = 1   // 纯黑
@@ -524,17 +526,55 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         sharedPrefs.edit().putString(KEY_ACTIVE_PRESET_NAME, name?.trim()?.takeIf { it.isNotEmpty() }).apply()
     }
 
+    fun isDefaultPreset(name: String?): Boolean = name?.trim() == DEFAULT_PRESET_NAME
+
+    fun getPresetDisplayName(name: String): String {
+        return if (isDefaultPreset(name)) context.getString(R.string.settings_privacy_preset_default) else name
+    }
+
     fun listPresetNames(): List<String> {
-        return readPresets().keys.toList()
+        return listOf(DEFAULT_PRESET_NAME) + readPresets().keys.filterNot(::isDefaultPreset)
     }
 
     fun getPreset(name: String): PrivacyPreset? {
-        return readPresets()[name]
+        return if (isDefaultPreset(name)) createDefaultPreset() else readPresets()[name]
+    }
+
+    private fun createDefaultPreset(): PrivacyPreset {
+        fun labelState(profile: DetectionConfig.LabelProfile) = PresetLabelState(
+            blockedLabels = DetectionConfig.getLockedLabels(profile),
+            labelStickerUris = emptyMap(),
+            labelMaskScales = emptyMap(),
+            labelEffectOverrides = emptyMap(),
+            reverseLabels = emptyList(),
+            maskOutlineLabels = DetectionConfig.getLabels(profile)
+                .filterNot { isReverseLockedInProfile(it, profile) }
+                .ifEmpty { DetectionConfig.getLabels(profile) }
+        )
+        return PrivacyPreset(
+            name = DEFAULT_PRESET_NAME,
+            blurMode = BLUR_MODE_MOSAIC,
+            animeBlurMode = BLUR_MODE_MOSAIC,
+            circularMaskEnabled = false,
+            maskOutlineEnabled = false,
+            mosaicBlockSize = MOSAIC_BLOCK_DEFAULT,
+            gaussianRadius = GAUSSIAN_RADIUS_DEFAULT,
+            maskScale = MASK_SCALE_DEFAULT,
+            animeMaskScale = MASK_SCALE_DEFAULT,
+            stickerUri = null,
+            animeStickerUri = null,
+            standardLabelState = labelState(DetectionConfig.LabelProfile.STANDARD),
+            animeLabelState = labelState(DetectionConfig.LabelProfile.ANIME),
+            reversePreRenderEnabled = true,
+            accessibilityEmptyReverseFullscreenEnabled = false,
+            reverseLabelMissFullscreenEnabled = false
+        )
     }
 
     fun savePreset(name: String): PrivacyPreset {
         val finalName = name.trim()
         require(finalName.isNotEmpty()) { "Preset name cannot be empty" }
+        require(!isDefaultPreset(finalName)) { "The built-in default preset cannot be overwritten" }
         val all = readPresets().toMutableMap()
         val snapshot = captureCurrentSnapshot(finalName)
         all[finalName] = snapshot
@@ -544,7 +584,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
     }
 
     fun applyPreset(name: String): Boolean {
-        val preset = readPresets()[name] ?: return false
+        val preset = getPreset(name) ?: return false
         applySnapshot(preset)
         setActivePresetName(name)
         return true
@@ -552,7 +592,7 @@ class PrivacySettingsManager private constructor(private val context: Context) {
 
     fun deletePreset(name: String): Boolean {
         val finalName = name.trim()
-        if (finalName.isEmpty()) return false
+        if (finalName.isEmpty() || isDefaultPreset(finalName)) return false
         val all = readPresets().toMutableMap()
         val removed = all.remove(finalName) != null
         if (!removed) return false
@@ -600,6 +640,10 @@ class PrivacySettingsManager private constructor(private val context: Context) {
         for (i in 0 until order.length()) {
             val name = order.optString(i).trim()
             if (name.isEmpty()) continue
+            if (isDefaultPreset(name)) {
+                skippedNames.add(name)
+                continue
+            }
             val presetObj = data.optJSONObject(name)
             val preset = if (presetObj == null) null else parsePreset(name, presetObj)
             if (preset == null) {

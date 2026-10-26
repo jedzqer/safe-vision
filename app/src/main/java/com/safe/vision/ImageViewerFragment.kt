@@ -35,7 +35,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.tabs.TabLayout
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
@@ -203,6 +202,27 @@ class ImageViewerFragment : Fragment() {
         privacyProcessor = ImagePrivacyProcessor(requireContext())
         privacySettings = PrivacySettingsManager.getInstance(requireContext())
         appSettings = AppSettingsManager.getInstance(requireContext())
+
+        // The viewer container changes size when entering fullscreen and when system
+        // bar insets change. Re-center the current media after the new bounds settle.
+        mediaContainer.addOnLayoutChangeListener { _, left, top, right, bottom,
+                                                    oldLeft, oldTop, oldRight, oldBottom ->
+            if (right - left == oldRight - oldLeft && bottom - top == oldBottom - oldTop) {
+                return@addOnLayoutChangeListener
+            }
+            fullSizeVideo.post { fullSizeVideo.requestLayout() }
+            val bitmap = currentProcessedBitmap
+            if (fullSizeImage.visibility == View.VISIBLE && bitmap != null &&
+                !isDragging && !isScaling && currentScale <= minScale + 0.0005f
+            ) {
+                fullSizeImage.post {
+                    if (isAdded && fullSizeImage.visibility == View.VISIBLE) {
+                        resetImageZoom(bitmap)
+                        detectionEditorOverlay.setImageMatrix(imageMatrix)
+                    }
+                }
+            }
+        }
         fullSizeVideo.setMediaController(null)
         fullSizeVideo.setOnErrorListener { _, what, extra ->
             val failedFile = currentVideoFile
@@ -981,7 +1001,7 @@ class ImageViewerFragment : Fragment() {
     }
 
     private fun confirmDeleteCurrentMedia(mediaFile: File) {
-        MaterialAlertDialogBuilder(requireContext())
+        DialogUtils.builder(requireContext())
             .setTitle(R.string.viewer_delete_title)
             .setMessage(getString(R.string.viewer_delete_message, mediaFile.name))
             .setNegativeButton(android.R.string.cancel, null)
@@ -1252,10 +1272,8 @@ class ImageViewerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        val reloaded = refreshMediaIfNeeded()
-        if (!reloaded) {
-            resumeCurrentVideoIfNeeded()
-        }
+        refreshMediaIfNeeded()
+        resumeCurrentVideoIfNeeded()
         restartRandomPlayCountdown()
         startMetronomeIfNeeded()
     }
@@ -1614,7 +1632,11 @@ class ImageViewerFragment : Fragment() {
         val metadataFile = currentMetadataFile ?: findMetadataFile(mediaFile)
         currentMetadataFile = metadataFile
         editingMetadataFile = metadataFile ?: File(mediaFile.parentFile, "${mediaFile.nameWithoutExtension}.json")
-        editableDetections = DetectionMetadataIo.read(metadataFile)
+        editableDetections = DetectionMetadataIo.read(
+            metadataFile,
+            surfaceWidth = bitmap.width,
+            surfaceHeight = bitmap.height
+        )
         isEditMode = true
         cancelRandomPlay()
         editToolbar.visibility = View.VISIBLE
@@ -1723,6 +1745,21 @@ class ImageViewerFragment : Fragment() {
             mediaContainer.strokeWidth = dp(1)
         }
         mediaContainer.layoutParams = layoutParams
+        // ConstraintLayout may apply the new bounds on the next frame. Recompute
+        // media geometry after that pass so the content is centered in the actual
+        // fullscreen/non-fullscreen viewport.
+        mediaContainer.post {
+            mediaContainer.requestLayout()
+            fullSizeVideo.requestLayout()
+            currentProcessedBitmap?.let { bitmap ->
+                if (fullSizeImage.visibility == View.VISIBLE &&
+                    !isDragging && !isScaling && currentScale <= minScale + 0.0005f
+                ) {
+                    resetImageZoom(bitmap)
+                    detectionEditorOverlay.setImageMatrix(imageMatrix)
+                }
+            }
+        }
     }
 
     private fun dp(value: Int): Int {
@@ -1747,7 +1784,7 @@ class ImageViewerFragment : Fragment() {
         if (!isEditMode) return
         val labels = DetectionConfig.LABELS
         val names = labels.map { DetectionConfig.getDisplayName(requireContext(), it) }.toTypedArray()
-        MaterialAlertDialogBuilder(requireContext())
+        DialogUtils.builder(requireContext())
             .setTitle(R.string.viewer_edit_label_picker_title)
             .setItems(names) { _, which ->
                 val label = labels[which]
@@ -1800,7 +1837,7 @@ class ImageViewerFragment : Fragment() {
             add(getString(R.string.viewer_edit_action_rotate))
             add(getString(R.string.viewer_edit_action_delete))
         }.toTypedArray()
-        MaterialAlertDialogBuilder(requireContext())
+        DialogUtils.builder(requireContext())
             .setItems(actions) { _, which ->
                 when (actions[which]) {
                     getString(R.string.viewer_edit_action_resize) -> {

@@ -8,8 +8,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import androidx.core.view.doOnPreDraw
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 internal class ScreenOverlayWindowHost(
@@ -19,8 +19,7 @@ internal class ScreenOverlayWindowHost(
     private val touchThrough: Boolean
 ) {
     companion object {
-        private const val MIN_SLOT_REUSE_DISTANCE_DP = 72f
-        private const val SLOT_REUSE_DISTANCE_MULTIPLIER = 0.75f
+        private const val MAX_IDLE_REGION_SLOTS = 4
     }
 
     private data class RegionOverlaySlot(
@@ -33,6 +32,7 @@ internal class ScreenOverlayWindowHost(
     )
 
     private var maskOverlayView: ScreenMaskOverlayView? = null
+    private var fullscreenMetrics: OverlayMetrics? = null
     private val maskRegionOverlaySlots = mutableListOf<RegionOverlaySlot>()
     private var activeOverlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame? = null
     private var renderGeneration: Long = 0L
@@ -41,9 +41,9 @@ internal class ScreenOverlayWindowHost(
     private var captureScaleX: Float = 1f
     private var captureScaleY: Float = 1f
 
-    private fun updateCaptureScale(metrics: OverlayMetrics, bitmap: android.graphics.Bitmap) {
-        captureScaleX = if (bitmap.width > 0) metrics.widthPixels.toFloat() / bitmap.width else 1f
-        captureScaleY = if (bitmap.height > 0) metrics.heightPixels.toFloat() / bitmap.height else 1f
+    private fun updateCaptureScale(metrics: OverlayMetrics, frame: ScreenPrivacyMaskRenderer.OverlayFrame) {
+        captureScaleX = metrics.widthPixels.toFloat() / frame.captureWidth
+        captureScaleY = metrics.heightPixels.toFloat() / frame.captureHeight
     }
 
     fun resolveOverlayMetrics(): OverlayMetrics {
@@ -90,27 +90,32 @@ internal class ScreenOverlayWindowHost(
     ) {
         val generation = ++renderGeneration
         val previousFrame = replaceActiveOverlayFrame(frame)
-        updateCaptureScale(metrics, frame.sourceBitmap)
+        updateCaptureScale(metrics, frame)
+        val layoutChanged = maskOverlayView == null || fullscreenMetrics != metrics
         if (maskOverlayView == null) {
             maskOverlayView = createOverlayView()
             try {
                 windowManager.addView(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+                fullscreenMetrics = metrics
             } catch (e: WindowManager.BadTokenException) {
                 DebugLogManager.addLog("屏幕遮挡", "addView 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
                 maskOverlayView = null
+                fullscreenMetrics = null
                 activeOverlayFrame = previousFrame
                 if (previousFrame !== frame) {
                     frame.release()
                 }
                 return
             }
-        } else {
+        } else if (fullscreenMetrics != metrics) {
             try {
                 windowManager.updateViewLayout(maskOverlayView, createFullscreenMaskLayoutParams(metrics))
+                fullscreenMetrics = metrics
             } catch (e: WindowManager.BadTokenException) {
                 DebugLogManager.addLog("屏幕遮挡", "updateViewLayout 全屏遮挡失败: ${e.message}", DebugLogManager.LogLevel.WARN)
                 runCatching { windowManager.removeView(maskOverlayView) }
                 maskOverlayView = null
+                fullscreenMetrics = null
                 activeOverlayFrame = previousFrame
                 if (previousFrame !== frame) {
                     frame.release()
@@ -121,7 +126,7 @@ internal class ScreenOverlayWindowHost(
         maskOverlayView?.let { view ->
             view.translationX = 0f
             view.translationY = 0f
-            bindFullscreenFrame(view, frame, metrics, generation)
+            bindFullscreenFrame(view, frame, metrics, generation, layoutChanged)
             view.visibility = View.VISIBLE
         }
         releaseOverlayFrame(previousFrame, frame)
@@ -133,17 +138,20 @@ internal class ScreenOverlayWindowHost(
     ) {
         val generation = ++renderGeneration
         val previousFrame = replaceActiveOverlayFrame(frame)
-        updateCaptureScale(metrics, frame.sourceBitmap)
+        updateCaptureScale(metrics, frame)
         markAllRegionSlotsUnused()
 
         frame.drawTasks.forEach { task ->
-            val safeRect = clampTaskRect(task.drawRect, frame.sourceBitmap.width, frame.sourceBitmap.height)
+            val safeRect = clampTaskRect(task.drawRect, frame.captureWidth, frame.captureHeight)
             if (safeRect.width() <= 0 || safeRect.height() <= 0) {
                 return@forEach
             }
 
             val safeTask = if (safeRect == task.drawRect) task else task.copy(drawRect = safeRect)
-            val slot = takeBestSlot(safeTask, safeRect, metrics) ?: obtainRegionSlot(metrics)
+            val slot = takeBestSlot(safeTask, safeRect) ?: obtainRegionSlot(metrics)
+            val wasAttached = slot.attached
+            val layoutChanged = updateRegionLayout(slot.layoutParams, safeRect, metrics)
+            // Attach directly at the target bounds; avoid a 1x1 add followed by a relayout.
             attachRegionSlotIfNeeded(slot)
             if (!slot.attached) {
                 return@forEach
@@ -151,7 +159,7 @@ internal class ScreenOverlayWindowHost(
             slot.inUse = true
             slot.view.translationX = 0f
             slot.view.translationY = 0f
-            if (updateRegionLayout(slot.layoutParams, safeRect, metrics)) {
+            if (wasAttached && layoutChanged) {
                 try {
                     windowManager.updateViewLayout(slot.view, slot.layoutParams)
                 } catch (e: WindowManager.BadTokenException) {
@@ -162,7 +170,7 @@ internal class ScreenOverlayWindowHost(
                     return@forEach
                 }
             }
-            bindRegionTask(slot.view, frame.sourceBitmap, safeTask, safeRect, metrics, generation)
+            bindRegionTask(slot.view, safeTask, safeRect, generation, layoutChanged || !wasAttached)
             slot.view.visibility = View.VISIBLE
             slot.label = safeTask.label
             slot.lastRegion.set(safeRect)
@@ -204,29 +212,28 @@ internal class ScreenOverlayWindowHost(
     }
 
     fun clearRegionOverlays() {
+        if (maskRegionOverlaySlots.none { it.inUse }) return
         renderGeneration++
-        removeAllRegionSlots()
+        markAllRegionSlotsUnused()
+        recycleUnusedRegionSlots()
     }
 
     fun clearFullscreenOverlay() {
+        if (maskOverlayView?.visibility != View.VISIBLE) return
         renderGeneration++
         maskOverlayView?.release()
         maskOverlayView?.visibility = View.INVISIBLE
     }
 
     fun removeOverlayViews() {
+        renderGeneration++
         maskOverlayView?.let { view ->
             view.release()
             runCatching { windowManager.removeView(view) }
         }
-        maskRegionOverlaySlots.forEach { slot ->
-            if (slot.attached) {
-                slot.view.release(false)
-                runCatching { windowManager.removeView(slot.view) }
-            }
-        }
+        removeAllRegionSlots()
         maskOverlayView = null
-        maskRegionOverlaySlots.clear()
+        fullscreenMetrics = null
         releaseActiveOverlayFrame()
     }
 
@@ -254,8 +261,7 @@ internal class ScreenOverlayWindowHost(
 
     private fun takeBestSlot(
         task: ScreenPrivacyMaskRenderer.DrawTask,
-        targetRect: Rect,
-        metrics: OverlayMetrics
+        targetRect: Rect
     ): RegionOverlaySlot? {
         var bestSameLabel: RegionOverlaySlot? = null
         var bestSameLabelDistance = Long.MAX_VALUE
@@ -263,7 +269,7 @@ internal class ScreenOverlayWindowHost(
         var bestAnyDistance = Long.MAX_VALUE
 
         maskRegionOverlaySlots.forEach { slot ->
-            if (slot.inUse || !slot.attached || !canReuseSlot(slot.lastRegion, targetRect, metrics)) {
+            if (slot.inUse || !slot.attached) {
                 return@forEach
             }
             val distance = movementDistanceSquared(slot.lastRegion, targetRect)
@@ -279,17 +285,6 @@ internal class ScreenOverlayWindowHost(
         return bestSameLabel ?: bestAny
     }
 
-    private fun canReuseSlot(previous: Rect, current: Rect, metrics: OverlayMetrics): Boolean {
-        val minReuseDistancePx = MIN_SLOT_REUSE_DISTANCE_DP * metrics.densityDpi / 160f
-        val sizeBasedReuseDistancePx = max(
-            max(previous.width(), previous.height()),
-            max(current.width(), current.height())
-        ) * SLOT_REUSE_DISTANCE_MULTIPLIER
-        val maxReuseDistancePx = max(minReuseDistancePx, sizeBasedReuseDistancePx)
-        return movementDistanceSquared(previous, current) <=
-            maxReuseDistancePx.toLong() * maxReuseDistancePx.toLong()
-    }
-
     private fun movementDistanceSquared(previous: Rect, current: Rect): Long {
         val dx = previous.centerX().toLong() - current.centerX().toLong()
         val dy = previous.centerY().toLong() - current.centerY().toLong()
@@ -303,12 +298,17 @@ internal class ScreenOverlayWindowHost(
     }
 
     private fun recycleUnusedRegionSlots() {
+        var idleCount = 0
         val iterator = maskRegionOverlaySlots.iterator()
         while (iterator.hasNext()) {
             val slot = iterator.next()
-            if (slot.inUse || !slot.attached) continue
-            removeRegionSlot(slot)
-            iterator.remove()
+            if (slot.inUse) continue
+            slot.view.visibility = View.INVISIBLE // Hidden windows must not consume touches.
+            slot.view.release(false)
+            if (!slot.attached || ++idleCount > MAX_IDLE_REGION_SLOTS) {
+                removeRegionSlot(slot)
+                iterator.remove()
+            }
         }
     }
 
@@ -390,7 +390,8 @@ internal class ScreenOverlayWindowHost(
         view: ScreenMaskOverlayView,
         frame: ScreenPrivacyMaskRenderer.OverlayFrame,
         metrics: OverlayMetrics,
-        generation: Long
+        generation: Long,
+        layoutChanged: Boolean
     ) {
         val (originX, originY) = resolveViewOrigin(view, metrics.contentOffsetX, metrics.contentOffsetY)
         view.bindFrame(
@@ -400,9 +401,10 @@ internal class ScreenOverlayWindowHost(
             scaleX = captureScaleX,
             scaleY = captureScaleY
         )
-        view.post {
+        if (!layoutChanged && !view.isLayoutRequested) return
+        view.doOnPreDraw {
             if (maskOverlayView !== view || renderGeneration != generation || !view.isAttachedToWindow) {
-                return@post
+                return@doOnPreDraw
             }
             val (resolvedX, resolvedY) = resolveViewOrigin(view, metrics.contentOffsetX, metrics.contentOffsetY)
             view.bindFrame(
@@ -417,31 +419,31 @@ internal class ScreenOverlayWindowHost(
 
     private fun bindRegionTask(
         view: ScreenMaskOverlayView,
-        bitmap: android.graphics.Bitmap,
         task: ScreenPrivacyMaskRenderer.DrawTask,
         region: Rect,
-        metrics: OverlayMetrics,
-        generation: Long
+        generation: Long,
+        layoutChanged: Boolean
     ) {
         // 窗口已放置在屏幕像素坐标，getLocationOnScreen 取不到时回退用缩放后的屏幕坐标。
         val fallbackX = (region.left * captureScaleX).roundToInt()
         val fallbackY = (region.top * captureScaleY).roundToInt()
-        val (originX, originY) = resolveViewOrigin(view, fallbackX, fallbackY)
+        // updateViewLayout 的位置可能还未生效，先使用目标位置，布局完成后再校正。
+        val (originX, originY) = if (layoutChanged || view.isLayoutRequested) fallbackX to fallbackY
+            else resolveViewOrigin(view, fallbackX, fallbackY)
         view.bindRegionTask(
-            bitmap = bitmap,
             task = task,
             windowOriginX = originX,
             windowOriginY = originY,
             scaleX = captureScaleX,
             scaleY = captureScaleY
         )
-        view.post {
+        if (!layoutChanged && !view.isLayoutRequested) return
+        view.doOnPreDraw {
             if (renderGeneration != generation || !view.isAttachedToWindow) {
-                return@post
+                return@doOnPreDraw
             }
             val (resolvedX, resolvedY) = resolveViewOrigin(view, fallbackX, fallbackY)
             view.bindRegionTask(
-                bitmap = bitmap,
                 task = task,
                 windowOriginX = resolvedX,
                 windowOriginY = resolvedY,
@@ -515,6 +517,7 @@ internal class ScreenOverlayWindowHost(
 
     private fun baseWindowFlags(): Int {
         var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
             WindowManager.LayoutParams.FLAG_SECURE or
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         if (touchThrough) {

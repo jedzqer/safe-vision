@@ -13,9 +13,9 @@ enum class DetectionModelVariant(
     STANDARD(
         prefValue = "standard",
         displayName = "标准模型",
-        modelFileName = "yolo26n.onnx",
+        modelFileName = "nude26_best_float16.tflite",
         dataFileName = null,
-        optimizedFileName = "yolo26n_optimized.onnx",
+        optimizedFileName = "nude26_best_float16.tflite",
         runtimeLabel = "26n-v1",
         inputSize = 320,
         outputLabels = DetectionConfig.STANDARD_LABELS
@@ -23,9 +23,9 @@ enum class DetectionModelVariant(
     ANIME(
         prefValue = "anime",
         displayName = "动漫模型",
-        modelFileName = "320n-anime.onnx",
-        dataFileName = "320n-anime.onnx.data",
-        optimizedFileName = "320n_anime_optimized.onnx",
+        modelFileName = "anime_320n_float16.tflite",
+        dataFileName = null,
+        optimizedFileName = "anime_320n_float16.tflite",
         runtimeLabel = "320n-anime",
         inputSize = 320,
         outputLabels = DetectionConfig.ANIME_LABELS

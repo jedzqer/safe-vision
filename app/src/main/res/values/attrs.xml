@@ -1,4 +1,6 @@
 <resources>
+    <!-- 0 keeps native ripple; filled/outlined buttons use different glow strengths. -->
+    <attr name="svButtonGlowStrength" format="float" />
     <!-- 自定义主题颜色属性，用于在多套色板之间切换 -->
     <attr name="svColorPrimary" format="color" />
     <attr name="svColorPrimaryVariant" format="color" />

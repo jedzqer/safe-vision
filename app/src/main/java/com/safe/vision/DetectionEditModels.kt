@@ -16,11 +16,19 @@ data class EditableDetection(
     val eyes: Pair<PointF, PointF>? = null,
     val eyeBar: RectF? = null,
     val eyeBarRotationDegrees: Float? = null,
-    val isDerivedEyeRegion: Boolean = false
+    val isDerivedEyeRegion: Boolean = false,
+    /** 派生眼睛框所属脸部框的 id，保存时据此把编辑结果写回脸部框的 eye_bar */
+    val sourceId: String? = null,
+    /** 派生眼睛框是否被用户改过大小/位置/角度；未改动时不落盘，继续随脸部框实时推导 */
+    val isEyeRegionEdited: Boolean = false
 )
 
 object DetectionMetadataIo {
-    fun read(file: File?): MutableList<EditableDetection> {
+    fun read(
+        file: File?,
+        surfaceWidth: Int? = null,
+        surfaceHeight: Int? = null
+    ): MutableList<EditableDetection> {
         if (file == null || !file.exists()) return mutableListOf()
         val text = file.readText(Charsets.UTF_8)
         val metadata = DetectionMetadataFormat.parse(text)
@@ -78,8 +86,8 @@ object DetectionMetadataIo {
                     eyeBar = item.eyeBar,
                     eyeBarRotationDegrees = item.eyeBarRotationDegrees
                 ),
-                surfaceWidth = item.rect.right.toInt().coerceAtLeast(1),
-                surfaceHeight = item.rect.bottom.toInt().coerceAtLeast(1)
+                surfaceWidth = surfaceWidth ?: item.rect.right.toInt().coerceAtLeast(1),
+                surfaceHeight = surfaceHeight ?: item.rect.bottom.toInt().coerceAtLeast(1)
             ) ?: return@forEach
             withDerivedEyeRegions.add(
                 EditableDetection(
@@ -90,7 +98,8 @@ object DetectionMetadataIo {
                     eyes = item.eyes,
                     eyeBar = eyeRect,
                     eyeBarRotationDegrees = item.eyeBarRotationDegrees,
-                    isDerivedEyeRegion = true
+                    isDerivedEyeRegion = true,
+                    sourceId = item.id
                 )
             )
         }
@@ -98,6 +107,9 @@ object DetectionMetadataIo {
     }
 
     fun write(file: File, items: List<EditableDetection>) {
+        val editedEyeRegions = items
+            .filter { it.isDerivedEyeRegion && it.isEyeRegionEdited && it.sourceId != null }
+            .associateBy { it.sourceId }
         val candidateItems = items.filterNot { item ->
             DetectionConfig.isEyeRegionLabel(item.label) && item.isDerivedEyeRegion
         }
@@ -108,7 +120,7 @@ object DetectionMetadataIo {
         }
         val arr = JSONArray()
         persistedItems.forEach { rawItem ->
-            val item = normalizeForWrite(rawItem)
+            val item = applyEditedEyeRegion(normalizeForWrite(rawItem), editedEyeRegions[rawItem.id])
             val clampedW = item.rect.width().coerceAtLeast(1f)
             val clampedH = item.rect.height().coerceAtLeast(1f)
             val obj = JSONObject().apply {
@@ -160,6 +172,21 @@ object DetectionMetadataIo {
             arr.put(obj)
         }
         file.writeText(DetectionMetadataFormat.build(arr, profile), Charsets.UTF_8)
+    }
+
+    /**
+     * 眼睛框不是独立持久化的标签，编辑结果只能写回所属脸部框的 eye_bar / eye_bar_rotation。
+     * 同时显式写出脸部框自己的 box_rotation：读取与渲染在缺少 box_rotation 时会把
+     * eye_bar_rotation 当作脸部框旋转，不写会让旋转眼睛连带旋转脸部遮挡。
+     */
+    private fun applyEditedEyeRegion(face: EditableDetection, eyeRegion: EditableDetection?): EditableDetection {
+        if (eyeRegion == null) return face
+        val eye = normalizeForWrite(eyeRegion)
+        return face.copy(
+            boxRotationDegrees = face.boxRotationDegrees ?: 0f,
+            eyeBar = RectF(eye.rect),
+            eyeBarRotationDegrees = eye.boxRotationDegrees
+        )
     }
 
     private fun normalizeForWrite(item: EditableDetection): EditableDetection {

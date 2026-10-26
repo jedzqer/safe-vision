@@ -53,10 +53,10 @@
     <string name="screen_detection_settings_system_alert_window_summary">用于无法启用无障碍权限的设备。此模式会使用普通悬浮窗显示遮挡，并拦截被遮挡区域的触摸。</string>
     <string name="screen_detection_settings_interval">识别频率</string>
     <string name="screen_detection_settings_interval_value">每 %1$.2f 秒识别一次</string>
-    <string name="screen_detection_settings_interval_motion_hint">运动插值会在检测间隙自动补足遮挡位移，检测频率并非越高越好。</string>
-    <string name="screen_detection_settings_interval_motion_effect_high">当前频率较高，插值介入较少，功耗稍高</string>
-    <string name="screen_detection_settings_interval_motion_effect_balanced">当前频率适中，插值与检测协同</string>
-    <string name="screen_detection_settings_interval_motion_effect_low">当前频率较低，插值主导遮挡位移，功耗较低</string>
+    <string name="screen_detection_settings_interval_hint">新帧到达时检测；静止画面自动跳过并定期复检。更短的间隔响应更快，但耗电更高。</string>
+    <string name="screen_detection_settings_interval_effect_high">当前频率较高，响应更快，功耗较高</string>
+    <string name="screen_detection_settings_interval_effect_balanced">当前频率适中，兼顾响应与功耗</string>
+    <string name="screen_detection_settings_interval_effect_low">当前频率较低，响应较慢，功耗较低</string>
     <string name="screen_detection_accessibility_permission_required">需要开启无障碍遮挡服务才能显示屏幕遮挡</string>
     <string name="screen_detection_accessibility_permission_denied">未启用无障碍遮挡服务，已取消屏幕检测</string>
     <string name="screen_detection_overlay_permission_required">需要授予悬浮窗权限才能显示屏幕遮挡</string>
@@ -200,6 +200,8 @@
     <string name="first_launch_confirm">我知道了</string>
     
     <!-- 设置 -->
+    <string name="settings_section_expand">展开 %1$s</string>
+    <string name="settings_section_collapse">收起 %1$s</string>
     <string name="settings_theme_title">主题风格</string>
     <string name="settings_theme_summary">选择你喜欢的配色方案</string>
     <string name="settings_theme_default">默认：黑底红色</string>
@@ -297,7 +299,7 @@
     <string name="settings_sticker_saved">已应用贴纸：%1$s</string>
     <string name="settings_sticker_reset_success">已切换为默认贴纸</string>
     <string name="settings_label_effects_title">遮挡标签</string>
-    <string name="settings_label_effects_hint">点击标签可开关遮挡或设置效果，未设置时使用全局默认效果</string>
+    <string name="settings_label_effects_hint">上下滑动选择标签行，左右滑动切换遮挡与暴露版本，松手编辑高亮标签；也可直接点击标签设置遮挡效果。</string>
     <string name="settings_anime_label_effects_title">动漫标签处理</string>
     <string name="settings_anime_label_effects_hint">查看带有动漫标签格式的 JSON 时，将使用这里的标签效果配置</string>
     <string name="settings_label_dialog_title">标签设置：%1$s</string>
@@ -531,4 +533,8 @@
     <string name="notification_video_cancelled_title">Safe Vision - 媒体处理已取消</string>
     <string name="notification_video_queue_progress">已完成 %1$d / 未完成 %2$d</string>
     <string name="notification_video_done_text">媒体处理任务结束</string>
+    <string name="settings_privacy_preset_default">默认预设（内置）</string>
+    <string name="settings_privacy_preset_name_reserved">此名称为内置预设保留，请使用其他名称</string>
+    <string name="settings_label_state_enabled">已开启</string>
+    <string name="settings_label_state_disabled">已关闭</string>
 </resources>

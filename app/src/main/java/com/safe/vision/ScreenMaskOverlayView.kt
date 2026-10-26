@@ -1,380 +1,149 @@
 package com.safe.vision
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.Rect
+import android.os.SystemClock
+import android.os.Trace
 import android.util.AttributeSet
 import android.view.View
 
+/** Displays immutable prepared patches and cheap geometry; never processes capture pixels. */
 class ScreenMaskOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
-
-    private val appContext = context.applicationContext
-    private val privacySettings = PrivacySettingsManager.getInstance(appContext)
-    private val clearPaint = Paint().apply {
-        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-    }
-
-    private var sourceBitmap: Bitmap? = null
-    private var preRenderedMaskBitmap: Bitmap? = null
-    private var drawTasks: List<ScreenPrivacyMaskRenderer.DrawTask> = emptyList()
-    private var singleDrawTask: ScreenPrivacyMaskRenderer.DrawTask? = null
-    private var reverseMode: Int? = null
-    private var reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion> = emptyList()
-    private var reversePreRender: Boolean = false
-    private var reverseStickerLabel: String? = null
-    private var windowOriginX: Float = 0f
-    private var windowOriginY: Float = 0f
-    // 采集面降分辨率后,draw 坐标处于采集像素空间,绘制时按该比例放大到屏幕像素。
-    private var scaleX: Float = 1f
-    private var scaleY: Float = 1f
+    private var frame: ScreenPrivacyMaskRenderer.OverlayFrame? = null
+    private var singleTask: ScreenPrivacyMaskRenderer.DrawTask? = null
+    private var captureTasks: List<ScreenPrivacyMaskRenderer.DrawTask> = emptyList()
+    private var screenTasks: List<ScreenPrivacyMaskRenderer.DrawTask> = emptyList()
+    private var outlines: List<BlurEffects.OutlineShape> = emptyList()
+    private val blackPaint = Paint().apply { color = android.graphics.Color.BLACK }
+    private var originX = 0f
+    private var originY = 0f
+    private var captureScaleX = 1f
+    private var captureScaleY = 1f
+    private var submittedAtNs = 0L
+    private var logStartNs = 0L
+    private var drawSamples = 0
+    private var waitTotalNs = 0L
+    private var waitMaxNs = 0L
+    private var drawTotalNs = 0L
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val renderedOverlay = preRenderedMaskBitmap?.takeIf { !it.isRecycled }
-        val bitmap = sourceBitmap?.takeIf { !it.isRecycled }
-        val localSingleTask = singleDrawTask
-        val allTasks = localSingleTask?.let { listOf(it) } ?: drawTasks
-        val captureSpaceTasks = allTasks.filterNot { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN }
-        val screenSpaceTasks = allTasks.filter { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN }
-        val hasRenderedTask = allTasks.any { it.renderedBitmap?.isRecycled == false }
-        val hasAnyTask = allTasks.isNotEmpty()
-        if (renderedOverlay != null) {
-            canvas.save()
-            canvas.translate(-windowOriginX, -windowOriginY)
-            canvas.scale(scaleX, scaleY)
-            canvas.drawBitmap(renderedOverlay, 0f, 0f, null)
-            canvas.restore()
-            drawScreenSpaceTasks(canvas, screenSpaceTasks)
-            if (!hasAnyTask) return
+        val start = SystemClock.elapsedRealtimeNanos()
+        Trace.beginSection("ScreenMask.draw")
+        try {
+            val checkpoint = canvas.save()
+            canvas.translate(-originX, -originY)
+            canvas.scale(captureScaleX, captureScaleY)
+            frame?.preRenderedMaskBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+            captureTasks.forEach { task ->
+                val patch = task.renderedBitmap
+                if (patch != null) {
+                    canvas.drawBitmap(patch, task.drawRect.left.toFloat(), task.drawRect.top.toFloat(), null)
+                } else if (task.renderMode == PrivacySettingsManager.BLUR_MODE_BLACK) {
+                    val clip = canvas.save()
+                    // Match the bounds of the previous pre-rendered patch, including circular masks.
+                    canvas.clipRect(task.drawRect)
+                    if (task.allowCircular) {
+                        BlurEffects.drawWithCircularClip(canvas, task.drawRect) {
+                            canvas.drawRect(task.drawRect, blackPaint)
+                        }
+                    } else {
+                        task.eyePath?.let { canvas.clipPath(it) }
+                        canvas.drawRect(task.drawRect, blackPaint)
+                    }
+                    canvas.restoreToCount(clip)
+                }
+            }
+            if (outlines.isNotEmpty()) BlurEffects.drawUnionOutline(canvas, outlines)
+            canvas.restoreToCount(checkpoint)
+            screenTasks.forEach { task ->
+                task.renderedBitmap?.let { patch ->
+                    canvas.drawBitmap(patch, task.drawRect.left * captureScaleX - originX,
+                        task.drawRect.top * captureScaleY - originY, null)
+                }
+            }
+        } finally {
+            Trace.endSection()
         }
-
-        val localReverseMode = reverseMode
-        if (bitmap == null && !hasRenderedTask) {
-            drawScreenSpaceTasks(canvas, screenSpaceTasks)
-            return
-        }
-
-        canvas.save()
-        canvas.translate(-windowOriginX, -windowOriginY)
-        canvas.scale(scaleX, scaleY)
-        if (renderedOverlay == null && bitmap != null && localReverseMode != null && reversePreRender) {
-            applyReverseMask(canvas, bitmap, localReverseMode)
-        }
-        val outlineShapes = mutableListOf<BlurEffects.OutlineShape>()
-        captureSpaceTasks.forEach { drawTask(canvas, bitmap, it)?.let { outlineShapes.add(it) } }
-        if (renderedOverlay == null && bitmap != null && localReverseMode != null && !reversePreRender) {
-            applyReverseMask(canvas, bitmap, localReverseMode)
-        }
-        if (renderedOverlay == null && bitmap != null && localReverseMode != null) {
-            outlineShapes.addAll(collectReverseOutlineShapes())
-        }
-        if (outlineShapes.isNotEmpty()) {
-            BlurEffects.drawUnionOutline(canvas, outlineShapes)
-        }
-        canvas.restore()
-        if (renderedOverlay == null) {
-            drawScreenSpaceTasks(canvas, screenSpaceTasks)
+        if (submittedAtNs != 0L) {
+            val wait = start - submittedAtNs
+            submittedAtNs = 0L
+            if (logStartNs == 0L) logStartNs = start
+            drawSamples++
+            waitTotalNs += wait
+            waitMaxNs = maxOf(waitMaxNs, wait)
+            drawTotalNs += SystemClock.elapsedRealtimeNanos() - start
+            if (start - logStartNs >= 5_000_000_000L) {
+                DebugLogManager.addLog("屏幕绘制",
+                    "$drawSamples 帧: 提交到绘制=${waitTotalNs / drawSamples / 1_000_000}ms, " +
+                        "最长=${waitMaxNs / 1_000_000}ms, View绘制=${drawTotalNs / drawSamples / 1_000_000}ms, " +
+                        "硬件加速=$isHardwareAccelerated（不含GPU执行/系统呈现等待）")
+                logStartNs = start
+                drawSamples = 0
+                waitTotalNs = 0L
+                waitMaxNs = 0L
+                drawTotalNs = 0L
+            }
         }
     }
 
-    fun bindFrame(
-        frame: ScreenPrivacyMaskRenderer.OverlayFrame?,
-        windowOriginX: Int,
-        windowOriginY: Int,
-        scaleX: Float = 1f,
-        scaleY: Float = 1f
-    ) {
-        val changed = updateState(
-            bitmap = frame?.sourceBitmap,
-            preRenderedMaskBitmap = frame?.preRenderedMaskBitmap,
-            tasks = frame?.drawTasks.orEmpty(),
-            singleTask = null,
-            reverseMode = frame?.reverseMode,
-            reverseRegions = frame?.reverseRegions.orEmpty(),
-            reversePreRender = frame?.reversePreRender == true,
-            reverseStickerLabel = frame?.reverseStickerLabel,
-            windowOriginX = windowOriginX.toFloat(),
-            windowOriginY = windowOriginY.toFloat(),
-            scaleX = scaleX,
-            scaleY = scaleY
-        )
-        if (changed) invalidate()
+    fun bindFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?, windowOriginX: Int,
+                  windowOriginY: Int, scaleX: Float = 1f, scaleY: Float = 1f) {
+        // Equal black geometry / cached stickers need no new display list, even after a recheck.
+        val changed = this.frame?.preRenderedMaskBitmap !== frame?.preRenderedMaskBitmap ||
+            this.frame?.drawTasks != frame?.drawTasks || singleTask != null
+        this.frame = frame
+        singleTask = null
+        if (changed) updateTasks(frame?.drawTasks.orEmpty())
+        bindCoordinates(changed, windowOriginX, windowOriginY, scaleX, scaleY)
     }
 
-    fun bindRegionTask(
-        bitmap: Bitmap?,
-        task: ScreenPrivacyMaskRenderer.DrawTask?,
-        windowOriginX: Int,
-        windowOriginY: Int,
-        scaleX: Float = 1f,
-        scaleY: Float = 1f
-    ) {
-        val changed = updateState(
-            bitmap = bitmap,
-            preRenderedMaskBitmap = null,
-            tasks = emptyList(),
-            singleTask = task,
-            reverseMode = null,
-            reverseRegions = emptyList(),
-            reversePreRender = false,
-            reverseStickerLabel = null,
-            windowOriginX = windowOriginX.toFloat(),
-            windowOriginY = windowOriginY.toFloat(),
-            scaleX = scaleX,
-            scaleY = scaleY
-        )
-        if (changed) invalidate()
+    fun bindRegionTask(task: ScreenPrivacyMaskRenderer.DrawTask?, windowOriginX: Int,
+                       windowOriginY: Int, scaleX: Float = 1f, scaleY: Float = 1f) {
+        val changed = singleTask != task || frame != null
+        frame = null
+        singleTask = task
+        if (changed) updateTasks(task?.let(::listOf).orEmpty())
+        bindCoordinates(changed, windowOriginX, windowOriginY, scaleX, scaleY)
+    }
+
+    private fun updateTasks(tasks: List<ScreenPrivacyMaskRenderer.DrawTask>) {
+        captureTasks = tasks.filter { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.CAPTURE }
+        screenTasks = tasks.filter { it.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN }
+        outlines = captureTasks.mapNotNull { task ->
+            if (!task.drawOutline) null
+            else if (task.allowCircular) BlurEffects.OutlineShape.CircleShape(task.drawRect)
+            else if (task.usesEyeStrip && task.eyePath != null) BlurEffects.OutlineShape.PathShape(task.eyePath, task.drawRect)
+            else BlurEffects.OutlineShape.RectShape(task.drawRect)
+        }
+    }
+
+    private fun bindCoordinates(contentChanged: Boolean, x: Int, y: Int, sx: Float, sy: Float) {
+        val changed = contentChanged || originX != x.toFloat() || originY != y.toFloat() ||
+            captureScaleX != sx || captureScaleY != sy
+        originX = x.toFloat()
+        originY = y.toFloat()
+        captureScaleX = sx
+        captureScaleY = sy
+        if (changed) {
+            // Keep the first submission timestamp through a pre-draw coordinate correction.
+            if (submittedAtNs == 0L) submittedAtNs = SystemClock.elapsedRealtimeNanos()
+            invalidate() // ViewRoot coalesces invalidations for the next vsync; no extra callback hop.
+        }
     }
 
     fun release(shouldInvalidate: Boolean = true) {
-        val changed = updateState(
-            bitmap = null,
-            preRenderedMaskBitmap = null,
-            tasks = emptyList(),
-            singleTask = null,
-            reverseMode = null,
-            reverseRegions = emptyList(),
-            reversePreRender = false,
-            reverseStickerLabel = null,
-            windowOriginX = 0f,
-            windowOriginY = 0f,
-            scaleX = 1f,
-            scaleY = 1f
-        )
-        if (changed && shouldInvalidate) invalidate()
-    }
-
-    private fun updateState(
-        bitmap: Bitmap?,
-        preRenderedMaskBitmap: Bitmap?,
-        tasks: List<ScreenPrivacyMaskRenderer.DrawTask>,
-        singleTask: ScreenPrivacyMaskRenderer.DrawTask?,
-        reverseMode: Int?,
-        reverseRegions: List<ScreenPrivacyMaskRenderer.ClearRegion>,
-        reversePreRender: Boolean,
-        reverseStickerLabel: String?,
-        windowOriginX: Float,
-        windowOriginY: Float,
-        scaleX: Float,
-        scaleY: Float
-    ): Boolean {
-        var changed = false
-        if (sourceBitmap !== bitmap) {
-            sourceBitmap = bitmap
-            changed = true
-        }
-        if (this.preRenderedMaskBitmap !== preRenderedMaskBitmap) {
-            this.preRenderedMaskBitmap = preRenderedMaskBitmap
-            changed = true
-        }
-        if (drawTasks !== tasks) {
-            drawTasks = tasks
-            changed = true
-        }
-        if (this.singleDrawTask !== singleTask) {
-            this.singleDrawTask = singleTask
-            changed = true
-        }
-        if (this.reverseMode != reverseMode) {
-            this.reverseMode = reverseMode
-            changed = true
-        }
-        if (this.reverseRegions !== reverseRegions) {
-            this.reverseRegions = reverseRegions
-            changed = true
-        }
-        if (this.reversePreRender != reversePreRender) {
-            this.reversePreRender = reversePreRender
-            changed = true
-        }
-        if (this.reverseStickerLabel != reverseStickerLabel) {
-            this.reverseStickerLabel = reverseStickerLabel
-            changed = true
-        }
-        if (this.windowOriginX != windowOriginX || this.windowOriginY != windowOriginY) {
-            this.windowOriginX = windowOriginX
-            this.windowOriginY = windowOriginY
-            changed = true
-        }
-        if (this.scaleX != scaleX || this.scaleY != scaleY) {
-            this.scaleX = scaleX
-            this.scaleY = scaleY
-            changed = true
-        }
-        return changed
-    }
-
-    private fun drawTask(
-        canvas: Canvas,
-        bitmap: Bitmap?,
-        task: ScreenPrivacyMaskRenderer.DrawTask
-    ): BlurEffects.OutlineShape? {
-        if (task.renderedBitmapSpace == ScreenPrivacyMaskRenderer.RenderedBitmapSpace.SCREEN) {
-            return null
-        }
-        task.renderedBitmap?.takeIf { !it.isRecycled }?.let { renderedBitmap ->
-            canvas.drawBitmap(
-                renderedBitmap,
-                task.drawRect.left.toFloat(),
-                task.drawRect.top.toFloat(),
-                null
-            )
-            return null
-        }
-        val safeBitmap = bitmap ?: return null
-        var outlineShape: BlurEffects.OutlineShape? = null
-        if (task.allowCircular) {
-            val circleBounds = BlurEffects.circumscribedCircleBounds(
-                task.drawRect,
-                safeBitmap.width,
-                safeBitmap.height
-            )
-            BlurEffects.drawWithCircularClip(canvas, task.drawRect) {
-                applyEffect(canvas, safeBitmap, task.renderMode, circleBounds, task)
-            }
-            if (task.drawOutline) {
-                outlineShape = BlurEffects.OutlineShape.CircleShape(task.drawRect)
-            }
-            return outlineShape
-        }
-
-        if (task.usesEyeStrip && task.eyePath != null && task.renderMode != PrivacySettingsManager.BLUR_MODE_STICKER) {
-            val checkpoint = canvas.save()
-            canvas.clipPath(task.eyePath)
-            applyEffect(canvas, safeBitmap, task.renderMode, task.drawRect, task)
-            canvas.restoreToCount(checkpoint)
-        } else {
-            applyEffect(canvas, safeBitmap, task.renderMode, task.drawRect, task)
-        }
-        if (task.drawOutline) {
-            outlineShape = if (task.usesEyeStrip && task.eyePath != null) {
-                BlurEffects.OutlineShape.PathShape(task.eyePath, task.drawRect)
-            } else {
-                BlurEffects.OutlineShape.RectShape(task.drawRect)
-            }
-        }
-        return outlineShape
-    }
-
-    private fun drawScreenSpaceTasks(
-        canvas: Canvas,
-        tasks: List<ScreenPrivacyMaskRenderer.DrawTask>
-    ) {
-        tasks.forEach { task ->
-            val renderedBitmap = task.renderedBitmap?.takeIf { !it.isRecycled } ?: return@forEach
-            val left = task.drawRect.left * scaleX - windowOriginX
-            val top = task.drawRect.top * scaleY - windowOriginY
-            canvas.drawBitmap(renderedBitmap, left, top, null)
-        }
-    }
-
-    private fun applyEffect(
-        canvas: Canvas,
-        bitmap: Bitmap,
-        mode: Int,
-        rect: Rect,
-        task: ScreenPrivacyMaskRenderer.DrawTask
-    ) {
-        when (mode) {
-            PrivacySettingsManager.BLUR_MODE_MOSAIC -> {
-                BlurEffects.drawMosaic(canvas, bitmap, rect, privacySettings.getMosaicBlockSize())
-            }
-            PrivacySettingsManager.BLUR_MODE_BLACK -> BlurEffects.drawBlack(canvas, rect)
-            PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
-                BlurEffects.drawGaussian(canvas, bitmap, rect, privacySettings.getGaussianRadius())
-            }
-            PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                val sticker = StickerLoader.loadSticker(appContext, privacySettings, task.label)
-                if (sticker != null) {
-                    BlurEffects.drawSticker(
-                        canvas,
-                        sticker,
-                        rect,
-                        bitmap.width,
-                        bitmap.height,
-                        fitInsideRect = task.usesEyeStrip,
-                        rotationDegrees = task.rotationDegrees
-                    )
-                } else {
-                    BlurEffects.drawMosaic(canvas, bitmap, rect, privacySettings.getMosaicBlockSize())
-                }
-            }
-            PrivacySettingsManager.BLUR_MODE_SOBEL -> BlurEffects.drawSobelEdge(canvas, bitmap, rect)
-            else -> BlurEffects.drawMosaic(canvas, bitmap, rect, privacySettings.getMosaicBlockSize())
-        }
-    }
-
-    private fun applyReverseMask(canvas: Canvas, bitmap: Bitmap, mode: Int) {
-        val fullRect = Rect(0, 0, bitmap.width, bitmap.height)
-        when (mode) {
-            PrivacySettingsManager.BLUR_MODE_MOSAIC -> {
-                BlurEffects.drawMosaic(canvas, bitmap, fullRect, privacySettings.getMosaicBlockSize())
-            }
-            PrivacySettingsManager.BLUR_MODE_BLACK -> canvas.drawColor(Color.BLACK)
-            PrivacySettingsManager.BLUR_MODE_GAUSSIAN -> {
-                BlurEffects.drawGaussian(canvas, bitmap, fullRect, privacySettings.getGaussianRadius())
-            }
-            PrivacySettingsManager.BLUR_MODE_STICKER -> {
-                val sticker = StickerLoader.loadSticker(appContext, privacySettings, reverseStickerLabel)
-                if (sticker != null) {
-                    BlurEffects.drawSticker(canvas, sticker, fullRect, bitmap.width, bitmap.height)
-                } else {
-                    BlurEffects.drawMosaic(canvas, bitmap, fullRect, privacySettings.getMosaicBlockSize())
-                }
-            }
-            PrivacySettingsManager.BLUR_MODE_SOBEL -> BlurEffects.drawSobelEdge(canvas, bitmap, fullRect)
-            else -> BlurEffects.drawMosaic(canvas, bitmap, fullRect, privacySettings.getMosaicBlockSize())
-        }
-
-        reverseRegions.forEach { clearRegion ->
-            if (clearRegion.circular) {
-                clearCircularRegion(canvas, clearRegion.rect)
-            } else if (clearRegion.path != null) {
-                clearPathRegion(canvas, clearRegion.path)
-            } else {
-                clearRegion(canvas, clearRegion.rect)
-            }
-        }
-    }
-
-    private fun collectReverseOutlineShapes(): List<BlurEffects.OutlineShape> {
-        return reverseRegions.mapNotNull { clearRegion ->
-            if (!clearRegion.drawOutline) return@mapNotNull null
-            if (clearRegion.circular) {
-                BlurEffects.OutlineShape.CircleShape(clearRegion.rect)
-            } else if (clearRegion.path != null) {
-                BlurEffects.OutlineShape.PathShape(clearRegion.path, clearRegion.rect)
-            } else {
-                BlurEffects.OutlineShape.RectShape(clearRegion.rect)
-            }
-        }
-    }
-
-    private fun clearRegion(canvas: Canvas, rect: Rect) {
-        if (rect.width() <= 0 || rect.height() <= 0) return
-        canvas.drawRect(rect, clearPaint)
-    }
-
-    private fun clearCircularRegion(canvas: Canvas, rect: Rect) {
-        if (rect.width() <= 0 || rect.height() <= 0) return
-        canvas.drawCircle(
-            rect.exactCenterX(),
-            rect.exactCenterY(),
-            kotlin.math.hypot(rect.width() / 2f, rect.height() / 2f),
-            clearPaint
-        )
-    }
-
-    private fun clearPathRegion(canvas: Canvas, path: Path) {
-        canvas.drawPath(path, clearPaint)
+        val hadContent = frame != null || singleTask != null
+        frame = null
+        singleTask = null
+        captureTasks = emptyList()
+        screenTasks = emptyList()
+        outlines = emptyList()
+        submittedAtNs = 0L
+        if (hadContent && shouldInvalidate) invalidate()
     }
 }

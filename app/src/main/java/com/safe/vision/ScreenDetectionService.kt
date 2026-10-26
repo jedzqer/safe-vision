@@ -9,12 +9,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
-import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjection.Callback
 import android.media.projection.MediaProjectionManager
@@ -23,13 +21,13 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -43,22 +41,17 @@ class ScreenDetectionService : Service() {
         private const val EXTRA_RESULT_DATA = "extra_result_data"
         private const val NOTIFICATION_CHANNEL_ID = "screen_detection_channel"
         private const val NOTIFICATION_ID = 3002
-        private const val FLICKER_WINDOW_SIZE = 4
-        private const val SHOW_THRESHOLD = 2
-        private const val HIDE_TIMEOUT_ACCESSIBILITY_MS = 500L
-        private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 300L
+        private const val HIDE_TIMEOUT_ACCESSIBILITY_MS = 180L
+        private const val HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS = 120L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_TIMEOUT_MS = 2_000L
         private const val ACCESSIBILITY_OVERLAY_CONNECT_POLL_MS = 100L
         private const val VISIBILITY_RESUME_GRACE_MS = 150L
-        // 静帧跳过：把整帧缩到极小灰度图做差分，变化低于阈值则跳过整条 YOLO 链路
-        private const val STATIC_FRAME_SIGNATURE_SIZE = 32
-        private const val STATIC_FRAME_DIFF_THRESHOLD = 2.0
+        private const val STATIC_FRAME_SIGNATURE_SIZE = 64
+        private const val PERFORMANCE_LOG_INTERVAL_MS = 5_000L
         // 采集端降分辨率：把镜像捕获面的短边压到该目标值，遮挡坐标在叠加边界按比例还原。
         // 模型输入只有 320，全屏挡/黑块/马赛克对像素精度不敏感，缩小可显著降低每帧 RGBA 搬运与缩放开销。
         private const val CAPTURE_TARGET_SHORT_EDGE = 480
-        // 运动补偿：YOLO 推理期间以固定步长偏移遮挡框，让滚动/滑动场景下遮挡跟随更及时。
-        // 检测频率越低（间隔越长），YOLO 单次处理时间内可执行的补偿步数越多，插值介入越多。
-        private const val MOTION_STEP_MS = 33L
+        private const val STATIC_RECHECK_MS = 500L
 
         fun createStartIntent(context: Context, resultCode: Int, data: Intent): Intent {
             return Intent(context, ScreenDetectionService::class.java).apply {
@@ -77,13 +70,16 @@ class ScreenDetectionService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var detectionJob: Job? = null
+    private val frameAvailable = Channel<Unit>(Channel.CONFLATED)
+    private var hideOverlayJob: Job? = null
+    private var lastDetectionTimeMs = 0L
     private var mediaProjection: MediaProjection? = null
-    private var imageReader: ImageReader? = null
+    private var captureSource: ScreenCaptureSource? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var yoloRunner: YoloOnnxRunner? = null
     private var currentVariant: DetectionModelVariant? = null
     private var overlayRenderer: ScreenPrivacyMaskRenderer? = null
-    private var detectionIntervalMs: Long = 500L
+    private var detectionIntervalMs: Long = 100L
     private var overlayMetrics: OverlayMetrics? = null
     private var overlayMode: ScreenOverlayMode = ScreenOverlayMode.ACCESSIBILITY
     private var analysisBitmap: Bitmap? = null
@@ -94,28 +90,30 @@ class ScreenDetectionService : Service() {
     private var isCapturedContentVisible = true
     private var pendingVisibilityResume = false
     private var visibilityResumeAfterMs: Long = 0L
+    private var captureVisibilityGeneration = 0L
 
-    // 静帧跳过：上一帧的小图灰度指纹与采样缓存
+    // 使用彩色指纹，避免亮度相近的颜色变化和局部移动被整屏平均值淹没。
     private var signatureBitmap: Bitmap? = null
     private var signatureCanvas: Canvas? = null
     private val signaturePixels = IntArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
-    private val signatureBufferA = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
-    private val signatureBufferB = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
-    private var useBufferA = true
-    private var lastSignature: FloatArray? = null
+    private val frameChangeDetector = ScreenFrameChangeDetector(STATIC_FRAME_SIGNATURE_SIZE)
+    private val signaturePaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
     private val signatureDstRect = Rect(0, 0, STATIC_FRAME_SIGNATURE_SIZE, STATIC_FRAME_SIGNATURE_SIZE)
 
-    // 运动补偿签名缓冲：与主检测缓冲分离，避免与 YOLO 推理期间的帧读取竞争
-    private val motionSignatureBuffer = FloatArray(STATIC_FRAME_SIGNATURE_SIZE * STATIC_FRAME_SIGNATURE_SIZE)
-
-    // 抗闪烁：滑动窗口 + 延迟清除
-    private val detectionWindow = ArrayDeque<Boolean>(FLICKER_WINDOW_SIZE)
+    // 首次命中立即显示；阴性延迟清除以容忍短暂漏检。
     private var overlayVisible = false
-    private var lastPositiveTimeMs: Long = 0L
     private var overlayUnavailableLogged = false
 
     // 去抖：仅在状态文案变化时刷新通知/状态/日志，避免每帧抢主线程做 notify()
     private var lastPublishedStatus: String? = null
+    private var performanceWindowStartMs = 0L
+    private var performanceSamples = 0
+    private var captureTimeTotalMs = 0L
+    private var detectionTimeTotalMs = 0L
+    private var renderTimeTotalMs = 0L
+    private var submitTimeTotalMs = 0L
+    private var cycleTimeTotalMs = 0L
+    private var cycleTimeMaxMs = 0L
 
     private val projectionCallback = object : Callback() {
         override fun onStop() {
@@ -165,6 +163,7 @@ class ScreenDetectionService : Service() {
     }
 
     override fun onDestroy() {
+        detectionJob?.cancel()
         releaseResources()
         serviceScope.cancel()
         super.onDestroy()
@@ -176,7 +175,10 @@ class ScreenDetectionService : Service() {
             return
         }
 
+        val previousJob = detectionJob
         detectionJob = serviceScope.launch {
+            // A cancelled inference can still be using its bitmaps until the native call returns.
+            previousJob?.join()
             try {
                 ScreenDetectionStateHolder.setRunning(getString(R.string.screen_detection_status_starting))
                 val projectionManager = getSystemService(MediaProjectionManager::class.java)
@@ -195,19 +197,16 @@ class ScreenDetectionService : Service() {
                     metrics.widthPixels,
                     metrics.heightPixels
                 )
-                imageReader = ImageReader.newInstance(
-                    captureWidth,
-                    captureHeight,
-                    PixelFormat.RGBA_8888,
-                    4
-                )
+                captureSource = ScreenCaptureSource(captureWidth, captureHeight) {
+                    frameAvailable.trySend(Unit)
+                }
                 virtualDisplay = projection.createVirtualDisplay(
                     "safe-vision-screen-detection",
                     captureWidth,
                     captureHeight,
                     metrics.densityDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                    imageReader?.surface,
+                    captureSource?.surface,
                     null,
                     null
                 )
@@ -249,72 +248,94 @@ class ScreenDetectionService : Service() {
                     error.message ?: getString(R.string.screen_detection_status_start_failed),
                     cancelJob = false
                 )
+            } finally {
+                withContext(NonCancellable + Dispatchers.Default) {
+                    releaseFrameBitmaps()
+                }
             }
         }
     }
 
     private suspend fun detectionLoop(variant: DetectionModelVariant) {
-        while (serviceScope.isActive) {
-            if (captureVisibilityMonitoringEnabled && shouldSuppressOverlayForHiddenCapture()) {
-                withContext(Dispatchers.Default) {
-                    imageReader?.acquireLatestImage()?.close()
+        var pendingFrame: ScreenPrivacyMaskRenderer.OverlayFrame? = null
+        try {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                // New frames drive normal work. A bounded timeout also rechecks a retained static
+                // capture (MediaProjection may stop producing buffers for an unchanged screen).
+                val recheckInterval = when {
+                    analysisBitmap == null || !isCapturedContentVisible -> STATIC_RECHECK_MS
+                    hideOverlayJob != null -> 1L
+                    else -> (lastDetectionTimeMs + STATIC_RECHECK_MS -
+                        android.os.SystemClock.elapsedRealtime()).coerceAtLeast(1L)
                 }
-                delay(200)
-                continue
-            }
-            val cycleStart = android.os.SystemClock.elapsedRealtime()
-            val bitmap = withContext(Dispatchers.Default) {
-                imageReader?.acquireLatestImage()?.use { image ->
-                    image.copyToReusableBitmap()
+                withTimeoutOrNull(recheckInterval) { frameAvailable.receive() }
+                if (captureVisibilityMonitoringEnabled && shouldSuppressOverlayForHiddenCapture()) {
+                    withContext(Dispatchers.Default) {
+                        captureSource?.withLatestImage { /* Drain hidden content without copying. */ }
+                    }
+                    continue
                 }
-            }
+                val cycleStart = android.os.SystemClock.elapsedRealtime()
+                val visibilityGeneration = captureVisibilityGeneration
+                val capture = withContext(Dispatchers.Default) {
+                    val bitmap = captureSource?.withLatestImage { image ->
+                        image.copyToReusableBitmap()
+                    }
+                    val frame = bitmap ?: analysisBitmap
+                    frame?.let {
+                        CapturedFrame(
+                            it,
+                            if (bitmap != null) analyseFrame(it) else frameChangeDetector.hasChanged(signaturePixels)
+                        )
+                    }
+                }
+                val frameBitmap = capture?.bitmap ?: continue
+                if (visibilityGeneration != captureVisibilityGeneration) continue
+                val now = android.os.SystemClock.elapsedRealtime()
+                val needsConfirmation = hideOverlayJob != null
+                if (!capture.hasChanged && !needsConfirmation &&
+                    now - lastDetectionTimeMs < STATIC_RECHECK_MS) {
+                    // 画面静止：跳过整条 YOLO 链路，遮挡与状态保持上一帧不动
+                    delayRemainingInterval(cycleStart)
+                    continue
+                }
 
-            if (bitmap == null) {
-                delay(50)
-                continue
-            }
+                val renderResult = withContext(Dispatchers.Default) {
+                    runDetectionAndRender(frameBitmap, variant).also {
+                        pendingFrame = it.overlayFrame
+                    }
+                }
+                if (visibilityGeneration != captureVisibilityGeneration) {
+                    pendingFrame?.release()
+                    pendingFrame = null
+                    continue
+                }
+                // Only advance the baseline after an accepted inference; slow changes accumulate.
+                frameChangeDetector.markDetected(signaturePixels)
+                lastDetectionTimeMs = now
+                val applyStart = android.os.SystemClock.elapsedRealtime()
+                applyOverlayFrame(renderResult.overlayFrame)
+                pendingFrame = null // Ownership transferred to the window host (or released there).
+                recordPerformance(cycleStart, now, applyStart, renderResult)
 
-            val analysis = withContext(Dispatchers.Default) {
-                analyseFrame(bitmap)
-            }
-            if (analysis.isStatic) {
-                // 画面静止：跳过整条 YOLO 链路，遮挡与状态保持上一帧不动
+                val status = if (renderResult.detectionCount == 0) {
+                    getString(R.string.screen_detection_status_clear)
+                } else {
+                    getString(R.string.screen_detection_status_detected, renderResult.detectionCount)
+                }
+                // 仅在状态变化时刷新,避免每帧 notify() 持续抢占主线程
+                if (status != lastPublishedStatus) {
+                    lastPublishedStatus = status
+                    ScreenDetectionStateHolder.setRunning(status, renderResult.detectionCount)
+                    updateNotification(status)
+                    DebugLogManager.addLog("屏幕检测", "检测状态更新: ${renderResult.detectionCount} 个目标")
+                }
+
                 delayRemainingInterval(cycleStart)
-                continue
             }
-
-            // YOLO 帧签名作为运动补偿基线；运动循环以最新帧与之比对估算全局位移。
-            val baseSignature = analysis.currentSignature
-            val motionCompensationEligible = overlayVisible && baseSignature != null
-
-            val renderResult = coroutineScope {
-                val yoloDeferred = async(Dispatchers.Default) {
-                    runDetectionAndRender(bitmap, variant)
-                }
-                if (motionCompensationEligible) {
-                    runMotionCompensation(yoloDeferred, baseSignature!!)
-                }
-                yoloDeferred.await()
-            }
-
-            // 运动补偿可能已偏移遮挡框，应用 YOLO 校正前先重置偏移
-            ScreenOverlayController.resetMotionShift(overlayMode)
-            applyOverlayFrame(renderResult.overlayFrame)
-
-            val status = if (renderResult.detectionCount == 0) {
-                getString(R.string.screen_detection_status_clear)
-            } else {
-                getString(R.string.screen_detection_status_detected, renderResult.detectionCount)
-            }
-            // 仅在状态变化时刷新,避免每帧 notify() 持续抢占主线程
-            if (status != lastPublishedStatus) {
-                lastPublishedStatus = status
-                ScreenDetectionStateHolder.setRunning(status, renderResult.detectionCount)
-                updateNotification(status)
-                DebugLogManager.addLog("屏幕检测", "检测状态更新: ${renderResult.detectionCount} 个目标")
-            }
-
-            delayRemainingInterval(cycleStart)
+        } finally {
+            // withContext may be cancelled after rendering but before it can deliver the result.
+            pendingFrame?.release()
         }
     }
 
@@ -322,11 +343,13 @@ class ScreenDetectionService : Service() {
         bitmap: Bitmap,
         variant: DetectionModelVariant
     ): RenderResult {
+        val detectionStart = android.os.SystemClock.elapsedRealtime()
         val detections = yoloRunner?.run(
             bitmap,
             // Skip face-landmark enrichment during realtime screen detection to reduce latency.
             enrichFaceLandmarks = false
         ).orEmpty()
+        val renderStart = android.os.SystemClock.elapsedRealtime()
         val profile = if (variant == DetectionModelVariant.ANIME) {
             DetectionConfig.LabelProfile.ANIME
         } else {
@@ -335,7 +358,9 @@ class ScreenDetectionService : Service() {
         val shouldRenderOverlay =
             overlayRenderer?.shouldRenderOverlay(detections, profile, overlayMode) == true
         val overlayFrame = if (shouldRenderOverlay) {
-            val overlayBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            // Rendering finishes before the next capture writes into this reusable bitmap.
+            // OverlayFrame contains only geometry and independent patches, never this input.
+            val overlayBitmap = bitmap
             val currentMetrics = overlayMetrics
             val outputScaleX = if (currentMetrics != null && overlayBitmap.width > 0) {
                 currentMetrics.widthPixels.toFloat() / overlayBitmap.width.toFloat()
@@ -354,70 +379,71 @@ class ScreenDetectionService : Service() {
                 overlayMode,
                 outputScaleX,
                 outputScaleY
-            ).also { frame ->
-                if (frame == null && !overlayBitmap.isRecycled) {
-                    overlayBitmap.recycle()
-                }
-            }
+            )
         } else {
             null
         }
-        return RenderResult(detections.size, overlayFrame)
-    }
-
-    private suspend fun runMotionCompensation(
-        yoloDeferred: Deferred<RenderResult>,
-        baseSignature: FloatArray
-    ) {
-        val screenWidth = overlayMetrics?.widthPixels ?: return
-        val screenHeight = overlayMetrics?.heightPixels ?: return
-        val maxShiftPx = (screenWidth * 0.5f).coerceAtLeast(200f)
-        while (yoloDeferred.isActive) {
-            delay(MOTION_STEP_MS)
-            if (!yoloDeferred.isActive) break
-            val motion = withContext(Dispatchers.Default) {
-                val image = imageReader?.acquireLatestImage()
-                if (image == null) {
-                    null
-                } else {
-                    try {
-                        val signature = extractMotionSignature(image)
-                        if (signature != null) {
-                            MotionEstimator.estimate(
-                                signature,
-                                baseSignature,
-                                screenWidth,
-                                screenHeight
-                            )
-                        } else {
-                            null
-                        }
-                    } finally {
-                        image.close()
-                    }
-                }
-            }
-            if (motion != null) {
-                val dx = motion.dxPx.coerceIn(-maxShiftPx, maxShiftPx)
-                val dy = motion.dyPx.coerceIn(-maxShiftPx, maxShiftPx)
-                ScreenOverlayController.applyMotionShift(dx, dy, overlayMode)
-            }
-        }
+        return RenderResult(
+            detections.size,
+            overlayFrame,
+            renderStart - detectionStart,
+            android.os.SystemClock.elapsedRealtime() - renderStart
+        )
     }
 
     // 把处理耗时计入周期：实际周期 = max(间隔, 处理耗时),而非「间隔 + 处理耗时」,降低端到端延迟。
     private suspend fun delayRemainingInterval(cycleStart: Long) {
         val elapsed = android.os.SystemClock.elapsedRealtime() - cycleStart
-        val remaining = detectionIntervalMs - elapsed
+        // A slow user interval must not postpone a miss recheck beyond the hide deadline.
+        val interval = if (hideOverlayJob != null) {
+            minOf(detectionIntervalMs, hideTimeoutMs() / 2)
+        } else {
+            detectionIntervalMs
+        }
+        val remaining = interval - elapsed
         if (remaining > 0) delay(remaining)
+    }
+
+    private fun hideTimeoutMs(): Long = when (overlayMode) {
+        ScreenOverlayMode.ACCESSIBILITY -> HIDE_TIMEOUT_ACCESSIBILITY_MS
+        ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS
+    }
+
+    private fun recordPerformance(cycleStart: Long, captureEnd: Long, applyStart: Long, result: RenderResult) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (performanceSamples == 0) performanceWindowStartMs = cycleStart
+        performanceSamples++
+        captureTimeTotalMs += captureEnd - cycleStart
+        detectionTimeTotalMs += result.detectionMs
+        renderTimeTotalMs += result.renderMs
+        submitTimeTotalMs += now - applyStart
+        cycleTimeTotalMs += now - cycleStart
+        cycleTimeMaxMs = maxOf(cycleTimeMaxMs, now - cycleStart)
+        if (now - performanceWindowStartMs < PERFORMANCE_LOG_INTERVAL_MS) return
+        DebugLogManager.addLog(
+            "屏幕性能",
+            "${performanceSamples} 次检测均值: 采集/差分=${captureTimeTotalMs / performanceSamples}ms, " +
+                "检测=${detectionTimeTotalMs / performanceSamples}ms, 渲染=${renderTimeTotalMs / performanceSamples}ms, " +
+                "提交=${submitTimeTotalMs / performanceSamples}ms, 处理=${cycleTimeTotalMs / performanceSamples}ms, " +
+                "最长=${cycleTimeMaxMs}ms, 设置间隔=${detectionIntervalMs}ms（不含系统捕获/屏幕呈现等待）"
+        )
+        resetPerformanceCounters()
+    }
+
+    private fun resetPerformanceCounters() {
+        performanceSamples = 0
+        captureTimeTotalMs = 0L
+        detectionTimeTotalMs = 0L
+        renderTimeTotalMs = 0L
+        submitTimeTotalMs = 0L
+        cycleTimeTotalMs = 0L
+        cycleTimeMaxMs = 0L
     }
 
     private fun applyOverlayFrame(frame: ScreenPrivacyMaskRenderer.OverlayFrame?) {
         if (shouldSuppressOverlayForHiddenCapture()) {
             ScreenOverlayController.clearMaskOverlays(overlayMode)
-            detectionWindow.clear()
             overlayVisible = false
-            lastPositiveTimeMs = 0L
             frame?.release()
             return
         }
@@ -429,51 +455,35 @@ class ScreenDetectionService : Service() {
             return
         }
 
-        val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
-        overlayMetrics = metrics
         val hasDetection = frame != null
-        val hideTimeoutMs = when (overlayMode) {
-            ScreenOverlayMode.ACCESSIBILITY -> HIDE_TIMEOUT_ACCESSIBILITY_MS
-            ScreenOverlayMode.SYSTEM_ALERT_WINDOW -> HIDE_TIMEOUT_SYSTEM_ALERT_WINDOW_MS
-        }
+        val hideTimeoutMs = hideTimeoutMs()
 
-        // 滑动窗口采样
-        if (detectionWindow.size >= FLICKER_WINDOW_SIZE) detectionWindow.removeFirst()
-        detectionWindow.addLast(hasDetection)
-        if (hasDetection) lastPositiveTimeMs = System.currentTimeMillis()
-
-        val positiveCount = detectionWindow.count { it }
-        val withinHideTimeout = if (overlayVisible) {
-            System.currentTimeMillis() - lastPositiveTimeMs < hideTimeoutMs
-        } else {
-            false
-        }
-
-        // 迟滞判断：已显示时要求更低的正帧数才维持；未显示时要求更高才触发
-        val shouldShow = if (overlayVisible) {
-            positiveCount > 1 || withinHideTimeout
-        } else {
-            positiveCount >= SHOW_THRESHOLD
-        }
-
-        if (!shouldShow) {
-            if (overlayVisible) {
+        if (hasDetection) {
+            hideOverlayJob?.cancel()
+            hideOverlayJob = null
+        } else if (overlayVisible && hideOverlayJob == null) {
+            // A negative result starts a bounded hold, even if capture produces no further frames.
+            hideOverlayJob = serviceScope.launch {
+                delay(hideTimeoutMs)
                 ScreenOverlayController.clearMaskOverlays(overlayMode)
                 overlayVisible = false
+                hideOverlayJob = null
             }
-            frame?.release()
-            return
         }
 
-        // 窗口判断为应显示，但当前帧无内容（延迟清除保护期内），保持上一帧不动
+        // 阴性清除保护期内保持上一帧；阳性无需再等一轮推理确认。
         if (frame == null) return
 
+        val metrics = ScreenOverlayController.resolveOverlayMetrics(applicationContext, overlayMode)
+        overlayMetrics = metrics
         overlayVisible = true
 
         val preferFullscreenOverlay =
-            overlayMode == ScreenOverlayMode.ACCESSIBILITY && frame.preRenderedMaskBitmap != null
+            overlayMode == ScreenOverlayMode.ACCESSIBILITY
 
         if (frame.requiresFullscreenOverlay || frame.drawTasks.isEmpty() || preferFullscreenOverlay) {
+            // 先清理旧窗口，再绑定新帧，避免清理递增 generation 后使位置校正失效。
+            ScreenOverlayController.clearRegionOverlays(overlayMode)
             val shown = ScreenOverlayController.showFullscreenOverlay(
                 applicationContext,
                 frame,
@@ -483,7 +493,6 @@ class ScreenDetectionService : Service() {
             if (!shown) {
                 frame.release()
             }
-            ScreenOverlayController.clearRegionOverlays(overlayMode)
             return
         }
 
@@ -528,7 +537,6 @@ class ScreenDetectionService : Service() {
         if (cancelJob) {
             detectionJob?.cancel()
         }
-        detectionJob = null
         ScreenDetectionStateHolder.setIdle(status)
         updateNotification(status)
         releaseResources()
@@ -537,12 +545,13 @@ class ScreenDetectionService : Service() {
     }
 
     private fun releaseResources() {
+        hideOverlayJob?.cancel()
+        hideOverlayJob = null
         ScreenOverlayController.removeOverlayViews()
-        detectionWindow.clear()
         overlayVisible = false
-        lastPositiveTimeMs = 0L
         overlayUnavailableLogged = false
         lastPublishedStatus = null
+        resetPerformanceCounters()
         captureVisibilityMonitoringEnabled = false
         isCapturedContentVisible = true
         pendingVisibilityResume = false
@@ -550,10 +559,8 @@ class ScreenDetectionService : Service() {
         runCatching { virtualDisplay?.release() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "释放 VirtualDisplay 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
         virtualDisplay = null
-        runCatching { imageReader?.close() }
-            .onFailure { e -> DebugLogManager.addLog("屏幕检测", "关闭 ImageReader 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
-        imageReader = null
-        releaseFrameBitmaps()
+        captureSource?.close()
+        captureSource = null
         mediaProjection?.unregisterCallback(projectionCallback)
         runCatching { mediaProjection?.stop() }
             .onFailure { e -> DebugLogManager.addLog("屏幕检测", "停止 MediaProjection 失败: ${e.message}", DebugLogManager.LogLevel.WARN) }
@@ -674,74 +681,20 @@ class ScreenDetectionService : Service() {
         return width.coerceAtLeast(2) to height.coerceAtLeast(2)
     }
 
-    private data class FrameAnalysis(
-        val isStatic: Boolean,
-        val currentSignature: FloatArray?
+    private data class CapturedFrame(
+        val bitmap: Bitmap,
+        val hasChanged: Boolean
     )
 
-    private fun analyseFrame(bitmap: Bitmap): FrameAnalysis {
+    private fun analyseFrame(bitmap: Bitmap): Boolean {
         val size = STATIC_FRAME_SIGNATURE_SIZE
         val small = signatureBitmap ?: Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
             signatureBitmap = it
             signatureCanvas = Canvas(it)
         }
-        signatureCanvas?.drawBitmap(bitmap, null, signatureDstRect, null)
+        signatureCanvas?.drawBitmap(bitmap, null, signatureDstRect, signaturePaint)
         small.getPixels(signaturePixels, 0, size, 0, 0, size, size)
-
-        val current = if (useBufferA) signatureBufferA else signatureBufferB
-        useBufferA = !useBufferA
-        for (i in signaturePixels.indices) {
-            val pixel = signaturePixels[i]
-            val r = (pixel shr 16) and 0xFF
-            val g = (pixel shr 8) and 0xFF
-            val b = pixel and 0xFF
-            current[i] = (r * 0.299f + g * 0.587f + b * 0.114f)
-        }
-
-        val previous = lastSignature
-        lastSignature = current
-        if (previous == null) return FrameAnalysis(isStatic = false, currentSignature = current)
-
-        var sum = 0.0
-        for (i in current.indices) {
-            sum += kotlin.math.abs(current[i] - previous[i])
-        }
-        val meanDiff = sum / current.size
-        val isStatic = meanDiff < STATIC_FRAME_DIFF_THRESHOLD
-        return FrameAnalysis(isStatic, current)
-    }
-
-    // 直接从 Image 缓冲区采样构建 32x32 灰度签名，无需分配中间 Bitmap。
-    // 运动补偿循环专用，与 analyseFrame 的签名缓冲完全分离。
-    private fun extractMotionSignature(image: Image): FloatArray? {
-        val plane = image.planes.first()
-        val buffer = plane.buffer
-        val pixelStride = plane.pixelStride
-        val rowStride = plane.rowStride
-        val crop = image.cropRect
-        val cropWidth = crop.width()
-        val cropHeight = crop.height()
-        val size = STATIC_FRAME_SIGNATURE_SIZE
-        val signature = motionSignatureBuffer
-        val capacity = buffer.capacity()
-        try {
-            for (row in 0 until size) {
-                val srcY = crop.top + (row * cropHeight) / size
-                val rowBase = srcY * rowStride
-                for (col in 0 until size) {
-                    val srcX = crop.left + (col * cropWidth) / size
-                    val idx = rowBase + srcX * pixelStride
-                    if (idx + 2 >= capacity) return null
-                    val r = buffer.get(idx).toInt() and 0xFF
-                    val g = buffer.get(idx + 1).toInt() and 0xFF
-                    val b = buffer.get(idx + 2).toInt() and 0xFF
-                    signature[row * size + col] = r * 0.299f + g * 0.587f + b * 0.114f
-                }
-            }
-            return signature
-        } catch (e: Exception) {
-            return null
-        }
+        return frameChangeDetector.hasChanged(signaturePixels)
     }
 
     private fun Image.copyToReusableBitmap(): Bitmap {
@@ -816,12 +769,14 @@ class ScreenDetectionService : Service() {
         signatureCanvas = null
         signatureBitmap?.takeIf { !it.isRecycled }?.recycle()
         signatureBitmap = null
-        lastSignature = null
+        frameChangeDetector.reset()
     }
 
     private data class RenderResult(
         val detectionCount: Int,
-        val overlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame?
+        val overlayFrame: ScreenPrivacyMaskRenderer.OverlayFrame?,
+        val detectionMs: Long,
+        val renderMs: Long
     )
 
     private fun shouldSuppressOverlayForHiddenCapture(): Boolean {
@@ -841,19 +796,21 @@ class ScreenDetectionService : Service() {
     private fun handleCapturedContentVisibilityChanged(isVisible: Boolean) {
         if (isVisible) {
             if (isCapturedContentVisible && !pendingVisibilityResume) return
+            captureVisibilityGeneration++
             pendingVisibilityResume = true
             visibilityResumeAfterMs =
                 android.os.SystemClock.elapsedRealtime() + VISIBILITY_RESUME_GRACE_MS
-            lastSignature = null
+            frameChangeDetector.reset()
             DebugLogManager.addLog("屏幕检测", "捕获内容重新可见，延迟恢复遮挡")
         } else {
+            captureVisibilityGeneration++
             isCapturedContentVisible = false
             pendingVisibilityResume = false
             visibilityResumeAfterMs = 0L
+            hideOverlayJob?.cancel()
+            hideOverlayJob = null
             ScreenOverlayController.removeOverlayViews()
-            detectionWindow.clear()
             overlayVisible = false
-            lastPositiveTimeMs = 0L
             DebugLogManager.addLog("屏幕检测", "捕获内容不可见，暂停遮挡显示")
         }
     }

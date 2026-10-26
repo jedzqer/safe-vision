@@ -44,6 +44,7 @@ object VideoCodecUtils {
                 uri: Uri
             ): AudioTrackCopier? {
                 val extractor = MediaExtractor()
+                var extractorOwnedByCopier = false
                 var foundAudioTrack = false
                 var foundReadableAudioTrack = false
                 try {
@@ -84,7 +85,9 @@ object VideoCodecUtils {
                                 try {
                                     val trackIndex = muxer.addTrack(format)
                                     DebugLogManager.addLog("视频处理", "[AUDIO] AAC 音轨将直接混流")
-                                    return PassthroughAudioCopier(extractor, muxer, trackIndex, mime)
+                                    val copier = PassthroughAudioCopier(extractor, muxer, trackIndex, mime)
+                                    extractorOwnedByCopier = true
+                                    return copier
                                 } catch (e: Exception) {
                                     DebugLogManager.addLog(
                                         "视频处理",
@@ -101,7 +104,6 @@ object VideoCodecUtils {
                             // 容器不接受原始音轨时，解码再重编码为 AAC，避免静默丢音
                             val transcoded = transcodeToAac(extractor, muxer, mime)
                             if (transcoded != null) {
-                                extractor.release()
                                 return transcoded
                             }
                             DebugLogManager.addLog(
@@ -112,9 +114,13 @@ object VideoCodecUtils {
                             runCatching { extractor.unselectTrack(i) }
                         }
                     }
-                    extractor.release()
                     if (foundReadableAudioTrack) {
-                        throw IllegalStateException("输入视频包含音轨，但无法保留或转码该音轨")
+                        DebugLogManager.addLog(
+                            "视频处理",
+                            "[AUDIO] 所有可读音轨均无法保留或转码，已回退为无音频视频，继续处理画面",
+                            DebugLogManager.LogLevel.WARN
+                        )
+                        return null
                     }
                     if (foundAudioTrack) {
                         DebugLogManager.addLog(
@@ -129,11 +135,15 @@ object VideoCodecUtils {
                 } catch (e: Exception) {
                     DebugLogManager.addLog(
                         "视频处理",
-                        "[AUDIO] 无法可靠保留输入音轨: ${e.message}",
+                        "[AUDIO] 音轨准备失败，已回退为无音频视频，继续处理画面: ${e.stackTraceToString()}",
                         DebugLogManager.LogLevel.WARN
                     )
-                    runCatching { extractor.release() }
-                    throw IllegalStateException("无法读取或保留输入视频的音轨", e)
+                    return null
+                } finally {
+                    // 直传由 copier 持有 extractor；转码、无音轨及失败路径在此统一释放。
+                    if (!extractorOwnedByCopier) {
+                        runCatching { extractor.release() }
+                    }
                 }
             }
 
@@ -215,6 +225,7 @@ object VideoCodecUtils {
                     encoder.configure(encoderFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                     decoder.start()
                     encoder.start()
+                    DebugLogManager.addLog("视频处理", "[AUDIO] 转码编解码器 decoder=$decoderName encoder=${encoder.name}")
                 } catch (e: Exception) {
                     DebugLogManager.addLog("视频处理", "[AUDIO] 编解码器初始化失败 mime=$sourceMime: ${e.message}", DebugLogManager.LogLevel.WARN)
                     runCatching { decoder?.release() }
@@ -352,7 +363,7 @@ object VideoCodecUtils {
                         }
                     }
                 } catch (e: Exception) {
-                    DebugLogManager.addLog("视频处理", "[AUDIO] AAC 转码过程异常: ${e.message}", DebugLogManager.LogLevel.WARN)
+                    DebugLogManager.addLog("视频处理", "[AUDIO] AAC 转码过程异常: ${e.stackTraceToString()}", DebugLogManager.LogLevel.WARN)
                     return null
                 } finally {
                     if (pendingDecoderOutput >= 0) {

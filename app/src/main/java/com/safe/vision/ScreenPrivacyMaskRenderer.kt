@@ -9,6 +9,7 @@ import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
+import android.util.LruCache
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.roundToInt
@@ -30,11 +31,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val drawOutline: Boolean,
         val renderedBitmap: Bitmap? = null,
         val renderedBitmapSpace: RenderedBitmapSpace = RenderedBitmapSpace.CAPTURE
-    ) {
-        fun release() {
-            renderedBitmap?.takeIf { !it.isRecycled }?.recycle()
-        }
-    }
+    )
 
     data class ClearRegion(
         val rect: Rect,
@@ -43,22 +40,30 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         val drawOutline: Boolean
     )
 
-    data class OverlayFrame(
-        val sourceBitmap: Bitmap,
-        val drawTasks: List<DrawTask>,
+    class OverlayFrame(
+        val captureWidth: Int,
+        val captureHeight: Int,
+        drawTasks: List<DrawTask>,
         val reverseMode: Int?,
         val reverseRegions: List<ClearRegion>,
         val reversePreRender: Boolean,
         val reverseStickerLabel: String? = null,
-        val preRenderedMaskBitmap: Bitmap? = null
+        preRenderedMaskBitmap: Bitmap? = null
     ) {
+        var drawTasks: List<DrawTask> = drawTasks
+            private set
+        var preRenderedMaskBitmap: Bitmap? = preRenderedMaskBitmap
+            private set
+
         val requiresFullscreenOverlay: Boolean
             get() = reverseMode != null
 
         fun release() {
-            preRenderedMaskBitmap?.takeIf { !it.isRecycled }?.recycle()
-            drawTasks.forEach { it.release() }
-            sourceBitmap.takeIf { !it.isRecycled }?.recycle()
+            // Published bitmaps may still be referenced by a hardware display list / RenderThread.
+            // Their immutable pixels are reclaimed by GC after all rendering references disappear.
+            // Never recycle or mutate them when replacing the Java-side frame.
+            drawTasks = emptyList()
+            preRenderedMaskBitmap = null
         }
     }
 
@@ -72,6 +77,36 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
     }
 
+    private data class StickerPatchKey(
+        val sticker: Bitmap,
+        val width: Int,
+        val height: Int,
+        val circular: Boolean,
+        val eyeStrip: Boolean,
+        val rotation: Float
+    )
+
+    // Geometry changes usually only move a sticker. Reuse its immutable pixels across frames.
+    // Eviction drops references; recycling would race with hardware display lists.
+    private val stickerPatches = object : LruCache<StickerPatchKey, Bitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: StickerPatchKey, value: Bitmap): Int = value.allocationByteCount
+    }
+
+    private fun renderStickerPatch(source: Bitmap, task: DrawTask, sx: Float, sy: Float): Bitmap? {
+        val sticker = StickerLoader.loadSticker(appContext, privacySettings, task.label)
+        val key = sticker?.let {
+            StickerPatchKey(it, (task.drawRect.width() * sx).roundToInt().coerceAtLeast(1),
+                (task.drawRect.height() * sy).roundToInt().coerceAtLeast(1),
+                task.allowCircular, task.usesEyeStrip, task.rotationDegrees)
+        }
+        if (key != null) stickerPatches.get(key)?.let { return it }
+        val patch = renderTaskBitmap(source, task, includeOutline = false,
+            outputScaleX = sx, outputScaleY = sy, outputSpace = RenderedBitmapSpace.SCREEN)
+        // Missing stickers fall back to source-dependent mosaic; those patches cannot be cached.
+        if (key != null && patch != null) stickerPatches.put(key, patch)
+        return patch
+    }
+
     private fun shouldPreRenderHdSticker(task: DrawTask): Boolean {
         return task.renderMode == PrivacySettingsManager.BLUR_MODE_STICKER
     }
@@ -81,7 +116,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         labelProfile: DetectionConfig.LabelProfile,
         overlayMode: ScreenOverlayMode
     ): Boolean {
-        if (detections.isNotEmpty()) return true
+        if (detections.any { privacySettings.isLabelBlocked(it.className, labelProfile) }) return true
         return shouldFullscreenFallback(
             detections = detections,
             labelProfile = labelProfile,
@@ -126,7 +161,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
                 reverseStickerLabel = firstReverseLabel
             )
             return OverlayFrame(
-                sourceBitmap = sourceBitmap,
+                captureWidth = sourceBitmap.width,
+                captureHeight = sourceBitmap.height,
                 drawTasks = emptyList(),
                 reverseMode = fullscreenMode,
                 reverseRegions = emptyList(),
@@ -322,7 +358,7 @@ class ScreenPrivacyMaskRenderer(context: Context) {
 
         val hdStickerDrawTasks = sortedDrawTasks.filter(::shouldPreRenderHdSticker)
         val preRenderedDrawTasks = sortedDrawTasks.filterNot(::shouldPreRenderHdSticker)
-        val preRenderedMaskBitmap = if (overlayMode != ScreenOverlayMode.SYSTEM_ALERT_WINDOW || finalReverseMode != null) {
+        val preRenderedMaskBitmap = if (finalReverseMode != null) {
             renderFullscreenOverlayBitmap(
                 sourceBitmap = sourceBitmap,
                 drawTasks = preRenderedDrawTasks,
@@ -334,37 +370,25 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         } else {
             null
         }
-        val preparedDrawTasks = if (overlayMode == ScreenOverlayMode.SYSTEM_ALERT_WINDOW && finalReverseMode == null) {
+        val preparedDrawTasks = if (finalReverseMode == null) {
             sortedDrawTasks.map { task ->
                 if (shouldPreRenderHdSticker(task)) {
                     task.copy(
-                        renderedBitmap = renderTaskBitmap(
-                            sourceBitmap = sourceBitmap,
-                            task = task,
-                            includeOutline = false,
-                            outputScaleX = outputScaleX,
-                            outputScaleY = outputScaleY,
-                            outputSpace = RenderedBitmapSpace.SCREEN
-                        ),
+                        renderedBitmap = renderStickerPatch(sourceBitmap, task, outputScaleX, outputScaleY),
                         renderedBitmapSpace = RenderedBitmapSpace.SCREEN
                     )
+                } else if (task.renderMode == PrivacySettingsManager.BLUR_MODE_BLACK) {
+                    task // Geometry only: no source snapshot, patch allocation or texture upload.
                 } else {
                     task.copy(
-                        renderedBitmap = renderTaskBitmap(sourceBitmap, task, includeOutline = true)
+                        renderedBitmap = renderTaskBitmap(sourceBitmap, task, includeOutline = false)
                     )
                 }
             }
         } else if (preRenderedMaskBitmap != null) {
             hdStickerDrawTasks.map { task ->
                 task.copy(
-                    renderedBitmap = renderTaskBitmap(
-                        sourceBitmap = sourceBitmap,
-                        task = task,
-                        includeOutline = false,
-                        outputScaleX = outputScaleX,
-                        outputScaleY = outputScaleY,
-                        outputSpace = RenderedBitmapSpace.SCREEN
-                    ),
+                    renderedBitmap = renderStickerPatch(sourceBitmap, task, outputScaleX, outputScaleY),
                     renderedBitmapSpace = RenderedBitmapSpace.SCREEN
                 )
             }
@@ -373,7 +397,8 @@ class ScreenPrivacyMaskRenderer(context: Context) {
         }
 
         return OverlayFrame(
-            sourceBitmap = sourceBitmap,
+            captureWidth = sourceBitmap.width,
+            captureHeight = sourceBitmap.height,
             drawTasks = preparedDrawTasks,
             reverseMode = finalReverseMode,
             reverseRegions = finalReverseRegions,

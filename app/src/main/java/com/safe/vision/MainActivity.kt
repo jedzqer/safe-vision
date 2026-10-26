@@ -138,7 +138,10 @@ class MainActivity : AppCompatActivity() {
     private fun handleIncomingShareIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action ?: return
-        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+        if (action != Intent.ACTION_SEND &&
+            action != Intent.ACTION_SEND_MULTIPLE &&
+            action != Intent.ACTION_VIEW
+        ) return
 
         val uris = extractSharedUris(intent)
         if (uris.isEmpty()) return
@@ -166,6 +169,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractSharedUris(intent: Intent): List<Uri> {
         val uris = linkedSetOf<Uri>()
+        // ACTION_VIEW（系统"打开方式"）把目标文件放在 intent.data 上
+        if (intent.action == Intent.ACTION_VIEW) {
+            intent.data?.let(uris::add)
+        }
         if (intent.action == Intent.ACTION_SEND) {
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)

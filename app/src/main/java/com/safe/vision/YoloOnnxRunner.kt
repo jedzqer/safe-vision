@@ -1,8 +1,9 @@
 package com.safe.vision
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
+import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.DataType
+import org.tensorflow.lite.gpu.CompatibilityList
+import org.tensorflow.lite.gpu.GpuDelegate
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -11,13 +12,15 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import java.io.Closeable
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutionException
 import java.io.File
-import java.nio.FloatBuffer
+import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Lightweight helper responsible for loading the YOLO ONNX model, preprocessing input bitmaps,
+ * Lightweight helper responsible for loading the YOLO TFLite model, preprocessing input bitmaps,
  * and returning structured detection metadata similar to the reference Python script.
  */
 class YoloOnnxRunner(
@@ -26,7 +29,6 @@ class YoloOnnxRunner(
 ) : Closeable {
 
     private val appContext = context.applicationContext
-    private val environment: OrtEnvironment = OrtEnvironment.getEnvironment()
     private val modelConfig = ModelConfig(
         modelFileName = variant.modelFileName,
         dataFileName = variant.dataFileName,
@@ -35,15 +37,38 @@ class YoloOnnxRunner(
         label = variant.runtimeLabel
     )
     private val modelInputSize = modelConfig.inputSize
-    private val session: OrtSession
-    private val inputName: String
-    private val executionProvider: String
+    private var interpreter: Interpreter
+    private var gpuDelegate: GpuDelegate?
+    private var executionProvider: String
     private val inputArea = modelInputSize * modelInputSize
     private val resolvedModelFiles = ensureModelFiles(context)
     private val optimizedModelPath: String =
         resolvedModelFiles.optimizedModelFile.absolutePath
     private val cpuThreads = DetectionConfig.defaultCpuThreadCount()
     private val runLock = Any()
+    private val inferenceExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "yolo-tflite-${variant.name}")
+    }
+    private var closed = false
+
+    private fun <T> onInferenceThread(block: () -> T): T {
+        val future = inferenceExecutor.submit<T> { block() }
+        // Keep caller-owned bitmaps alive until inference has finished, including on interruption.
+        var interrupted = false
+        try {
+            while (true) {
+                try {
+                    return future.get()
+                } catch (_: InterruptedException) {
+                    interrupted = true
+                } catch (error: ExecutionException) {
+                    throw (error.cause ?: error)
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt()
+        }
+    }
     private var resizedBitmap: Bitmap? = null
     private var resizedCanvas: Canvas? = null
     private val resizeDstRect = Rect(0, 0, modelInputSize, modelInputSize)
@@ -55,16 +80,41 @@ class YoloOnnxRunner(
 
     init {
         val modelFile = resolvedModelFiles.modelFile
-        val (createdSession, provider) = createSessionWithFallback(modelFile.absolutePath)
-        session = createdSession
-        executionProvider = provider
-        inputName = session.inputNames.iterator().next()
+        val (createdInterpreter, delegate) = try {
+            onInferenceThread {
+                val created = createInterpreter(modelFile)
+                try {
+                    val input = created.first.getInputTensor(0)
+                    YoloTensorInput.requireShape(input.shape(), modelInputSize)
+                    require(input.dataType() == DataType.FLOAT32) {
+                        "不支持的 TFLite 输入类型: ${input.dataType()}，期望 FLOAT32"
+                    }
+                    DebugLogManager.addLog(
+                        "模型加载",
+                        "输入=${input.shape().contentToString()} FLOAT32 NHWC RGB [0,1], " +
+                            "输出=${created.first.getOutputTensor(0).shape().contentToString()}"
+                    )
+                    created
+                } catch (error: Throwable) {
+                    runCatching { created.first.close() }
+                    runCatching { created.second?.close() }
+                    throw error
+                }
+            }
+        } catch (error: Throwable) {
+            inferenceExecutor.shutdown()
+            throw error
+        }
+        interpreter = createdInterpreter
+        gpuDelegate = delegate
+        executionProvider = if (delegate != null) "TFLite GPU (FP16)" else "TFLite CPU"
         DebugLogManager.addLog("模型加载", "推理后端: $executionProvider (模型: ${modelConfig.label})")
     }
 
     fun run(bitmap: Bitmap, enrichFaceLandmarks: Boolean = true): List<Detection> {
         return synchronized(runLock) {
-            runInternal(bitmap, enrichFaceLandmarks)
+            check(!closed) { "YOLO runner is closed" }
+            onInferenceThread { runInternal(bitmap, enrichFaceLandmarks) }
         }
     }
 
@@ -72,56 +122,89 @@ class YoloOnnxRunner(
         val startTime = System.currentTimeMillis()
         val (inputTensor, meta) = preprocess(bitmap)
 
-        inputTensor.use { tensor ->
-            val inferenceStart = System.currentTimeMillis()
-            session.run(mapOf(inputName to tensor)).use { result ->
-                val inferenceTime = System.currentTimeMillis() - inferenceStart
-                if (result.size() < 1) {
-                    DebugLogManager.addLog("模型检测", "错误: 模型输出为空")
-                    return emptyList()
-                }
-                val outputTensor = result[0]
-                val rawData = outputTensor.value
-                val processedData = when (rawData) {
-                    is Array<*> -> {
-                        if (rawData.isNotEmpty() && rawData[0] is Array<*>) {
-                            val batchData = rawData[0] as Array<*>
-                            if (batchData.isNotEmpty() && batchData[0] is FloatArray) {
-                                @Suppress("UNCHECKED_CAST")
-                                batchData as Array<FloatArray>
-                            } else {
-                                DebugLogManager.addLog("模型检测", "错误: 数据格式不匹配")
-                                emptyArray()
-                            }
-                        } else {
-                            DebugLogManager.addLog("模型检测", "错误: 批次数据为空")
-                            emptyArray()
-                        }
-                    }
-                    else -> {
-                        DebugLogManager.addLog("模型检测", "错误: 未知的数据格式")
-                        emptyArray()
-                    }
-                }
-                var detections = postProcess(processedData, meta)
-                if (enrichFaceLandmarks && detections.any { DetectionConfig.supportsFaceLandmarks(it.className) }) {
-                    detections = attachFaceLandmarks(bitmap, detections)
-                }
-                detections = withDerivedEyeRegionDetections(detections)
-                val totalTime = System.currentTimeMillis() - startTime
-                DebugLogManager.addLog(
-                    "模型检测",
-                    "检测完成: 输入=${bitmap.width}x${bitmap.height}, 推理=${inferenceTime}ms, 总耗时=${totalTime}ms, 结果=${detections.size}"
-                )
+        val inferenceStart = System.currentTimeMillis()
+        val output = runInferenceWithCpuFallback(inputTensor)
+        val inferenceTime = System.currentTimeMillis() - inferenceStart
+        val processedData = normalizeOutput(output)
+        var detections = postProcess(processedData, meta)
+        if (enrichFaceLandmarks && detections.any { DetectionConfig.supportsFaceLandmarks(it.className) }) {
+            detections = attachFaceLandmarks(bitmap, detections)
+        }
+        detections = withDerivedEyeRegionDetections(
+            detections,
+            surfaceWidth = bitmap.width,
+            surfaceHeight = bitmap.height
+        )
+        val totalTime = System.currentTimeMillis() - startTime
+        DebugLogManager.addLog(
+            "模型检测",
+            "检测完成: 后端=$executionProvider, 输入=${bitmap.width}x${bitmap.height}, 推理=${inferenceTime}ms, 总耗时=${totalTime}ms, 结果=${detections.size}"
+        )
 
-                return detections
+        return detections
+    }
+
+    private fun runInferenceWithCpuFallback(inputTensor: ByteBuffer): Array<FloatArray> {
+        try {
+            return runInference(inputTensor)
+        } catch (error: Throwable) {
+            if (gpuDelegate == null || !isRecoverableGpuFailure(error)) throw error
+            DebugLogManager.addLog("模型检测", "GPU 推理失败，回退 CPU: ${error.javaClass.simpleName}: ${error.message}")
+            // Interpreter and delegate must also be released on their owning thread.
+            runCatching { interpreter.close() }
+            runCatching { gpuDelegate?.close() }
+            gpuDelegate = null
+            try {
+                interpreter = createInterpreter(resolvedModelFiles.modelFile, allowGpu = false).first
+                executionProvider = "TFLite CPU"
+            } catch (cpuError: Throwable) {
+                cpuError.addSuppressed(error)
+                // The old interpreter has been released; do not allow it to be used again.
+                closed = true
+                runCatching { faceLandmarkRunner?.close() }
+                resizedBitmap?.recycle()
+                resizedBitmap = null
+                resizedCanvas = null
+                inferenceExecutor.shutdown()
+                throw cpuError
             }
+            try {
+                // Retry once with fresh output storage and the original input.
+                inputTensor.rewind()
+                return runInference(inputTensor)
+            } catch (cpuError: Throwable) {
+                cpuError.addSuppressed(error)
+                throw cpuError
+            }
+        }
+    }
+
+    private fun runInference(inputTensor: ByteBuffer): Array<FloatArray> {
+        val outputShape = interpreter.getOutputTensor(0).shape()
+        return when (outputShape.size) {
+            3 -> {
+                require(outputShape[0] == 1) {
+                    "不支持的 TFLite 输出 batch: ${outputShape.contentToString()}"
+                }
+                // TFLite requires the destination to retain the tensor's batch dimension.
+                val batchedOutput = Array(outputShape[0]) {
+                    Array(outputShape[1]) { FloatArray(outputShape[2]) }
+                }
+                interpreter.run(inputTensor, batchedOutput)
+                batchedOutput[0]
+            }
+            2 -> {
+                val unbatchedOutput = Array(outputShape[0]) { FloatArray(outputShape[1]) }
+                interpreter.run(inputTensor, unbatchedOutput)
+                unbatchedOutput
+            }
+            else -> error("不支持的 TFLite 输出形状: ${outputShape.contentToString()}")
         }
     }
     
     // 移除私有调试日志方法，直接使用DebugLogManager
 
-    private fun preprocess(bitmap: Bitmap): Pair<OnnxTensor, PreprocessMeta> {
+    private fun preprocess(bitmap: Bitmap): Pair<ByteBuffer, YoloImageGeometry> {
         val sourceBitmap = if (bitmap.config == Bitmap.Config.ARGB_8888) bitmap else {
             bitmap.copy(Bitmap.Config.ARGB_8888, false)
         }
@@ -131,8 +214,6 @@ class YoloOnnxRunner(
             val squareSize = max(width, height)
 
             val pixels = IntArray(inputArea)
-            val floatValues = FloatArray(3 * inputArea)
-            val floatBuffer = FloatBuffer.wrap(floatValues)
 
             if (resizedBitmap == null) {
                 resizedBitmap = Bitmap.createBitmap(modelInputSize, modelInputSize, Bitmap.Config.ARGB_8888)
@@ -150,30 +231,14 @@ class YoloOnnxRunner(
 
             resizedBitmap?.getPixels(pixels, 0, modelInputSize, 0, 0, modelInputSize, modelInputSize)
 
-            for (i in 0 until inputArea) {
-                val pixel = pixels[i]
-                val r = ((pixel shr 16) and 0xFF) / 255f
-                val g = ((pixel shr 8) and 0xFF) / 255f
-                val b = (pixel and 0xFF) / 255f
-                floatValues[i] = r
-                floatValues[i + inputArea] = g
-                floatValues[i + inputArea * 2] = b
-            }
+            // TFLite uses [1, height, width, 3]: RGB must be adjacent for each pixel.
+            val floatBuffer = YoloTensorInput.fromArgb(pixels)
 
-            floatBuffer.position(0)
-            floatBuffer.limit(floatValues.size)
-            val tensor = OnnxTensor.createTensor(
-                environment,
-                floatBuffer,
-                longArrayOf(1, 3, modelInputSize.toLong(), modelInputSize.toLong())
-            )
-
-            val meta = PreprocessMeta(
+            val meta = YoloImageGeometry(
                 originalWidth = width,
-                originalHeight = height,
-                squareSize = squareSize
+                originalHeight = height
             )
-            return tensor to meta
+            return floatBuffer to meta
         } finally {
             if (sourceBitmap !== bitmap && !sourceBitmap.isRecycled) {
                 sourceBitmap.recycle()
@@ -181,7 +246,7 @@ class YoloOnnxRunner(
         }
     }
 
-    private fun postProcess(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
+    private fun postProcess(raw: Array<FloatArray>, meta: YoloImageGeometry): List<Detection> {
         if (raw.isEmpty()) return emptyList()
         return if (isEndToEndDetections(raw)) {
             postProcessEndToEnd(raw, meta)
@@ -194,7 +259,7 @@ class YoloOnnxRunner(
         return raw.firstOrNull()?.size == 6
     }
 
-    private fun postProcessLegacy(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
+    private fun postProcessLegacy(raw: Array<FloatArray>, meta: YoloImageGeometry): List<Detection> {
         val detections = mutableListOf<DetectionCandidate>()
         val attrs = raw.size
         val rows = raw[0].size
@@ -205,38 +270,25 @@ class YoloOnnxRunner(
             var classId = -1
             for (j in 4 until attrs) {
                 val score = raw[j][i]
-                if (!score.isNaN() && score >= 0f && score > maxScore) {
+                if (score.isFinite() && score >= 0f && score > maxScore) {
                     maxScore = score
                     classId = j - 4
                 }
             }
             if (classId == -1) continue
             if (maxScore < DetectionConfig.SCORE_THRESHOLD) continue
-            var x = raw[0][i]
-            var y = raw[1][i]
-            var w = raw[2][i]
-            var h = raw[3][i]
-
-            x = x - w / 2f
-            y = y - h / 2f
-
-            val xPad = (meta.squareSize - meta.originalWidth).toFloat()
-            val yPad = (meta.squareSize - meta.originalHeight).toFloat()
-            x = x * (meta.originalWidth + xPad) / modelInputSize
-            y = y * (meta.originalHeight + yPad) / modelInputSize
-            w = w * (meta.originalWidth + xPad) / modelInputSize
-            h = h * (meta.originalHeight + yPad) / modelInputSize
-
-            x = x.coerceIn(0f, meta.originalWidth.toFloat())
-            y = y.coerceIn(0f, meta.originalHeight.toFloat())
-            w = min(w, meta.originalWidth - x)
-            h = min(h, meta.originalHeight - y)
+            val x = raw[0][i]
+            val y = raw[1][i]
+            val w = raw[2][i]
+            val h = raw[3][i]
+            val box = meta.restoreBox(x - w / 2f, y - h / 2f, x + w / 2f, y + h / 2f)
+                ?: continue
 
             detections.add(
                 DetectionCandidate(
                     score = maxScore,
                     classId = classId,
-                    rect = RectF(x, y, x + w, y + h)
+                    rect = RectF(box[0], box[1], box[2], box[3])
                 )
             )
         }
@@ -251,7 +303,7 @@ class YoloOnnxRunner(
         }
     }
 
-    private fun postProcessEndToEnd(raw: Array<FloatArray>, meta: PreprocessMeta): List<Detection> {
+    private fun postProcessEndToEnd(raw: Array<FloatArray>, meta: YoloImageGeometry): List<Detection> {
         val detections = mutableListOf<Detection>()
         raw.forEach { prediction ->
             if (prediction.size < 6) return@forEach
@@ -262,54 +314,48 @@ class YoloOnnxRunner(
             val classId = prediction[5].toInt()
             if (classId !in variant.outputLabels.indices) return@forEach
 
-            val left = scaleFromModelSpace(prediction[0], meta.squareSize, meta.originalWidth)
-            val top = scaleFromModelSpace(prediction[1], meta.squareSize, meta.originalHeight)
-            val right = scaleFromModelSpace(prediction[2], meta.squareSize, meta.originalWidth)
-            val bottom = scaleFromModelSpace(prediction[3], meta.squareSize, meta.originalHeight)
-            if (!left.isFinite() || !top.isFinite() || !right.isFinite() || !bottom.isFinite()) return@forEach
-            if (right <= left || bottom <= top) return@forEach
+            val box = meta.restoreBox(prediction[0], prediction[1], prediction[2], prediction[3])
+                ?: return@forEach
 
             detections.add(
                 Detection(
                     className = variant.outputLabels[classId],
                     score = score,
-                    box = RectF(left, top, right, bottom)
+                    box = RectF(box[0], box[1], box[2], box[3])
                 )
             )
         }
         return deduplicateHighOverlapEndToEndDetections(detections)
     }
 
-    private fun scaleFromModelSpace(value: Float, squareSize: Int, originalSize: Int): Float {
-        val scaled = value * squareSize.toFloat() / modelInputSize.toFloat()
-        return scaled.coerceIn(0f, originalSize.toFloat())
+    private fun isRecoverableGpuFailure(error: Throwable): Boolean =
+        error is Exception || error is LinkageError
+
+    private fun createInterpreter(
+        modelFile: File,
+        allowGpu: Boolean = true
+    ): Pair<Interpreter, GpuDelegate?> {
+        val mapped = java.io.FileInputStream(modelFile).use { stream ->
+            stream.channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, 0, modelFile.length())
+        }
+        var delegate: GpuDelegate? = null
+        try {
+            if (allowGpu && CompatibilityList().use { it.isDelegateSupportedOnThisDevice }) {
+                delegate = GpuDelegate()
+                return Interpreter(mapped, Interpreter.Options().addDelegate(delegate)) to delegate
+            }
+        } catch (error: Throwable) {
+            runCatching { delegate?.close() }
+            if (!isRecoverableGpuFailure(error)) throw error
+            DebugLogManager.addLog("模型加载", "GPU 初始化失败，回退 CPU: ${error.javaClass.simpleName}: ${error.message}")
+        }
+        return Interpreter(mapped, Interpreter.Options().setNumThreads(cpuThreads)) to null
     }
 
-    private fun createSessionWithFallback(modelPath: String): Pair<OrtSession, String> {
-        DebugLogManager.addLog("模型加载", "尝试使用 NNAPI 硬件加速")
-        try {
-            val nnapiOptions = OrtSession.SessionOptions().apply {
-                setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                setIntraOpNumThreads(cpuThreads)
-                setInterOpNumThreads(1)
-                // NNAPI may produce provider-specific compiled nodes. Those graphs cannot be
-                // serialized via setOptimizedModelFilePath, otherwise session creation fails.
-                addNnapi()
-            }
-            val nnapiSession = environment.createSession(modelPath, nnapiOptions)
-            return nnapiSession to "NNAPI"
-        } catch (e: Exception) {
-            DebugLogManager.addLog("模型加载", "NNAPI 初始化失败，回退 CPU: ${e.message}")
-        }
-
-        val cpuOptions = OrtSession.SessionOptions().apply {
-            setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-            setIntraOpNumThreads(cpuThreads)
-            setInterOpNumThreads(1)
-            runCatching { setOptimizedModelFilePath(optimizedModelPath) }
-        }
-        val cpuSession = environment.createSession(modelPath, cpuOptions)
-        return cpuSession to "CPU"
+    private fun normalizeOutput(raw: Array<FloatArray>): Array<FloatArray> {
+        if (raw.isEmpty()) return raw
+        if (raw.size == 6) return Array(raw[0].size) { i -> FloatArray(6) { j -> raw[j][i] } }
+        return raw
     }
 
     private fun ensureModelFiles(context: Context): ResolvedModelFiles {
@@ -496,12 +542,6 @@ class YoloOnnxRunner(
         val rect: RectF
     )
 
-    private data class PreprocessMeta(
-        val originalWidth: Int,
-        val originalHeight: Int,
-        val squareSize: Int
-    )
-
     data class ModelConfig(
         val modelFileName: String,
         val dataFileName: String?,
@@ -516,12 +556,30 @@ class YoloOnnxRunner(
     )
 
     override fun close() {
-        runCatching { faceLandmarkRunner?.close() }
-        runCatching { session.close() }
+        synchronized(runLock) {
+            if (closed) return
+            closed = true
+            try {
+                onInferenceThread {
+                    runCatching { faceLandmarkRunner?.close() }
+                    runCatching { interpreter.close() }
+                    runCatching { gpuDelegate?.close() }
+                    resizedBitmap?.recycle()
+                    resizedBitmap = null
+                    resizedCanvas = null
+                }
+            } finally {
+                inferenceExecutor.shutdown()
+            }
+        }
     }
 
     companion object {
-        fun withDerivedEyeRegionDetections(detections: List<Detection>): List<Detection> {
+        fun withDerivedEyeRegionDetections(
+            detections: List<Detection>,
+            surfaceWidth: Int? = null,
+            surfaceHeight: Int? = null
+        ): List<Detection> {
             if (detections.isEmpty()) return detections
             if (detections.any { DetectionConfig.isEyeRegionLabel(it.className) }) return detections
             val derived = mutableListOf<Detection>()
@@ -537,8 +595,8 @@ class YoloOnnxRunner(
                         },
                         eyeBar = detection.eyeBar
                     ),
-                    surfaceWidth = detection.box.right.toInt().coerceAtLeast(1),
-                    surfaceHeight = detection.box.bottom.toInt().coerceAtLeast(1)
+                    surfaceWidth = surfaceWidth ?: detection.box.right.toInt().coerceAtLeast(1),
+                    surfaceHeight = surfaceHeight ?: detection.box.bottom.toInt().coerceAtLeast(1)
                 ) ?: return@forEach
                 derived.add(
                     detection.copy(

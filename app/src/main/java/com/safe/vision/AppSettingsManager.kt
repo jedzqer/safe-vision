@@ -37,7 +37,7 @@ class AppSettingsManager private constructor(context: Context) {
         private const val KEY_SCREEN_LOSS_AUTO_PAUSE_ENABLED = "screen_loss_auto_pause_enabled"
         private const val KEY_METADATA_REPAIR_VERSION = "metadata_repair_version"
 
-        private const val DEFAULT_SCREEN_DETECTION_INTERVAL_SECONDS = 0.5f
+        private const val DEFAULT_SCREEN_DETECTION_INTERVAL_SECONDS = 0.1f
         private const val MIN_SCREEN_DETECTION_INTERVAL_SECONDS = 0.01f
         private const val MAX_SCREEN_DETECTION_INTERVAL_SECONDS = 1.0f
 
